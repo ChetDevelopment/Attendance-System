@@ -3,9 +3,12 @@ import { getToken } from '../services/auth'
 import AppLayout from '../layouts/AppLayout.vue'
 import LoginPage from '../pages/LoginPage.vue'
 import RegisterPage from '../pages/RegisterPage.vue'
-import DashboardPage from '../pages/DashboardPage.vue'
 
 const routes = [
+  {
+    path: '/',
+    redirect: '/dashboard',
+  },
   {
     path: '/login',
     name: 'login',
@@ -19,20 +22,10 @@ const routes = [
     meta: { guestOnly: true },
   },
   {
-    path: '/',
+    path: '/dashboard',
+    name: 'dashboard',
     component: AppLayout,
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: '',
-        redirect: '/dashboard',
-      },
-      {
-        path: '/dashboard',
-        name: 'dashboard',
-        component: DashboardPage,
-      },
-    ],
+    meta: { requiresAuth: false },
   },
 ]
 

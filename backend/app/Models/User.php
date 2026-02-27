@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\Role;
+use App\Models\Attendance;
 
 class User extends Authenticatable
 {
@@ -22,7 +24,17 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role_id',
+        'is_active',
     ];
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+    public function attendanceRecords()
+    {
+        return $this->hasMany(AttendanceRecord::class, 'recorded_by');
+    }
 
     /**
      * The attributes that should be hidden for serialization.
@@ -40,8 +52,8 @@ class User extends Authenticatable
      * @var array<string, string>
      */
     protected $casts = [
-        'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'is_active' => 'boolean',
     ];
 
     public function attendances(): HasMany

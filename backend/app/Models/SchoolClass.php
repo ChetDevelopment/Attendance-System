@@ -17,9 +17,8 @@ class SchoolClass extends Model
         'description',
         'is_active',
     ];
-
-    public function students()
+    public function class()
     {
-        return $this->hasMany(Student::class);
+        return $this->belongsTo(student::class);
     }
 }

@@ -9,21 +9,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('classes', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
             $table->id();
-
             $table->string('name');
-            // Example: WEP A, WEP B
-
             $table->string('code')->unique();
-            // Example: WEP-A-2026
-
             $table->string('description')->nullable();
-
             $table->boolean('is_active')->default(true);
-
             $table->timestamps();
         });
     }
+
     public function down(): void
     {
         Schema::dropIfExists('classes');

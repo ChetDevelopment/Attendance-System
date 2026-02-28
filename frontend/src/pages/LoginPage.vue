@@ -2,6 +2,12 @@
 import { ref, onMounted } from 'vue';
 import { User, Lock, Eye, EyeOff, ArrowRight, HelpCircle } from 'lucide-vue-next';
 
+// import your background image from assets (rename or add login-bg.png to src/assets)
+// '@' aliased to frontend root, so reference src/assets directly or use relative path
+import bgImage from '../assets/login-bg.png';
+// import a new logo image (place attendance-logo.png in src/assets)
+import logoImage from '../assets/image.png';
+
 const showPassword = ref(false);
 const isLoading = ref(false);
 const email = ref('');
@@ -25,12 +31,13 @@ onMounted(() => {
   <div class="min-h-screen flex flex-col md:flex-row font-sans">
     <!-- Left Side: Hero Section -->
     <div class="relative w-full md:w-3/5 h-64 md:h-screen overflow-hidden">
-      <!-- Background Image -->
+      <!-- Background Image (imported from assets)
+           Place a file named `login-bg.png` in `src/assets` or change
+           the import above to point at another image. -->
       <img
-        src="https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=1986&auto=format&fit=crop"
-        alt="PNC Campus"
+        :src="bgImage"
+        alt="Login Background"
         class="absolute inset-0 w-full h-full object-cover"
-        referrerPolicy="no-referrer"
       />
       <!-- Overlay Gradient -->
       <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
@@ -52,10 +59,12 @@ onMounted(() => {
           enter-to-class="transform translate-y-0 opacity-100"
         >
           <div v-if="isMounted" class="flex items-center gap-3 mb-6">
-            <div class="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-xl">
-              <span class="text-blue-600 font-bold text-xl">PN</span>
+            <!-- if you have a banner-style logo, show it full width; otherwise the square logo remains -->
+            <div class="h-12 flex items-center justify-center">
+              <img v-if="bannerImage" :src="bannerImage" alt="PNC banner" class="h-full object-contain" />
+              <img v-else :src="logoImage" alt="Attendance Logo" class="w-35 h-20 bg-white/50 border border-white/30 rounded-md object-contain" />
             </div>
-            <div class="h-8 w-[1px] bg-white/30" />
+            <div class="h-8 w-[1px] bg-white/0" />
             <span class="text-lg font-medium tracking-tight">Passerelles Numériques Cambodia</span>
           </div>
         </Transition>

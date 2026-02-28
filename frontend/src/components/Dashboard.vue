@@ -1,36 +1,32 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { ref, computed } from 'vue';
 import StatCard from './StatCard.vue';
 import ActiveSession from './ActiveSession.vue';
 import AbsenceChart from './AbsenceChart.vue';
 import RiskTable from './RiskTable.vue';
 import Modal from './Modal.vue';
-import {
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Send,
+import { cn } from '@/lib/utils';
+import { 
+  CheckCircle2, 
+  XCircle, 
+  Clock, 
+  Send, 
   CloudCheck,
   Search,
-  MapPin,
+  MapPin
 } from 'lucide-vue-next';
 
 const isLateModalOpen = ref(false);
 const lateSearchQuery = ref('');
 const selectedPeriod = ref<'Today' | 'Weekly' | 'Monthly'>('Today');
 const notifications = ref([
-  {
-    id: 1,
-    title: 'Automated Parent Call scheduled for 09:45 AM',
-    subtitle: "Target: 34 students from today's absence list",
-    type: 'call',
-  },
+  { id: 1, title: 'Automated Parent Call scheduled for 09:45 AM', subtitle: 'Target: 34 students from today\'s absence list', type: 'call' }
 ]);
 
 const stats = {
   Today: { present: '1,142', absent: '34', late: '12', rate: '94.2%', offsite: '2' },
   Weekly: { present: '5,820', absent: '156', late: '84', rate: '92.8%', offsite: '15' },
-  Monthly: { present: '24,150', absent: '412', late: '320', rate: '93.5%', offsite: '42' },
+  Monthly: { present: '24,150', absent: '412', late: '320', rate: '93.5%', offsite: '42' }
 };
 
 const lateStudents = [
@@ -39,88 +35,92 @@ const lateStudents = [
   { name: 'Mike Ross', class: '11A', time: '08:15 AM', status: 'Late' },
 ];
 
-const filteredLateStudents = computed(() =>
-  lateStudents.filter(
-    (s) =>
-      s.name.toLowerCase().includes(lateSearchQuery.value.toLowerCase()) ||
-      s.class.toLowerCase().includes(lateSearchQuery.value.toLowerCase())
+const filteredLateStudents = computed(() => 
+  lateStudents.filter(s => 
+    s.name.toLowerCase().includes(lateSearchQuery.value.toLowerCase()) || 
+    s.class.toLowerCase().includes(lateSearchQuery.value.toLowerCase())
   )
 );
 
-const currentStats = computed(() => stats[selectedPeriod.value]);
-
 const dismissNotification = (id: number) => {
-  notifications.value = notifications.value.filter((n) => n.id !== id);
+  notifications.value = notifications.value.filter(n => n.id !== id);
 };
 </script>
 
 <template>
   <div class="space-y-8">
+    <!-- Header Section -->
     <div class="flex items-end justify-between">
       <div>
-        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900">វត្តមាន-Attendance Dashboard</h2>
-        <p class="text-sm text-slate-500 font-medium">Academic Session 2023-2024 - Term 2</p>
+        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900">Daily Dashboard</h2>
+        <p class="text-sm text-slate-500 font-medium">Academic Session 2023-2024 • Term 2</p>
       </div>
       <div class="flex items-center gap-3 bg-white p-1.5 rounded-lg border border-slate-200 shadow-sm">
         <button
-          v-for="period in ['Today', 'Weekly', 'Monthly']"
+          v-for="period in (['Today', 'Weekly', 'Monthly'] as const)"
           :key="period"
-          @click="selectedPeriod = period as 'Today' | 'Weekly' | 'Monthly'"
-          :class="[
+          @click="selectedPeriod = period"
+          :class="cn(
             'px-4 py-1.5 rounded-md text-xs font-bold transition-all',
-            selectedPeriod === period ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
-          ]"
+            selectedPeriod === period ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+          )"
         >
           {{ period }}
         </button>
       </div>
     </div>
 
+    <!-- Summary Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6">
-      <StatCard
+      <StatCard 
         :title="`Present ${selectedPeriod}`"
-        :value="currentStats.present"
+        :value="stats[selectedPeriod].present"
         :icon="CheckCircle2"
         icon-color="text-green-500"
         border-color="border-green-500"
-        :trend="`${currentStats.rate} Attendance rate`"
+        :trend="`${stats[selectedPeriod].rate} Attendance rate`"
       />
-      <StatCard
+      <StatCard 
         :title="`Absent ${selectedPeriod}`"
-        :value="currentStats.absent"
+        :value="stats[selectedPeriod].absent"
         :icon="XCircle"
         icon-color="text-red-500"
         border-color="border-red-500"
         subtitle="Requires verification"
       />
-      <StatCard
+      <StatCard 
         :title="`Late ${selectedPeriod}`"
-        :value="currentStats.late"
+        :value="stats[selectedPeriod].late"
         :icon="Clock"
         icon-color="text-amber-500"
         border-color="border-amber-500"
         subtitle="Peak at 08:05 AM"
       >
         <template #action>
-          <button @click="isLateModalOpen = true" class="text-[10px] text-primary font-bold hover:underline">View Details</button>
+          <button 
+            @click="isLateModalOpen = true"
+            class="text-[10px] text-primary font-bold hover:underline"
+          >
+            View Details
+          </button>
         </template>
       </StatCard>
-      <StatCard
+      <StatCard 
         :title="`Off-site ${selectedPeriod}`"
-        :value="currentStats.offsite"
+        :value="stats[selectedPeriod].offsite"
         :icon="MapPin"
         icon-color="text-red-500"
         border-color="border-red-500"
         subtitle="Outside school perimeter"
         footer-text="Requires verification"
       />
-      <StatCard
+      <StatCard 
         title="Telegram Alerts"
         value="Sent Status"
         :icon="Send"
         icon-color="text-primary"
         border-color="border-primary"
-        footer-text="ID: TG-99238 - 08:32 AM"
+        footer-text="ID: TG-99238 • 08:32 AM"
       >
         <template #action>
           <div class="size-2 bg-green-500 rounded-full animate-pulse self-center ml-2"></div>
@@ -128,6 +128,7 @@ const dismissNotification = (id: number) => {
       </StatCard>
     </div>
 
+    <!-- Main Grid -->
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
       <div class="xl:col-span-2 space-y-8">
         <ActiveSession />
@@ -138,22 +139,20 @@ const dismissNotification = (id: number) => {
       </div>
     </div>
 
+    <!-- Footer Stats -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 pb-12">
       <div class="bg-slate-900 text-white rounded-xl p-8 flex items-center justify-between shadow-xl">
         <div>
           <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Weekly System Uptime</h4>
           <p class="text-4xl font-black">99.98%</p>
-          <p class="text-[10px] text-slate-500 mt-2">Biometric and RFID sensors online across all blocks</p>
+          <p class="text-[10px] text-slate-500 mt-2">Biometric & RFID sensors online across all blocks</p>
         </div>
         <div class="size-20 bg-primary/20 rounded-full flex items-center justify-center border-4 border-primary/40">
           <CloudCheck class="size-10 text-primary" />
         </div>
       </div>
 
-      <div
-        v-if="notifications.length > 0"
-        class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm flex items-center gap-8"
-      >
+      <div v-if="notifications.length > 0" class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm flex items-center gap-8">
         <div class="flex-1">
           <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Recent Notification</h4>
           <p class="text-sm font-bold text-slate-900">{{ notifications[0].title }}</p>
@@ -161,7 +160,7 @@ const dismissNotification = (id: number) => {
         </div>
         <div class="flex flex-col gap-2">
           <button class="px-4 py-2 bg-primary text-white text-[10px] font-bold rounded-lg shadow-lg shadow-primary/20">Edit Action</button>
-          <button
+          <button 
             @click="dismissNotification(notifications[0].id)"
             class="px-4 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-200 transition-colors"
           >
@@ -169,22 +168,25 @@ const dismissNotification = (id: number) => {
           </button>
         </div>
       </div>
-      <div
-        v-else
-        class="bg-slate-50 rounded-xl p-8 border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest"
-      >
+      <div v-else class="bg-slate-50 rounded-xl p-8 border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest">
         No recent notifications
       </div>
     </div>
 
-    <Modal :is-open="isLateModalOpen" title="Late Students Details" size="lg" @close="isLateModalOpen = false">
+    <!-- Late Students Detail Modal -->
+    <Modal 
+      :is-open="isLateModalOpen" 
+      @close="isLateModalOpen = false" 
+      title="Late Students Details"
+      size="lg"
+    >
       <div class="space-y-4">
         <div class="relative">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
-          <input
+          <input 
+            type="text" 
+            placeholder="Filter by name or class..." 
             v-model="lateSearchQuery"
-            type="text"
-            placeholder="Filter by name or class..."
             class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
@@ -207,7 +209,7 @@ const dismissNotification = (id: number) => {
               </td>
             </tr>
             <tr v-if="filteredLateStudents.length === 0">
-              <td :colspan="4" class="px-4 py-10 text-center text-slate-400 italic">No late students found.</td>
+              <td colSpan="4" class="px-4 py-10 text-center text-slate-400 italic">No late students found.</td>
             </tr>
           </tbody>
         </table>

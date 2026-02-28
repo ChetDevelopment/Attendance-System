@@ -1,26 +1,28 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { User, Shield, Camera, Save, Lock } from 'lucide-vue-next';
+import { User, Camera, Shield, Lock, Save } from 'lucide-vue-next';
 
 const adminData = ref({
   name: 'Admin (Principal)',
   email: 'principal@eduattend.com',
   role: 'Administrator',
   phone: '+1 (555) 000-1234',
-  bio: 'Dedicated educator with 15+ years of experience in academic administration and student welfare.',
+  bio: 'Dedicated educator with 15+ years of experience.'
 });
 
 const isEditing = ref(false);
 </script>
 
 <template>
-  <div class="max-w-4xl mx-auto space-y-8">
+  <div 
+    class="max-w-4xl mx-auto space-y-8"
+  >
     <div class="flex items-center justify-between">
       <div>
         <h2 class="text-2xl font-extrabold tracking-tight text-slate-900">Admin Profile</h2>
         <p class="text-sm text-slate-500 font-medium">Manage your personal information and security settings</p>
       </div>
-      <button
+      <button 
         @click="isEditing = !isEditing"
         class="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
       >
@@ -29,6 +31,7 @@ const isEditing = ref(false);
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- Profile Card -->
       <div class="lg:col-span-1 space-y-6">
         <div class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center space-y-4">
           <div class="relative inline-block">
@@ -71,61 +74,62 @@ const isEditing = ref(false);
         </div>
       </div>
 
+      <!-- Details Form -->
       <div class="lg:col-span-2 space-y-6">
         <div class="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
           <h3 class="text-lg font-bold text-slate-900 border-b border-slate-100 pb-4">Personal Information</h3>
-
+          
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="space-y-1">
               <label class="text-[10px] font-bold text-slate-500 uppercase">Full Name</label>
-              <input
-                v-model="adminData.name"
-                type="text"
+              <input 
+                type="text" 
                 :disabled="!isEditing"
-                class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                v-model="adminData.name"
+                class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60" 
               />
             </div>
             <div class="space-y-1">
               <label class="text-[10px] font-bold text-slate-500 uppercase">Email Address</label>
-              <input
-                v-model="adminData.email"
-                type="email"
+              <input 
+                type="email" 
                 :disabled="!isEditing"
-                class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                v-model="adminData.email"
+                class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60" 
               />
             </div>
             <div class="space-y-1">
               <label class="text-[10px] font-bold text-slate-500 uppercase">Phone Number</label>
-              <input
-                v-model="adminData.phone"
-                type="text"
+              <input 
+                type="text" 
                 :disabled="!isEditing"
-                class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                v-model="adminData.phone"
+                class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60" 
               />
             </div>
             <div class="space-y-1">
               <label class="text-[10px] font-bold text-slate-500 uppercase">Role</label>
-              <input
-                :value="adminData.role"
-                type="text"
+              <input 
+                type="text" 
                 disabled
-                class="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-sm outline-none opacity-60"
+                v-model="adminData.role"
+                class="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded-xl text-sm outline-none opacity-60" 
               />
             </div>
           </div>
 
           <div class="space-y-1">
             <label class="text-[10px] font-bold text-slate-500 uppercase">Bio / Description</label>
-            <textarea
-              v-model="adminData.bio"
+            <textarea 
               :disabled="!isEditing"
+              v-model="adminData.bio"
               rows="4"
               class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60 resize-none"
             />
           </div>
 
           <div v-if="isEditing" class="pt-4 flex justify-end">
-            <button
+            <button 
               @click="isEditing = false"
               class="flex items-center gap-2 px-8 py-3 bg-primary text-white rounded-xl font-bold text-sm shadow-xl shadow-primary/20 hover:scale-105 transition-all"
             >

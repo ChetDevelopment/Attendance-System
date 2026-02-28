@@ -18,13 +18,13 @@
 import { computed, ref } from 'vue';
 import Sidebar from './Sidebar.vue';
 import Navbar from './Navbar.vue';
-import Dashboard from '../components/Admin/Dashboard.vue';
-import UserManagement from '../components/Admin/UserManagement.vue';
-import AcademicStructure from '../components/Admin/AcademicStructure.vue';
-import StudentManagement from '../components/Admin/StudentManagement.vue';
-import AttendanceControl from '../components/Admin/AttendanceControl.vue';
-import SystemSettings from '../components/Admin/SystemSettings.vue';
-import Profile from '../components/Admin/Profile.vue';
+import Dashboard from '../components/Dashboard.vue';
+import UserManagement from '../components/UserManagement.vue';
+import AcademicStructure from '../components/AcademicStructure.vue';
+import StudentManagement from '../components/StudentManagement.vue';
+import AttendanceControl from '../components/AttendanceControl.vue';
+import SystemSettings from '../components/SystemSettings.vue';
+import Profile from '../components/Profile.vue';
 
 const currentModule = ref('dashboard');
 

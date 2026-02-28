@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { cn } from '@/lib/utils';
 
 const students = [
   { name: 'Sat Vichet', id: 'PNC2026-053', class: '10A', total: 14, risk: 'Critical' },
@@ -9,27 +9,18 @@ const students = [
   { name: 'Bruce Wayne', id: 'PNC2026-045', class: '12A', total: 4, risk: 'Normal' },
 ];
 
-const riskClass = (risk: string) => [
-  'px-2 py-1 text-[9px] font-black rounded uppercase',
-  risk === 'Critical' ? 'bg-red-100 text-red-600' : '',
-  risk === 'Warning' ? 'bg-amber-100 text-amber-600' : '',
-  risk === 'Normal' ? 'bg-green-100 text-green-600' : '',
-];
-
-const today = computed(() => new Date().toISOString().split('T')[0]);
-
 const handleDownloadReport = () => {
   const headers = ['Student Name', 'Student ID', 'Class', 'Total Absences', 'Risk Level'];
   const csvContent = [
     headers.join(','),
-    ...students.map((s) => `${s.name},${s.id},${s.class},${s.total},${s.risk}`),
+    ...students.map(s => `${s.name},${s.id},${s.class},${s.total},${s.risk}`)
   ].join('\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
   link.setAttribute('href', url);
-  link.setAttribute('download', `Risk_Report_${today.value}.csv`);
+  link.setAttribute('download', `Risk_Report_${new Date().toISOString().split('T')[0]}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
@@ -43,7 +34,7 @@ const handleDownloadReport = () => {
       <h3 class="text-lg font-bold text-slate-900">Highest Absences</h3>
       <p class="text-sm text-slate-500">Student risk level assessment</p>
     </div>
-
+    
     <div class="flex-1 overflow-x-auto">
       <table class="w-full text-left text-sm">
         <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
@@ -63,15 +54,22 @@ const handleDownloadReport = () => {
             <td class="px-6 py-4 font-medium text-slate-600">{{ student.class }}</td>
             <td class="px-6 py-4 font-black text-slate-900">{{ student.total }}</td>
             <td class="px-6 py-4">
-              <span :class="riskClass(student.risk)">{{ student.risk }}</span>
+              <span :class="cn(
+                'px-2 py-1 text-[9px] font-black rounded uppercase',
+                student.risk === 'Critical' && 'bg-red-100 text-red-600',
+                student.risk === 'Warning' && 'bg-amber-100 text-amber-600',
+                student.risk === 'Normal' && 'bg-green-100 text-green-600'
+              )">
+                {{ student.risk }}
+              </span>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-
+    
     <div class="p-4 border-t border-slate-200 bg-slate-50">
-      <button
+      <button 
         @click="handleDownloadReport"
         class="w-full py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
       >

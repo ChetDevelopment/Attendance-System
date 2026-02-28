@@ -4,7 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Classes;
+use App\Models\SchoolClass;
+use App\Models\AttendanceRecord;
 
 class Student extends Model
 {

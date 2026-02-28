@@ -32,6 +32,7 @@ return new class extends Migration
             $table->enum('status', ['present', 'absent', 'late']);
 
             $table->timestamp('check_in_time')->nullable();
+            $table->boolean('is_locked')->default(false);
 
             $table->timestamps();
 

@@ -10,6 +10,8 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Role;
 use App\Models\Attendance;
+use App\Models\AttendanceRecord;
+use App\Models\AbsenceComment;
 
 class User extends Authenticatable
 {
@@ -31,9 +33,17 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Role::class);
     }
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class);
+    }
     public function attendanceRecords()
     {
         return $this->hasMany(AttendanceRecord::class, 'recorded_by');
+    }
+    public function absenceComments()
+    {
+        return $this->hasMany(AbsenceComment::class, 'commented_by');
     }
 
     /**
@@ -56,8 +66,6 @@ class User extends Authenticatable
         'is_active' => 'boolean',
     ];
 
-    public function attendances(): HasMany
-    {
-        return $this->hasMany(Attendance::class);
-    }
+    
+    
 }

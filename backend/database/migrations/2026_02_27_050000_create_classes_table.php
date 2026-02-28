@@ -18,6 +18,9 @@ return new class extends Migration
 
             $table->string('code')->unique(); 
             // Example: WEP-A-2026
+            $table->foreignId('academic_year_id')
+                  ->constrained('academic_years')
+                  ->onDelete('cascade');
 
             $table->string('description')->nullable();
 

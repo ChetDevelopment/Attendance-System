@@ -4,6 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Student;
+use App\Models\Session;
+use App\Models\User;
+use App\Models\AbsenceComment;
 
 
 class AttendanceRecord extends Model
@@ -34,6 +38,11 @@ class AttendanceRecord extends Model
     public function teacher()
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    public function absenceComments()
+    {
+        return $this->hasMany(AbsenceComment::class);
     }
 
 }

@@ -18,8 +18,9 @@ return new class extends Migration
 
             $table->string('first_name');
             $table->string('last_name');
-
             $table->string('email')->nullable();
+            $table->string('gender')->nullable();
+            $table->date('date_of_birth')->nullable();
 
             $table->foreignId('class_id')
                   ->constrained('classes')

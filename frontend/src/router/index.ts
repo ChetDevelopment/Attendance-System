@@ -1,11 +1,12 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import { getToken } from '../services/auth'
 import AppLayout from '../layouts/AppLayout.vue'
 import LoginPage from '../pages/LoginPage.vue'
 import RegisterPage from '../pages/RegisterPage.vue'
 import DashboardPage from '../pages/DashboardPage.vue'
+import AttendancePage from '../pages/DashboardPage.vue'
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'login',
@@ -28,9 +29,16 @@ const routes = [
         redirect: '/dashboard',
       },
       {
-        path: '/dashboard',
+        path: 'dashboard',
         name: 'dashboard',
         component: DashboardPage,
+        meta: { title: 'Dashboard' },
+      },
+      {
+        path: 'attendance',
+        name: 'attendance',
+        component: AttendancePage,
+        meta: { title: 'Attendance' },
       },
     ],
   },

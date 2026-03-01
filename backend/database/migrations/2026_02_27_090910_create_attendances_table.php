@@ -13,15 +13,14 @@ return new class extends Migration
     {
         Schema::create('attendances', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('class_id')->constrained()->onDelete('cascade');
+            $table->foreignId('session_id')->constrained()->onDelete('cascade');
             $table->date('date');
-            $table->enum('status', ['present', 'absent', 'late']);
-            $table->time('check_in')->nullable();
-            $table->time('check_out')->nullable();
-            $table->text('notes')->nullable();
+            $table->foreignId('submitted_by')->constrained('users')->onDelete('cascade');
+            $table->boolean('is_locked')->default(false);
             $table->timestamps();
 
-            $table->unique(['user_id', 'date']);
+            $table->unique(['class_id', 'session_id', 'date']);
         });
     }
 

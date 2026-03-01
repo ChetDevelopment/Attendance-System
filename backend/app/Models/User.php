@@ -33,17 +33,25 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Role::class);
     }
+
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class);
     }
+
     public function attendanceRecords()
     {
         return $this->hasMany(AttendanceRecord::class, 'recorded_by');
     }
+
     public function absenceComments()
     {
         return $this->hasMany(AbsenceComment::class, 'commented_by');
+    }
+    
+    public function activityLogs()
+    {
+        return $this->hasMany(ActivityLog::class);
     }
 
     /**

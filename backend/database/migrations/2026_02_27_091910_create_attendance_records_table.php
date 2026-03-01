@@ -13,30 +13,24 @@ return new class extends Migration
     {
         Schema::create('attendance_records', function (Blueprint $table) {
             $table->id();
-            // Foreign Keys
+
             $table->foreignId('student_id')
-                  ->constrained('students')
-                  ->onDelete('cascade');
+                ->constrained('students')
+                ->onDelete('cascade');
 
             $table->foreignId('session_id')
-                  ->constrained('sessions')
-                  ->onDelete('cascade');
+                ->constrained('sessions')
+                ->onDelete('cascade');
 
-            $table->foreignId('recorded_by') // teacher user id
-                  ->constrained('users')
-                  ->onDelete('cascade');
+            $table->foreignId('recorded_by')
+                ->constrained('users')
+                ->onDelete('cascade');
 
-            // Attendance Info
             $table->date('attendance_date');
-
             $table->enum('status', ['present', 'absent', 'late']);
-
             $table->timestamp('check_in_time')->nullable();
-            $table->boolean('is_locked')->default(false);
-
             $table->timestamps();
 
-            // Prevent duplicate attendance per session per day
             $table->unique(['student_id', 'session_id', 'attendance_date'], 'unique_attendance_per_session');
         });
     }

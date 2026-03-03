@@ -10,6 +10,7 @@ use App\Models\AttendanceRecord;
 use App\Models\Session;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class TeacherAttendanceController extends Controller
 {
@@ -84,13 +85,36 @@ class TeacherAttendanceController extends Controller
             ], 422);
         }
 
-        // Prevent duplicate attendance for class+session+date
-        $exists = Attendance::where('class_id', $request->class_id)
-            ->where('session_id', $sessionId)
-            ->where('date', $date)
-            ->exists();
+        // Validate attendance date is today or within allowed window
+        $allowedDays = (int) env('ATTENDANCE_ALLOWED_PAST_DAYS', 0);
+        try {
+            $attendanceDate = Carbon::parse($date)->startOfDay();
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Invalid attendance date.'], 422);
+        }
 
-        if ($exists) {
+        $today = Carbon::today();
+        $minDate = $today->copy()->subDays($allowedDays)->startOfDay();
+
+        if ($attendanceDate->gt($today) || $attendanceDate->lt($minDate)) {
+            return response()->json([
+                'message' => 'Attendance date must be today or within the allowed range.'
+            ], 422);
+        }
+
+        // Check existing attendance for this class, session and date
+        $existing = Attendance::where('class_id', $request->class_id)
+            ->where('session_id', $sessionId)
+            ->whereDate('date', $attendanceDate->toDateString())
+            ->first();
+
+        if ($existing) {
+            if ($existing->is_locked) {
+                return response()->json([
+                    'message' => 'Attendance for this class/session/date is locked and cannot be modified.'
+                ], 400);
+            }
+
             return response()->json([
                 'message' => 'Attendance already submitted for this class and session on this date.'
             ], 400);

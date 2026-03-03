@@ -37,6 +37,20 @@ class StudentSeeder extends Seeder
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ],
+            [
+                'student_code' => 'PNC2026-038',
+                'first_name' => 'Vichet',
+                'last_name' => 'Sat',
+                'email' => 'vichet.sat@student.passerellesnumeriques.org',
+                'gender' => 'Male',
+                'date_of_birth' => '2007-05-12',
+                'class_id' => $class->id,
+                'qr_code' => 'qr_pnc2026-038.png',
+                'face_image' => 'faces/pnc2026038.jpg',
+                'is_active' => true,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
+            ],
         ]);
     }
 }

@@ -13,6 +13,10 @@ class Attendance extends Model
 
     protected $fillable = [
         'user_id',
+        'class_id',
+        'session_id',
+        'submitted_by',
+        'is_locked',
         'date',
         'status',
         'check_in',

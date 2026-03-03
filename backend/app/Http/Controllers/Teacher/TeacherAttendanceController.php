@@ -9,6 +9,7 @@ use App\Models\Attendance;
 use App\Models\AttendanceRecord;
 use App\Models\Session;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class TeacherAttendanceController extends Controller
 {
@@ -42,26 +43,65 @@ class TeacherAttendanceController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $request->validate([
+        $rules = [
             'class_id' => 'required|exists:classes,id',
-            'session_id' => 'required|exists:sessions,id',
-            'date' => 'required|date',
-            'students' => 'required|array',
-            'students.*.student_id' => 'required|exists:students,id',
-            'students.*.status' => 'required|in:present,absent,late',
-        ]);
+            'session_id' => 'nullable|exists:sessions,id',
+            'date' => 'sometimes|date',
+            'attendance_date' => 'sometimes|date',
+        ];
 
-        // Prevent duplicate attendance
+        if ($request->has('records')) {
+            $rules['records'] = 'required|array';
+            $rules['records.*.student_id'] = 'required|exists:students,id';
+            $rules['records.*.status'] = 'required|in:present,absent,late';
+        } else {
+            $rules['students'] = 'required|array';
+            $rules['students.*.student_id'] = 'required|exists:students,id';
+            $rules['students.*.status'] = 'required|in:present,absent,late';
+        }
+
+        $request->validate($rules);
+
+        // Normalize inputs to use a common variable set
+        $date = $request->input('attendance_date') ?? $request->input('date');
+
+        if (!$date) {
+            return response()->json(['message' => 'The date (attendance_date or date) is required.'], 422);
+        }
+
+        $students = $request->input('records') ?? $request->input('students');
+
+        // Determine session: prefer provided session_id, otherwise pick an active session
+        $sessionId = $request->input('session_id');
+
+        if (!$sessionId) {
+            $sessionId = Session::where('is_active', true)->value('id');
+        }
+
+        if (!$sessionId) {
+            return response()->json([
+                'message' => 'No active session found. Please provide a session_id.'
+            ], 422);
+        }
+
+        // Prevent duplicate attendance for class+session+date
         $exists = Attendance::where('class_id', $request->class_id)
-            ->where('session_id', $request->session_id)
-            ->where('date', $request->date)
+            ->where('session_id', $sessionId)
+            ->where('date', $date)
             ->exists();
 
         if ($exists) {
             return response()->json([
-                'message' => 'Attendance already submitted for this class and session.'
+                'message' => 'Attendance already submitted for this class and session on this date.'
             ], 400);
         }
+
+        Log::info('TeacherAttendance submit', [
+            'input' => $request->all(),
+            'sessionId' => $sessionId,
+            'date' => $date,
+            'students_count' => is_array($students) ? count($students) : null,
+        ]);
 
         DB::beginTransaction();
 
@@ -70,17 +110,25 @@ class TeacherAttendanceController extends Controller
             // Create attendance (main record)
             $attendance = Attendance::create([
                 'class_id' => $request->class_id,
-                'session_id' => $request->session_id,
-                'date' => $request->date,
+                'session_id' => $sessionId,
+                'date' => $date,
                 'submitted_by' => auth()->id(),
                 'is_locked' => true
             ]);
 
             // Insert student attendance records
-            foreach ($request->students as $student) {
+            foreach ($students as $student) {
+                $studentId = $student['student_id'] ?? ($student['id'] ?? null);
+
+                if (!$studentId) {
+                    continue;
+                }
+
                 AttendanceRecord::create([
-                    'attendance_id' => $attendance->id,
-                    'student_id' => $student['student_id'],
+                    'student_id' => $studentId,
+                    'session_id' => $sessionId,
+                    'recorded_by' => auth()->id(),
+                    'attendance_date' => $date,
                     'status' => $student['status'],
                 ]);
             }
@@ -91,7 +139,6 @@ class TeacherAttendanceController extends Controller
                 'message' => 'Attendance submitted successfully.',
                 'attendance_id' => $attendance->id
             ]);
-
         } catch (\Exception $e) {
 
             DB::rollBack();

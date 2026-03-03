@@ -15,13 +15,15 @@ class Student extends Model
         'first_name',
         'last_name',
         'email',
+        'gender',
+        'date_of_birth',
         'class_id',
         'qr_code',
         'face_image',
         'is_active',
     ];
 
-    public function SchoolClass()
+    public function schoolClass()
     {
         return $this->belongsTo(SchoolClass::class, 'class_id');
     }

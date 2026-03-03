@@ -1,58 +1,39 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import { getToken } from '../services/auth'
-import AppLayout from '../layouts/AppLayout.vue'
-import LoginPage from '../pages/LoginPage.vue'
-import RegisterPage from '../pages/RegisterPage.vue'
-import DashboardPage from '../pages/DashboardPage.vue'
-
-const routes = [
-  {
-    path: '/login',
-    name: 'login',
-    component: LoginPage,
-    meta: { guestOnly: true },
-  },
-  {
-    path: '/register',
-    name: 'register',
-    component: RegisterPage,
-    meta: { guestOnly: true },
-  },
-  {
-    path: '/',
-    component: AppLayout,
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: '',
-        redirect: '/dashboard',
-      },
-      {
-        path: '/dashboard',
-        name: 'dashboard',
-        component: DashboardPage,
-      },
-    ],
-  },
-]
+import { createRouter, createWebHistory } from 'vue-router';
 
 const router = createRouter({
   history: createWebHistory(),
-  routes,
-})
+  routes: [
+    {
+      path: '/',
+      component: () => import('../layouts/AppLayout.vue'),
+      children: [
+        {
+          path: '',
+          redirect: '/dashboard'
+        },
+        {
+          path: 'dashboard',
+          name: 'dashboard',
+          component: () => import('../pages/DashboardStudent.vue')
+        },
+        {
+          path: 'attendance',
+          name: 'attendance',
+          component: () => import('../pages/AttendanceStudent.vue')
+        },
+        {
+          path: 'history',
+          name: 'history',
+          component: () => import('../pages/HistoryStudent.vue')
+        },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('../pages/SettingsStudent.vue')
+        }
+      ]
+    }
+  ]
+});
 
-router.beforeEach((to) => {
-  const hasToken = Boolean(getToken())
-
-  if (to.meta.requiresAuth && !hasToken) {
-    return { name: 'login' }
-  }
-
-  if (to.meta.guestOnly && hasToken) {
-    return { name: 'dashboard' }
-  }
-
-  return true
-})
-
-export default router
+export default router;

@@ -1,21 +1,24 @@
 <?php
 
-use App\Http\Controllers\AttendanceController;
-use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\ClassController;
 use App\Http\Controllers\Admin\AcademicYearController;
 
+/*
+|--------------------------------------------------------------------------
+| Admin Routes (Protected)
+|--------------------------------------------------------------------------
+*/
 Route::prefix('admin')
-    ->middleware(['auth:sanctum'])
+    ->middleware(['auth:sanctum', 'role:admin']) // Only admin users can access
     ->group(function () {
 
         // User CRUD
         Route::apiResource('users', UserController::class);
-
-        // Assign role
         Route::put('users/{id}/role', [UserController::class, 'assignRole']);
 
         // Student CRUD
@@ -29,6 +32,11 @@ Route::prefix('admin')
         Route::put('academic-years/{id}/activate', [AcademicYearController::class, 'activate']);
     });
 
+/*
+|--------------------------------------------------------------------------
+| Auth Routes
+|--------------------------------------------------------------------------
+*/
 Route::prefix('auth')->group(function () {
     Route::match(['get', 'post'], '/register', [AuthController::class, 'register']);
     Route::match(['get', 'post'], '/login', [AuthController::class, 'login']);
@@ -39,4 +47,11 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-Route::middleware('auth:sanctum')->apiResource('attendances', AttendanceController::class);
+/*
+|--------------------------------------------------------------------------
+| Attendance Routes (Authenticated users)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::apiResource('attendances', AttendanceController::class);
+});

@@ -1,3 +1,5 @@
+<?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -16,41 +18,47 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $request->validate([
             'name' => 'required|string',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
         ]);
 
         $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
         ]);
 
         return response()->json($user, 201);
+    }
+
+    public function show($id)
+    {
+        return response()->json(User::with('roles')->findOrFail($id));
     }
 
     public function update(Request $request, $id)
     {
         $user = User::findOrFail($id);
 
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string',
+        $request->validate([
+            'name' => 'sometimes|string',
             'email' => [
                 'sometimes',
-                'required',
                 'email',
-                Rule::unique('users')->ignore($id)
+                Rule::unique('users')->ignore($id),
             ],
             'password' => 'sometimes|min:6',
         ]);
 
-        if (isset($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
+        $data = $request->only(['name', 'email']);
+
+        if ($request->password) {
+            $data['password'] = Hash::make($request->password);
         }
 
-        $user->update($validated);
+        $user->update($data);
 
         return response()->json($user);
     }
@@ -58,10 +66,10 @@ class UserController extends Controller
     public function destroy($id)
     {
         User::findOrFail($id)->delete();
+
         return response()->json(['message' => 'User deleted']);
     }
 
-    // Assign Role
     public function assignRole(Request $request, $id)
     {
         $request->validate([

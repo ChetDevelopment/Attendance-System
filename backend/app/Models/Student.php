@@ -4,11 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Classes;
+use App\Models\SchoolClass;
+use App\Models\AttendanceRecord;
 
 class Student extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'student_code',
         'first_name',
@@ -20,13 +22,15 @@ class Student extends Model
         'is_active',
     ];
 
+    // Relationship: Student belongs to a class
     public function class()
     {
-        return $this->belongsTo(SchoolClass::class);
+        return $this->belongsTo(SchoolClass::class, 'class_id');
     }
 
+    // Relationship: Student has many attendance records
     public function attendanceRecords()
     {
-        return $this->hasMany(AttendanceRecord::class);
+        return $this->hasMany(AttendanceRecord::class, 'student_id');
     }
 }

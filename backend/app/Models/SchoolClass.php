@@ -1,24 +1,26 @@
 <?php
 
-namespace App\Models;
+namespace App\Http\Controllers\Admin;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use App\Http\Controllers\Controller;
+use App\Models\SchoolClass;
 
-class SchoolClass extends Model
+class ClassController extends Controller
 {
-    use HasFactory;
-
-    protected $table = 'classes';
-
-    protected $fillable = [
-        'name',
-        'code',
-        'description',
-        'is_active',
-    ];
-    public function class()
+    public function destroy($id)
     {
-        return $this->belongsTo(student::class);
+        $class = SchoolClass::with('students')->findOrFail($id);
+
+        if ($class->students()->count() > 0) {
+            return response()->json([
+                'message' => 'Cannot delete class with students'
+            ], 400);
+        }
+
+        $class->delete();
+
+        return response()->json([
+            'message' => 'Class deleted'
+        ]);
     }
 }

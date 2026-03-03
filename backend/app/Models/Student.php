@@ -21,9 +21,9 @@ class Student extends Model
         'is_active',
     ];
 
-    public function class()
+    public function SchoolClass()
     {
-        return $this->belongsTo(SchoolClass::class);
+        return $this->belongsTo(SchoolClass::class, 'class_id');
     }
 
     public function attendanceRecords()

@@ -16,10 +16,11 @@ class SchoolClass extends Model
         'name',
         'code',
         'description',
+        'academic_year_id',
         'is_active',
     ];
-    public function class()
+    public function students()
     {
-        return $this->belongsTo(student::class);
+        return $this->hasMany(Student::class, 'class_id');
     }
 }

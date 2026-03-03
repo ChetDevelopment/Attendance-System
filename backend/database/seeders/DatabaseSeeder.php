@@ -17,6 +17,8 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             SessionSeeder::class,
             AcademicYearSeeder::class,
+            ClassSeeder::class,
+            StudentSeeder::class,
         ]);
         // \App\Models\User::factory(10)->create();
 

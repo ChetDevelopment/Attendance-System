@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import StatCard from './StatCard.vue';
 import ActiveSession from './ActiveSession.vue';
-import AbsenceChart from './AbsenceChart.vue';
+import AbsenceChart from '../AbsenceChart.vue';
 import RiskTable from './RiskTable.vue';
 import Modal from './Modal.vue';
 import { cn } from '@/lib/utils';

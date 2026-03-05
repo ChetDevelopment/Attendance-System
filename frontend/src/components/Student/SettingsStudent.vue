@@ -10,7 +10,7 @@ import {
   CheckCircle2, 
   AlertCircle 
 } from 'lucide-vue-next';
-import { studentProfile, updateProfile } from '../services/auth';
+import { studentProfile, updateProfile } from '../../services/auth';
 
 const editName = ref(studentProfile.value.name);
 const editAvatar = ref(studentProfile.value.avatar);

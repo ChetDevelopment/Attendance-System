@@ -14,22 +14,22 @@ const router = createRouter({
         {
           path: 'dashboard',
           name: 'dashboard',
-          component: () => import('../pages/DashboardStudent.vue')
+          component: () => import('../components/Student/DashboardStudent.vue')
         },
         {
           path: 'attendance',
           name: 'attendance',
-          component: () => import('../pages/AttendanceStudent.vue')
+          component: () => import('../components/Student/AttendanceStudent.vue')
         },
         {
           path: 'history',
           name: 'history',
-          component: () => import('../pages/HistoryStudent.vue')
+          component: () => import('../components/Student/HistoryStudent.vue')
         },
         {
           path: 'settings',
           name: 'settings',
-          component: () => import('../pages/SettingsStudent.vue')
+          component: () => import('../components/Student/SettingsStudent.vue')
         }
       ]
     }

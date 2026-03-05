@@ -11,8 +11,8 @@ import {
   TrendingDown,
   ArrowRight
 } from 'lucide-vue-next';
-import { fetchAttendanceHistory } from '../services/api';
-import { AttendanceRecord } from '../../types';
+import { fetchAttendanceHistory } from '../../services/api';
+import { AttendanceRecord } from '../../../types';
 
 const attendanceHistory = ref<AttendanceRecord[]>([]);
 

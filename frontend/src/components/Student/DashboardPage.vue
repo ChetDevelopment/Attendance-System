@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import api from '../services/api'
+import api from '../../services/api'
 
 const attendances = ref([])
 const loading = ref(true)

@@ -13,8 +13,8 @@ import {
   AlertCircle
 } from 'lucide-vue-next';
 import jsQR from 'jsqr';
-import { studentProfile } from '../services/auth';
-import { checkIn, submitManualAttendanceRequest } from '../services/api';
+import { studentProfile } from '../../services/auth';
+import { checkIn, submitManualAttendanceRequest } from '../../services/api';
 
 const attendanceMode = ref<'webcam' | 'qr' | 'manual'>('webcam');
 const videoRef = ref<HTMLVideoElement | null>(null);

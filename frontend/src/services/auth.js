@@ -1,11 +1,35 @@
-const TOKEN_KEY = 'access_token'
+import { ref } from 'vue';
+import { MOCK_STUDENT } from '../../types';
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY)
+const TOKEN_KEY = 'attendx_token';
+
+export const getToken = () => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
+};
 
 export const setToken = (token) => {
-  localStorage.setItem(TOKEN_KEY, token)
-}
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(TOKEN_KEY, token);
+  }
+  isLoggedIn.value = true;
+};
 
 export const clearToken = () => {
-  localStorage.removeItem(TOKEN_KEY)
-}
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+  isLoggedIn.value = false;
+};
+
+export const isLoggedIn = ref(Boolean(getToken()));
+export const studentProfile = ref({ ...MOCK_STUDENT });
+
+export const logout = () => {
+  clearToken();
+};
+
+export const updateProfile = (name, avatar) => {
+  studentProfile.value.name = name;
+  studentProfile.value.avatar = avatar;
+};

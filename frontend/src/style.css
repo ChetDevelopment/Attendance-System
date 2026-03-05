@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+<<<<<<< HEAD
   --color-primary: #135bec;
   --color-background-light: #f8fafc;
 }
@@ -132,4 +133,52 @@
   .sidebar {
     display: none;
   }
+=======
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-primary: #4285F4;
+  
+  @keyframes scan {
+    0% { top: 0%; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+}
+
+@layer utilities {
+  .animate-scan {
+    animation: scan 3s linear infinite;
+  }
+}
+
+@layer base {
+  body {
+    @apply font-sans bg-[#F8FAFC] text-slate-900 transition-colors duration-200;
+  }
+}
+
+.dark {
+  --background: #0F172A;
+  --foreground: #F8FAFC;
+}
+
+.dark body {
+  @apply bg-[#0F172A] text-slate-100;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.circular-progress {
+  background: conic-gradient(#4285F4 316.8deg, #E2E8F0 0deg);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dark .circular-progress {
+  background: conic-gradient(#4285F4 316.8deg, #334155 0deg);
+>>>>>>> feature/student-Dashboard
 }

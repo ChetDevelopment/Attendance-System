@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+<<<<<<< HEAD
     "module": "ESNext",
     "moduleResolution": "bundler",
     "moduleDetection": "force",
@@ -20,4 +21,28 @@
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
   "exclude": ["node_modules"]
+=======
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  }
+>>>>>>> feature/student-Dashboard
 }

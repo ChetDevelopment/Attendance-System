@@ -1,11 +1,20 @@
+<<<<<<< HEAD:frontend/src/router/index.js
 <<<<<<< HEAD
 import { createRouter, createWebHistory } from 'vue-router'
+=======
+import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
+>>>>>>> feature/login:frontend/src/router/index.ts
 import { getToken } from '../services/auth'
 import AppLayout from '../layouts/AppLayout.vue'
 import LoginPage from '../pages/LoginPage.vue'
 import RegisterPage from '../pages/RegisterPage.vue'
+<<<<<<< HEAD:frontend/src/router/index.js
+=======
+import DashboardPage from '../pages/DashboardPage.vue'
+import AttendancePage from '../pages/DashboardPage.vue'
+>>>>>>> feature/login:frontend/src/router/index.ts
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   {
     path: '/',
     redirect: '/dashboard',
@@ -26,7 +35,29 @@ const routes = [
     path: '/dashboard',
     name: 'dashboard',
     component: AppLayout,
+<<<<<<< HEAD:frontend/src/router/index.js
     meta: { requiresAuth: false },
+=======
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        redirect: '/dashboard',
+      },
+      {
+        path: 'dashboard',
+        name: 'dashboard',
+        component: DashboardPage,
+        meta: { title: 'Dashboard' },
+      },
+      {
+        path: 'attendance',
+        name: 'attendance',
+        component: AttendancePage,
+        meta: { title: 'Attendance' },
+      },
+    ],
+>>>>>>> feature/login:frontend/src/router/index.ts
   },
 ]
 =======

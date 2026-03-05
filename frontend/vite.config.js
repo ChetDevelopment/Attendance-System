@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
@@ -18,6 +19,13 @@ import vue from '@vitejs/plugin-vue';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 
+=======
+import tailwindcss from '@tailwindcss/vite';
+import vue from '@vitejs/plugin-vue';
+import path from 'path';
+import {defineConfig, loadEnv} from 'vite';
+
+>>>>>>> feature/login
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
@@ -36,5 +44,8 @@ export default defineConfig(({mode}) => {
       hmr: process.env.DISABLE_HMR !== 'true',
     },
   };
+<<<<<<< HEAD
 >>>>>>> feature/student-Dashboard
+=======
+>>>>>>> feature/login
 });

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+<<<<<<< HEAD
 
 @theme {
 <<<<<<< HEAD
@@ -132,6 +133,12 @@
 
   .sidebar {
     display: none;
+=======
+
+@layer base {
+  body {
+    @apply antialiased;
+>>>>>>> feature/login
   }
 =======
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -181,4 +188,14 @@
 .dark .circular-progress {
   background: conic-gradient(#4285F4 316.8deg, #334155 0deg);
 >>>>>>> feature/student-Dashboard
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors;
+  }
 }

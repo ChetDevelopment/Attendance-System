@@ -24,10 +24,24 @@ const request = async (path, options = {}) => {
     requestHeaders.Authorization = `Bearer ${token}`;
   }
 
+<<<<<<< HEAD:frontend/src/services/api.js
   let requestBody = body;
   if (body !== undefined && body !== null && !(body instanceof FormData)) {
     requestHeaders['Content-Type'] = 'application/json';
     requestBody = JSON.stringify(body);
+=======
+  return config
+})
+
+api.interceptors.response.use(
+  (response: any) => response,
+  (error: any) => {
+    if (error.response?.status === 401) {
+      clearToken()
+    }
+
+    return Promise.reject(error)
+>>>>>>> feature/login:frontend/src/services/api.ts
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {

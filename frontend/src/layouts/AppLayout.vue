@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 <template>
   <div class="flex h-screen overflow-hidden bg-background-light">
     <Sidebar :current-module="currentModule" @module-change="setCurrentModule" />
@@ -39,10 +40,39 @@ const navItems = [
 const handleLogout = () => {
   logout();
   router.push('/dashboard');
+=======
+<script setup lang="ts">
+import { useRouter } from 'vue-router';
+import { 
+  LayoutDashboard as LayoutDashboardIcon, 
+  LogOut as LogOutIcon, 
+  Users as UsersIcon, 
+  Calendar as CalendarIcon 
+} from 'lucide-vue-next';
+
+interface UserData {
+  email: string;
+  role: 'student' | 'admin';
+  name: string;
+}
+
+defineProps<{
+  title: string;
+  user: UserData;
+}>();
+
+const router = useRouter();
+
+const handleLogout = () => {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user_data');
+  router.push('/login');
+>>>>>>> feature/login
 };
 </script>
 
 <template>
+<<<<<<< HEAD
   <div class="flex min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A]">
     <!-- Sidebar -->
     <aside class="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col fixed inset-y-0 left-0 z-50">
@@ -76,12 +106,71 @@ const handleLogout = () => {
           class="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
         >
           <LogOut :size="20" />
+=======
+  <div class="min-h-screen bg-slate-950 flex">
+    <!-- Sidebar -->
+    <aside class="w-64 border-r border-slate-800 bg-slate-900/50 hidden md:flex flex-col">
+      <div class="p-6 border-bottom border-slate-800">
+        <div class="flex items-center gap-3">
+          <div class="bg-white p-1 rounded shadow-sm">
+            <img 
+              src="https://www.passerellesnumeriques.org/wp-content/uploads/2016/03/pn-logo.png" 
+              alt="PNC Logo" 
+              class="h-6 w-auto"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <span class="text-white font-bold text-sm">PNC Portal</span>
+        </div>
+      </div>
+      
+      <nav class="flex-1 p-4 space-y-2">
+        <router-link 
+          to="/admin" 
+          v-if="user.role === 'admin'"
+          class="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl font-medium transition-colors"
+          active-class="bg-pnc-blue/10 text-pnc-blue"
+        >
+          <LayoutDashboardIcon class="h-5 w-5" />
+          Dashboard
+        </router-link>
+        <router-link 
+          to="/student" 
+          v-if="user.role === 'student'"
+          class="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl font-medium transition-colors"
+          active-class="bg-pnc-blue/10 text-pnc-blue"
+        >
+          <LayoutDashboardIcon class="h-5 w-5" />
+          Dashboard
+        </router-link>
+        <router-link 
+          to="/attendance"
+          class="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl font-medium transition-colors"
+          active-class="bg-pnc-blue/10 text-pnc-blue"
+        >
+          <CalendarIcon class="h-5 w-5" />
+          Attendance
+        </router-link>
+        <button v-if="user.role === 'admin'" class="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl font-medium transition-colors">
+          <UsersIcon class="h-5 w-5" />
+          Students
+        </button>
+      </nav>
+
+      <div class="p-4 border-t border-slate-800">
+        <button 
+          @click="handleLogout"
+          class="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl font-medium transition-colors"
+        >
+          <LogOutIcon class="h-5 w-5" />
+>>>>>>> feature/login
           Logout
         </button>
       </div>
     </aside>
 
     <!-- Main Content -->
+<<<<<<< HEAD
     <main class="flex-1 ml-64 flex flex-col min-h-screen">
       <!-- Header -->
       <header class="h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 sticky top-0 z-40">
@@ -113,10 +202,23 @@ const handleLogout = () => {
               :src="studentProfile.avatar" 
               class="w-10 h-10 rounded-xl object-cover ring-2 ring-primary/10"
             />
+=======
+    <main class="flex-1 flex flex-col">
+      <header class="h-16 border-b border-slate-800 bg-slate-900/30 flex items-center justify-between px-8">
+        <h2 class="text-xl font-bold text-white">{{ title }}</h2>
+        <div class="flex items-center gap-4">
+          <div class="text-right hidden sm:block">
+            <p class="text-sm font-bold text-white leading-none">{{ user.name }}</p>
+            <p class="text-[10px] text-slate-500 uppercase tracking-widest mt-1">{{ user.role }}</p>
+          </div>
+          <div class="w-10 h-10 rounded-full bg-pnc-blue/20 border border-pnc-blue/30 flex items-center justify-center text-pnc-blue font-bold">
+            {{ user.name.charAt(0) }}
+>>>>>>> feature/login
           </div>
         </div>
       </header>
 
+<<<<<<< HEAD
       <!-- Content Area -->
       <div class="flex-1">
         <router-view v-slot="{ Component }">
@@ -125,6 +227,10 @@ const handleLogout = () => {
           </transition>
         </router-view>
 >>>>>>> feature/student-Dashboard
+=======
+      <div class="flex-1 p-8 overflow-y-auto">
+        <slot />
+>>>>>>> feature/login
       </div>
     </main>
   </div>

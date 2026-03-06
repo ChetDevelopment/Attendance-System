@@ -16,11 +16,13 @@ class AttendanceRecord extends Model
         'attendance_date',
         'status',
         'check_in_time',
+        'recorded_at',
     ];
 
     protected $casts = [
         'attendance_date' => 'date',
         'check_in_time' => 'datetime',
+        'recorded_at' => 'datetime',
     ];
 
     public function student()

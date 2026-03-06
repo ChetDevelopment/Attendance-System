@@ -11,6 +11,8 @@ use App\Models\Session;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use App\Enums\AttendanceStatus;
+use App\Models\Student as StudentModel;
 
 class TeacherAttendanceController extends Controller
 {
@@ -148,12 +150,30 @@ class TeacherAttendanceController extends Controller
                     continue;
                 }
 
+                // Validate the student belongs to the provided class
+                $s = StudentModel::find($studentId);
+                if (!$s || $s->class_id != $request->class_id) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => "Student {$studentId} does not belong to class {$request->class_id}."
+                    ], 422);
+                }
+
+                // Normalize status to enum value and save recorded_at
+                try {
+                    $status = AttendanceStatus::fromString($student['status'])->value;
+                } catch (\InvalidArgumentException $e) {
+                    DB::rollBack();
+                    return response()->json(['message' => $e->getMessage()], 422);
+                }
+
                 AttendanceRecord::create([
                     'student_id' => $studentId,
                     'session_id' => $sessionId,
                     'recorded_by' => auth()->id(),
                     'attendance_date' => $date,
-                    'status' => $student['status'],
+                    'status' => $status,
+                    'recorded_at' => Carbon::now(),
                 ]);
             }
 

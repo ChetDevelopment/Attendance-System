@@ -20,6 +20,7 @@ Route::middleware('auth:sanctum')->apiResource('attendances', AttendanceControll
 
 // Custom attendance actions (keep names consistent with resource route)
 Route::middleware('auth:sanctum')->post('/attendances/mark-present', [AttendanceController::class, 'markPresent']);
+Route::middleware('auth:sanctum')->post('/attendances/mark-absent', [AttendanceController::class, 'markAbsent']);
 Route::middleware('auth:sanctum')->post('/attendances/{attendance}/unlock', [AttendanceController::class, 'unlock']);
 
 

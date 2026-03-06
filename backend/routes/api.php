@@ -6,8 +6,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Teacher\TeacherAttendanceController;
 
 Route::prefix('auth')->group(function () {
-    Route::match(['get', 'post'], '/register', [AuthController::class, 'register']);
-    Route::match(['get', 'post'], '/login', [AuthController::class, 'login']);
+    // Use POST for register/login for consistency and security
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -16,6 +17,10 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->apiResource('attendances', AttendanceController::class);
+
+// Custom attendance actions (keep names consistent with resource route)
+Route::middleware('auth:sanctum')->post('/attendances/mark-present', [AttendanceController::class, 'markPresent']);
+Route::middleware('auth:sanctum')->post('/attendances/{attendance}/unlock', [AttendanceController::class, 'unlock']);
 
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -29,5 +34,4 @@ Route::middleware('auth:sanctum')->group(function () {
         '/teacher/attendance',
         [TeacherAttendanceController::class, 'submitAttendance']
     );
-
 });

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Vue App</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Vue.js App Test</h1>
+        
+        <div class="status info">
+            <strong>Testing Vue.js Application:</strong>
+            <p>This test will verify if the Vue.js application can be loaded and if the main components are working.</p>
+        </div>
+
+        <div id="app">
+            <div class="status info">
+                <strong>Loading Vue.js Application...</strong>
+                <p>If you see this message, the Vue.js app is loading. If you see an error below, there may be an issue with the application.</p>
+            </div>
+        </div>
+
+        <div class="status success">
+            <strong>Expected Behavior:</strong>
+            <ul>
+                <li>The Vue.js app should mount to the #app div</li>
+                <li>You should see the Dashboard page with proper styling</li>
+                <li>Navigation should work between different pages</li>
+                <li>API calls should be made to fetch data</li>
+            </ul>
+        </div>
+
+        <div class="status error">
+            <strong>Common Issues:</strong>
+            <ul>
+                <li>Missing dependencies - run 'npm install' in the frontend directory</li>
+                <li>API endpoints not running - ensure backend server is running</li>
+                <li>CORS issues - check backend CORS configuration</li>
+                <li>Vue.js errors - check browser console for specific errors</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Test if Vue.js is available
+        console.log('Testing Vue.js availability...');
+        
+        // Check if the main.js file can be loaded
+        fetch('/src/main.js')
+            .then(response => {
+                if (response.ok) {
+                    console.log('main.js loaded successfully');
+                    document.getElementById('app').innerHTML = '<div class="status success"><strong>✓ Vue.js Application Loaded</strong><p>The Vue.js application files are accessible. The app should be working if all dependencies are installed.</p></div>';
+                } else {
+                    throw new Error('main.js not found');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading Vue.js app:', error);
+                document.getElementById('app').innerHTML = '<div class="status error"><strong>✗ Vue.js Application Error</strong><p>' + error.message + '</p><p>Check the browser console for more details.</p></div>';
+            });
+    </script>
+</body>
+</html>

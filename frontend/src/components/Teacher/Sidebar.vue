@@ -8,7 +8,8 @@ import {
   History, 
   MessageSquare, 
   CheckCircle2,
-  ChevronDown
+  ChevronDown,
+  LogOut
 } from 'lucide-vue-next';
 import { t } from '../composables/useSettings';
 
@@ -21,6 +22,18 @@ export interface User {
   photo?: string;
 }
 
+const props = defineProps<{
+  currentView: ViewType;
+  user: User;
+  mockUsers: User[];
+}>();
+
+const emit = defineEmits<{
+  (e: 'viewChange', view: ViewType): void;
+  (e: 'userChange', user: User): void;
+  (e: 'logout'): void;
+}>();
+
 const navItems = computed(() => [
   { icon: LayoutDashboard, label: t('dashboard'), id: 'dashboard' as ViewType },
   { icon: CalendarDays, label: t('schedule'), id: 'schedule' as ViewType },
@@ -29,17 +42,6 @@ const navItems = computed(() => [
   { icon: Users, label: t('management'), id: 'management' as ViewType },
   { icon: MessageSquare, label: t('messages'), id: 'messages' as ViewType },
 ]);
-
-defineProps<{
-  currentView: ViewType;
-  user: User;
-  mockUsers: User[];
-}>();
-
-defineEmits<{
-  (e: 'viewChange', view: ViewType): void;
-  (e: 'userChange', user: User): void;
-}>();
 </script>
 
 <template>
@@ -96,6 +98,14 @@ defineEmits<{
           >
             <img :src="u.photo" class="size-8 rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
             <span class="text-xs font-bold">{{ u.name }}</span>
+          </button>
+          <div class="border-t border-slate-200 my-2"></div>
+          <button
+            @click="$emit('logout')"
+            class="w-full flex items-center gap-3 p-2 rounded-lg text-left text-rose-600 hover:bg-rose-50 transition-colors"
+          >
+            <LogOut :size="16" />
+            <span class="text-xs font-bold">Logout</span>
           </button>
         </div>
       </div>

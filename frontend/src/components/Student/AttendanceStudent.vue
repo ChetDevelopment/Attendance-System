@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { 
   Camera, 
   QrCode, 
   ArrowRight, 
   Calendar, 
+  Clock,
   Loader2, 
   FlipHorizontal, 
   RefreshCw,
@@ -25,6 +26,7 @@ const showFlash = ref(false);
 const videoDevices = ref<MediaDeviceInfo[]>([]);
 const selectedDeviceId = ref<string>('');
 const videoResolution = ref('0x0');
+const cameraColor = ref<'normal' | 'vivid' | 'bw'>('normal');
 const notification = ref<{ message: string; type: 'success' | 'error' } | null>(null);
 
 const manualCourse = ref('Web Development II');
@@ -36,6 +38,19 @@ const showNotification = (message: string, type: 'success' | 'error' = 'success'
     notification.value = null;
   }, 3000);
 };
+
+const cameraFilter = computed(() => {
+  if (attendanceMode.value !== 'webcam') return 'none';
+
+  switch (cameraColor.value) {
+    case 'vivid':
+      return 'saturate(1.2) contrast(1.05)';
+    case 'bw':
+      return 'grayscale(1) contrast(1.1)';
+    default:
+      return 'none';
+  }
+});
 
 const getDevices = async () => {
   try {
@@ -94,6 +109,7 @@ const capturePhoto = () => {
   const ctx = canvas.getContext('2d');
   if (ctx) {
     ctx.save();
+    ctx.filter = cameraFilter.value;
     if (isMirrored.value) {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
@@ -314,8 +330,8 @@ onUnmounted(() => {
               playsinline
               @loadedmetadata="updateResolution"
               class="w-full h-full object-cover opacity-80 transition-transform duration-300"
+              :style="{ filter: cameraFilter }"
               :class="{ 
-                'grayscale contrast-125': attendanceMode === 'webcam',
                 '-scale-x-100': isMirrored
               }"
             ></video>
@@ -329,6 +345,16 @@ onUnmounted(() => {
 
             <!-- Camera Controls Overlay -->
             <div class="absolute top-4 right-4 flex flex-col gap-2 z-20">
+              <select
+                v-if="attendanceMode === 'webcam'"
+                v-model="cameraColor"
+                class="px-2.5 py-2 bg-black/40 backdrop-blur-md text-white rounded-xl hover:bg-black/60 transition-all border border-white/10 text-[11px] font-semibold uppercase"
+                title="Camera Color"
+              >
+                <option value="normal">Normal</option>
+                <option value="vivid">Vivid</option>
+                <option value="bw">B/W</option>
+              </select>
               <button 
                 @click="isMirrored = !isMirrored"
                 class="p-2.5 bg-black/40 backdrop-blur-md text-white rounded-xl hover:bg-black/60 transition-all border border-white/10"

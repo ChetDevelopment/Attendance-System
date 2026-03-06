@@ -1,3 +1,5 @@
+<?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -11,7 +13,7 @@ class UserController extends Controller
 {
     public function index()
     {
-        return response()->json(User::with('roles')->get());
+        return response()->json(User::with('role')->get());
     }
 
     public function store(Request $request)
@@ -69,7 +71,8 @@ class UserController extends Controller
         ]);
 
         $user = User::findOrFail($id);
-        $user->roles()->sync([$request->role_id]);
+        $user->role_id = $request->role_id;
+        $user->save();
 
         return response()->json(['message' => 'Role assigned successfully']);
     }

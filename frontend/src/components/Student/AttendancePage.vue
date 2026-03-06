@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import AppLayout from '../layouts/AppLayout.vue';
+import { submitAttendance as submitAttendanceApi } from '../../services/api';
 import { 
   CheckCircle2 as CheckCircle2Icon, 
   XCircle as XCircleIcon, 
@@ -11,8 +11,6 @@ import {
   AlertCircle as AlertCircleIcon,
   Check as CheckIcon
 } from 'lucide-vue-next';
-
-const user = JSON.parse(localStorage.getItem('user_data') || '{}');
 
 // --- Mock Data ---
 const classes = ['WEB-2024A', 'WEB-2024B', 'SNA-2024A', 'SNA-2024B'];
@@ -43,6 +41,8 @@ const searchQuery = ref('');
 const students = ref<Student[]>([...mockStudents]);
 const isSubmitted = ref(false);
 const showSuccess = ref(false);
+const isSubmitting = ref(false);
+const submitError = ref('');
 
 // --- Computed ---
 const filteredStudents = computed(() => {
@@ -71,15 +71,40 @@ const setStatus = (studentId: number, status: 'present' | 'absent' | 'late') => 
   }
 };
 
-const submitAttendance = () => {
+const submitAttendance = async () => {
   if (attendanceStats.value.pending > 0) {
     alert('Please mark attendance for all students before submitting.');
     return;
   }
-  
+
+  submitError.value = '';
+  isSubmitting.value = true;
+
+  const classId = classes.indexOf(selectedClass.value) + 1;
+  const sessionId = sessions.indexOf(selectedSession.value) + 1;
+
+  const payload = {
+    class_id: classId,
+    attendance_date: new Date().toISOString().split('T')[0],
+    session_id: sessionId,
+    records: students.value.map(s => ({
+      student_id: s.id,
+      status: s.status as 'present' | 'absent' | 'late',
+    })),
+  };
+
+  try {
+    await submitAttendanceApi(payload);
+  } catch (error: any) {
+    submitError.value = error?.message || 'Failed to submit attendance.';
+    isSubmitting.value = false;
+    return;
+  }
+
   isSubmitted.value = true;
   showSuccess.value = true;
-  
+  isSubmitting.value = false;
+
   // Auto hide success message after 5 seconds
   setTimeout(() => {
     showSuccess.value = false;
@@ -94,8 +119,7 @@ const resetAttendance = () => {
 </script>
 
 <template>
-  <AppLayout title="Manual Attendance" :user="user">
-    <div class="space-y-6">
+  <div class="space-y-6 p-8">
       <!-- Header Controls -->
       <div class="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
         <div class="flex flex-wrap gap-4 w-full lg:w-auto">
@@ -185,6 +209,10 @@ const resetAttendance = () => {
           </button>
         </div>
       </transition>
+
+      <div v-if="submitError" class="bg-red-500/10 border border-red-500/30 text-red-300 p-3 rounded-xl">
+        {{ submitError }}
+      </div>
 
       <!-- Student Table -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
@@ -286,14 +314,13 @@ const resetAttendance = () => {
           </button>
           <button 
             @click="submitAttendance"
-            :disabled="isSubmitted || attendanceStats.pending > 0"
+            :disabled="isSubmitted || attendanceStats.pending > 0 || isSubmitting"
             class="flex items-center gap-2 px-8 py-3 bg-pnc-blue hover:bg-blue-600 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold rounded-xl shadow-lg shadow-pnc-blue/20 transition-all active:scale-[0.98]"
           >
             <SaveIcon class="h-5 w-5" />
-            Submit Attendance
+            {{ isSubmitting ? 'Submitting...' : 'Submit Attendance' }}
           </button>
         </div>
       </div>
     </div>
-  </AppLayout>
 </template>

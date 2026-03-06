@@ -27,6 +27,9 @@ export const studentProfile = ref({ ...MOCK_STUDENT });
 
 export const logout = () => {
   clearToken();
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('user_data');
+  }
 };
 
 export const updateProfile = (name, avatar) => {

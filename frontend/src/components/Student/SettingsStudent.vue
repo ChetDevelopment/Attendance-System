@@ -7,6 +7,7 @@ import {
   BadgeCheck, 
   Lock, 
   Bell, 
+  Loader2,
   CheckCircle2, 
   AlertCircle 
 } from 'lucide-vue-next';

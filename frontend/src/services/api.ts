@@ -1,94 +1,124 @@
-import { clearToken, getToken } from './auth';
+import { clearToken, getToken } from './auth'
+import type { AttendanceRecord, AttendanceStatus } from '../../types'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
 
-const parseResponse = async (response) => {
-  const contentType = response.headers.get('content-type') || '';
+type RequestOptions = {
+  method?: string
+  body?: unknown
+  headers?: Record<string, string>
+}
 
-  if (contentType.includes('application/json')) {
-    return response.json();
-  }
+const parseResponse = async (response: Response) => {
+  const contentType = response.headers.get('content-type') || ''
+  if (contentType.includes('application/json')) return response.json()
+  return response.text()
+}
 
-  return response.text();
-};
+const request = async (path: string, options: RequestOptions = {}) => {
+  const { method = 'GET', body, headers = {} } = options
+  const token = getToken()
 
-const request = async (path, options = {}) => {
-  const { method = 'GET', body, headers = {} } = options;
-  const token = getToken();
-  const requestHeaders = {
+  const requestHeaders: Record<string, string> = {
     Accept: 'application/json',
     ...headers,
-  };
-
-  if (token) {
-    requestHeaders.Authorization = `Bearer ${token}`;
   }
 
-<<<<<<< HEAD:frontend/src/services/api.js
-  let requestBody = body;
-  if (body !== undefined && body !== null && !(body instanceof FormData)) {
-    requestHeaders['Content-Type'] = 'application/json';
-    requestBody = JSON.stringify(body);
-=======
-  return config
-})
+  if (token) requestHeaders.Authorization = `Bearer ${token}`
 
-api.interceptors.response.use(
-  (response: any) => response,
-  (error: any) => {
-    if (error.response?.status === 401) {
-      clearToken()
+  let requestBody: BodyInit | undefined
+  if (body !== undefined && body !== null) {
+    if (body instanceof FormData) {
+      requestBody = body
+    } else {
+      requestHeaders['Content-Type'] = 'application/json'
+      requestBody = JSON.stringify(body)
     }
-
-    return Promise.reject(error)
->>>>>>> feature/login:frontend/src/services/api.ts
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
     headers: requestHeaders,
     body: requestBody,
-  });
+  })
 
-  const data = await parseResponse(response);
+  const data = await parseResponse(response)
 
   if (response.status === 401) {
-    clearToken();
+    clearToken()
   }
 
   if (!response.ok) {
-    const message =
-      (data && typeof data === 'object' && data.message) ||
-      `Request failed with status ${response.status}`;
-    const error = new Error(message);
-    error.response = { status: response.status, data };
-    throw error;
+    const message = (data && typeof data === 'object' && 'message' in data)
+      ? String((data as { message: string }).message)
+      : `Request failed with status ${response.status}`
+    const error = new Error(message) as Error & { response?: { status: number; data: unknown } }
+    error.response = { status: response.status, data }
+    throw error
   }
 
-  return { data, status: response.status };
-};
+  return { data, status: response.status }
+}
 
 const api = {
-  get: (path, config = {}) => request(path, { ...config, method: 'GET' }),
-  post: (path, body, config = {}) => request(path, { ...config, method: 'POST', body }),
-  put: (path, body, config = {}) => request(path, { ...config, method: 'PUT', body }),
-  patch: (path, body, config = {}) => request(path, { ...config, method: 'PATCH', body }),
-  delete: (path, config = {}) => request(path, { ...config, method: 'DELETE' }),
-};
+  get: (path: string, config = {}) => request(path, { ...config, method: 'GET' }),
+  post: (path: string, body?: unknown, config = {}) => request(path, { ...config, method: 'POST', body }),
+  put: (path: string, body?: unknown, config = {}) => request(path, { ...config, method: 'PUT', body }),
+  patch: (path: string, body?: unknown, config = {}) => request(path, { ...config, method: 'PATCH', body }),
+  delete: (path: string, config = {}) => request(path, { ...config, method: 'DELETE' }),
+}
 
-export const fetchAttendanceHistory = async () => {
-  const { data } = await api.get('/attendance/history');
-  return data;
-};
+export const submitAttendance = async (payload: {
+  class_id: number
+  attendance_date: string
+  session_id: number
+  records: Array<{ student_id: number; status: 'present' | 'absent' | 'late' }>
+}) => {
+  const { data } = await api.post('/attendances/submit', payload)
+  return data
+}
 
-export const checkIn = async (record) => {
-  const { data } = await api.post('/attendance/check-in', record);
-  return data;
-};
+const toUiStatus = (status: string): AttendanceStatus => {
+  const normalized = String(status || '').toLowerCase()
+  if (normalized === 'late') return 'LATE'
+  if (normalized === 'absent') return 'ABSENT'
+  return 'PRESENT'
+}
 
-export const submitManualAttendanceRequest = async (payload) => {
-  const { data } = await api.post('/attendance/manual-request', payload);
-  return data;
-};
+export const fetchAttendanceHistory = async (): Promise<AttendanceRecord[]> => {
+  const { data } = await api.get('/attendances')
+  const list = Array.isArray(data) ? data : []
 
-export default api;
+  return list.map((item: any) => ({
+    id: String(item.id ?? Date.now()),
+    studentId: String(item.student_id ?? item.user_id ?? 'N/A'),
+    courseName: 'General Session',
+    instructor: 'System',
+    date: item.date ?? new Date().toISOString().split('T')[0],
+    timeSlot: item.check_in && item.check_out ? `${item.check_in} - ${item.check_out}` : 'N/A',
+    status: toUiStatus(item.status),
+    type: 'API',
+  }))
+}
+
+export const checkIn = async (record: Partial<AttendanceRecord>) => {
+  const payload = {
+    date: new Date().toISOString().split('T')[0],
+    status: 'present',
+    notes: JSON.stringify(record),
+  }
+  const { data } = await api.post('/attendances', payload)
+  return data
+}
+
+export const submitManualAttendanceRequest = async (payload: Record<string, unknown>) => {
+  const body = {
+    date: new Date().toISOString().split('T')[0],
+    status: 'absent',
+    notes: JSON.stringify(payload),
+  }
+  const { data } = await api.post('/attendances', body)
+  return data
+}
+
+export default api

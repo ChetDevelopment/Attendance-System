@@ -7,25 +7,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\User;
 
-class Attendance extends Model
+class ActivityLog extends Model
 {
     use HasFactory;
-
     protected $fillable = [
         'user_id',
-        'date',
-        'status',
-        'check_in',
-        'check_out',
-        'notes',
-    ];
-
-    protected $casts = [
-        'date' => 'date',
+        'action',
+        'description',
+        'ip_address',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
+
 }

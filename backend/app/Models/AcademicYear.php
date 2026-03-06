@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\SchoolClass;
 
 class AcademicYear extends Model
 {
@@ -15,7 +16,7 @@ class AcademicYear extends Model
         'is_active',
     ];
 
-     public function classes()
+    public function classes()
     {
         return $this->hasMany(SchoolClass::class);
     }

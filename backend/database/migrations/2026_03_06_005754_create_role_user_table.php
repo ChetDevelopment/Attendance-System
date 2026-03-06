@@ -11,17 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('attendances', function (Blueprint $table) {
+        Schema::create('role_user', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->date('date');
-            $table->enum('status', ['present', 'absent', 'late']);
-            $table->time('check_in')->nullable();
-            $table->time('check_out')->nullable();
-            $table->text('notes')->nullable();
+            $table->foreignId('role_id')->constrained()->cascadeOnDelete();
             $table->timestamps();
-
-            $table->unique(['user_id', 'date']);
         });
     }
 
@@ -30,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('attendances');
+        Schema::dropIfExists('role_user');
     }
 };

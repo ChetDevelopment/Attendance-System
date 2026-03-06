@@ -16,6 +16,8 @@ class Student extends Model
         'first_name',
         'last_name',
         'email',
+        'gender',
+        'date_of_birth',
         'class_id',
         'qr_code',
         'face_image',
@@ -23,7 +25,7 @@ class Student extends Model
     ];
 
     // Relationship: Student belongs to a class
-    public function class()
+    public function schoolClass()
     {
         return $this->belongsTo(SchoolClass::class, 'class_id');
     }

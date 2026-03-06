@@ -7,12 +7,21 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\ClassController;
 use App\Http\Controllers\Admin\AcademicYearController;
+use App\Http\Controllers\Teacher\TeacherAttendanceController;
+use App\Http\Controllers\Api\DashboardController;
 
 /*
 |--------------------------------------------------------------------------
 | Admin Routes (Protected)
 |--------------------------------------------------------------------------
 */
+
+Route::get('/', function () {
+    return response()->json([
+        'message' => 'Attendance API is working'
+    ]);
+});
+
 Route::prefix('admin')
     ->middleware(['auth:sanctum', 'role:admin']) // Only admin users can access
     ->group(function () {
@@ -30,6 +39,12 @@ Route::prefix('admin')
         // Academic Year CRUD
         Route::apiResource('academic-years', AcademicYearController::class);
         Route::put('academic-years/{id}/activate', [AcademicYearController::class, 'activate']);
+
+
+        Route::get('/users', [UserController::class, 'index']);
+        Route::post('/users', [UserController::class, 'store']);
+        Route::put('/users/{id}', [UserController::class, 'update']);
+        Route::delete('/users/{id}', [UserController::class, 'destroy']);
     });
 
 /*
@@ -54,4 +69,25 @@ Route::prefix('auth')->group(function () {
 */
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('attendances', AttendanceController::class);
+    Route::middleware('auth:sanctum')->apiResource('attendances', AttendanceController::class);
+
+
+    Route::middleware('auth:sanctum')->group(function () {
+
+        Route::get(
+            '/teacher/classes/{classId}/students',
+            [TeacherAttendanceController::class, 'getStudentsByClass']
+        );
+
+        Route::post(
+            '/teacher/attendance',
+            [TeacherAttendanceController::class, 'submitAttendance']
+        );
+    });
+});
+Route::prefix('dashboard')->group(function () {
+
+    Route::get('/present-today', [DashboardController::class, 'presentToday']);
+    Route::get('/absent-today', [DashboardController::class, 'absentToday']);
+    Route::get('/late-today', [DashboardController::class, 'lateToday']);
 });

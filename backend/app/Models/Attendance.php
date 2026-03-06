@@ -32,4 +32,9 @@ class Attendance extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function submitter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
 }

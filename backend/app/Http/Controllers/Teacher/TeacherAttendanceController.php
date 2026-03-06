@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use App\Enums\AttendanceStatus;
 use App\Models\Student as StudentModel;
+use App\Services\ActivityLogger;
 
 class TeacherAttendanceController extends Controller
 {
@@ -178,6 +179,14 @@ class TeacherAttendanceController extends Controller
             }
 
             DB::commit();
+
+            // Log teacher activity (CREATE)
+            ActivityLogger::log(
+                auth()->id(),
+                'CREATE',
+                "Submitted attendance for class {$request->class_id}, session {$sessionId}, date {$date}",
+                request()->ip()
+            );
 
             return response()->json([
                 'message' => 'Attendance submitted successfully.',

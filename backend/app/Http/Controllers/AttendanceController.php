@@ -93,6 +93,39 @@ class AttendanceController extends Controller
     }
 
     /**
+     * Admin: list attendances across teachers with optional filters.
+     * Query params: class_id, session_id, date, teacher_id
+     */
+    public function adminIndex(Request $request)
+    {
+        if (auth()->user()->role->slug !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $query = Attendance::with('submitter')->latest('date');
+
+        if ($request->filled('class_id')) {
+            $query->where('class_id', $request->class_id);
+        }
+
+        if ($request->filled('session_id')) {
+            $query->where('session_id', $request->session_id);
+        }
+
+        if ($request->filled('date')) {
+            $query->whereDate('date', $request->date);
+        }
+
+        if ($request->filled('teacher_id')) {
+            $query->where('submitted_by', $request->teacher_id);
+        }
+
+        $attendances = $query->get();
+
+        return response()->json($attendances);
+    }
+
+    /**
      * Mark a single student present.
      *
      * Payload: { class_id, student_id, attendance_date (optional), session_id (optional) }

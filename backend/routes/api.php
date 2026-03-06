@@ -18,6 +18,9 @@ Route::prefix('auth')->group(function () {
 
 Route::middleware('auth:sanctum')->apiResource('attendances', AttendanceController::class);
 
+// Admin: view attendances across teachers/classes
+Route::middleware('auth:sanctum')->get('/admin/attendances', [AttendanceController::class, 'adminIndex']);
+
 // Custom attendance actions (keep names consistent with resource route)
 Route::middleware('auth:sanctum')->post('/attendances/mark-present', [AttendanceController::class, 'markPresent']);
 Route::middleware('auth:sanctum')->post('/attendances/mark-absent', [AttendanceController::class, 'markAbsent']);

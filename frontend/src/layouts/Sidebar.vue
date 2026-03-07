@@ -6,8 +6,12 @@ import {
   Users,
   Calendar,
   Settings,
-  Headset,
+  Headphones,
+  ClipboardList,
+  User,
 } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { getUserRole } from '../services/auth';
 
 defineProps<{
   currentModule: string;
@@ -17,14 +21,44 @@ const emit = defineEmits<{
   moduleChange: [module: string];
 }>();
 
-const navItems = [
-  { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { id: 'users', icon: ShieldCheck, label: 'User & Permission' },
-  { id: 'academic', icon: Network, label: 'Academic Structure' },
-  { id: 'students', icon: Users, label: 'Student Management' },
-  { id: 'attendance', icon: Calendar, label: 'Attendance Control' },
-  { id: 'settings', icon: Settings, label: 'System Settings' },
-];
+const userRole = computed(() => getUserRole());
+
+const navItems = computed(() => {
+  if (userRole.value === 'student') {
+    return [
+      { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { id: 'attendance', icon: Calendar, label: 'Attendance' },
+      { id: 'absences', icon: ClipboardList, label: 'Absences' },
+    ];
+  } else if (userRole.value === 'teacher') {
+    return [
+      { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { id: 'attendance', icon: Calendar, label: 'Attendance Control' },
+      { id: 'absences', icon: ClipboardList, label: 'Absence Management' },
+    ];
+  } else if (userRole.value === 'education') {
+    return [
+      { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { id: 'users', icon: ShieldCheck, label: 'User & Permission' },
+      { id: 'academic', icon: Network, label: 'Academic Structure' },
+      { id: 'students', icon: Users, label: 'Student Management' },
+      { id: 'attendance', icon: Calendar, label: 'Attendance Control' },
+      { id: 'absences', icon: ClipboardList, label: 'Absence Management' },
+      { id: 'settings', icon: Settings, label: 'System Settings' },
+    ];
+  } else {
+    // Admin role
+    return [
+      { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { id: 'users', icon: ShieldCheck, label: 'User & Permission' },
+      { id: 'academic', icon: Network, label: 'Academic Structure' },
+      { id: 'students', icon: Users, label: 'Student Management' },
+      { id: 'attendance', icon: Calendar, label: 'Attendance Control' },
+      { id: 'absences', icon: ClipboardList, label: 'Absence Management' },
+      { id: 'settings', icon: Settings, label: 'System Settings' },
+    ];
+  }
+});
 
 const onSelect = (module: string) => emit('moduleChange', module);
 </script>
@@ -33,7 +67,7 @@ const onSelect = (module: string) => emit('moduleChange', module);
   <aside class="w-64 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-screen">
     <div class="p-6 border-b border-slate-200 flex items-center gap-3">
       <div class="size-10 rounded-lg border border-slate-200 bg-white flex items-center justify-center p-1.5">
-        <img src="/image.png" alt="Website logo" class="size-7 object-contain" />
+        <img src="/PictureUseInPageLogin.png" alt="Website logo" class="size-7 object-contain" />
       </div>
       <div>
         <h1 class="text-lg font-bold tracking-tight text-slate-900">វត្តមាន-Attendance</h1>
@@ -67,7 +101,7 @@ const onSelect = (module: string) => emit('moduleChange', module);
     <div class="p-4 border-t border-slate-200">
       <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
         <div class="size-8 rounded-full bg-primary/20 flex items-center justify-center">
-          <Headset class="size-4 text-primary" />
+          <Headphones class="size-4 text-primary" />
         </div>
         <div>
           <p class="text-xs font-bold text-slate-900">Help Desk</p>

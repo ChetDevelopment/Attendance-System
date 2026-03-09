@@ -3,56 +3,51 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Attendance;
-use Carbon\Carbon; // Make sure Carbon is imported
+use App\Models\AttendanceRecord;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    /**
-     * Total Present Today
-     */
+    private function getTodayAttendanceTotals(): array
+    {
+        $today = Carbon::today()->toDateString();
+
+        $counts = AttendanceRecord::query()
+            ->selectRaw('status, COUNT(*) as total')
+            ->whereDate('attendance_date', $today)
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        return [
+            'present_today' => (int) ($counts['PRESENT'] ?? $counts['present'] ?? 0),
+            'absent_today' => (int) ($counts['ABSENT'] ?? $counts['absent'] ?? 0),
+            'late_today' => (int) ($counts['LATE'] ?? $counts['late'] ?? 0),
+        ];
+    }
+
+    public function todayAttendance()
+    {
+        return response()->json($this->getTodayAttendanceTotals());
+    }
+
     public function presentToday()
     {
-        $count = Attendance::whereDate('date', Carbon::today())
-            ->where('status', 'PRESENT') // Make sure your DB status column uses uppercase
-            ->count();
-
         return response()->json([
-            'status' => true,
-            'message' => 'Total present today',
-            'data' => $count
+            'present_today' => $this->getTodayAttendanceTotals()['present_today'],
         ]);
     }
 
-    /**
-     * Total Absent Today
-     */
     public function absentToday()
     {
-        $count = Attendance::whereDate('date', Carbon::today())
-            ->where('status', 'ABSENT')
-            ->count();
-
         return response()->json([
-            'status' => true,
-            'message' => 'Total absent today',
-            'data' => $count
+            'absent_today' => $this->getTodayAttendanceTotals()['absent_today'],
         ]);
     }
 
-    /**
-     * Total Late Today
-     */
     public function lateToday()
     {
-        $count = Attendance::whereDate('date', Carbon::today())
-            ->where('status', 'LATE')
-            ->count();
-
         return response()->json([
-            'status' => true,
-            'message' => 'Total late today',
-            'data' => $count
+            'late_today' => $this->getTodayAttendanceTotals()['late_today'],
         ]);
     }
 }

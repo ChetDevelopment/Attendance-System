@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -21,14 +22,25 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role_id' => ['required', 'exists:roles,id'],
+            'role_id' => ['nullable', 'exists:roles,id'],
         ]);
+
+        $defaultRoleId = Role::where('slug', 'student')->value('id')
+            ?? Role::orderBy('id')->value('id');
+
+        $roleId = $validated['role_id'] ?? $defaultRoleId;
+
+        if (!$roleId) {
+            return response()->json([
+                'message' => 'No roles found. Please seed roles first.',
+            ], 422);
+        }
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role_id' => $validated['role_id'],
+            'role_id' => $roleId,
         ]);
 
         $token = $user->createToken('auth-token')->plainTextToken;

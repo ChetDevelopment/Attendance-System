@@ -13,6 +13,10 @@ class Attendance extends Model
 
     protected $fillable = [
         'user_id',
+        'class_id',
+        'session_id',
+        'submitted_by',
+        'is_locked',
         'date',
         'status',
         'check_in',
@@ -27,5 +31,10 @@ class Attendance extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function submitter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
     }
 }

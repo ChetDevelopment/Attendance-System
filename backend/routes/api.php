@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Teacher\TeacherAttendanceController;
+use App\Models\Role;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -72,6 +73,10 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::prefix('admin')
     ->middleware(['auth:sanctum', 'role:admin'])
     ->group(function () {
+        Route::get('roles', function () {
+            return response()->json(Role::select('id', 'name', 'slug')->orderBy('id')->get());
+        });
+
         Route::apiResource('users', UserController::class);
         Route::put('users/{id}/role', [UserController::class, 'assignRole']);
 

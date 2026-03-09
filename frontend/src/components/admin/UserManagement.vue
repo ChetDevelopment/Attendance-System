@@ -1,24 +1,25 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import Modal from './Modal.vue';
 import { Search, Key, Power, UserPlus, CheckCircle } from 'lucide-vue-next';
 import { cn } from '@/lib/utils';
+import api from '../../services/api';
 
-const initialUsers = [
-  { id: 1, name: 'Dr. Albus Percival', role: 'Admin', email: 'albus@eduattend.com', status: 'Active' },
-  { id: 2, name: 'Dr. Minerva McGonagall', role: 'Teacher', email: 'minerva@eduattend.com', status: 'Active' },
-  { id: 3, name: 'Severus Snape', role: 'Teacher', email: 'severus@eduattend.com', status: 'Active' },
-  { id: 4, name: 'Argus Filch', role: 'Staff', email: 'argus@eduattend.com', status: 'Inactive' },
-];
+type RoleItem = { id: number; name: string; slug: string };
+type UserItem = { id: number; name: string; role: string; roleId: number | null; email: string; status: 'Active' | 'Inactive' };
 
-const users = ref(initialUsers);
+const users = ref<UserItem[]>([]);
+const roles = ref<RoleItem[]>([]);
 const isCreateModalOpen = ref(false);
 const isResetModalOpen = ref(false);
 const selectedUser = ref<any>(null);
 const resetSuccess = ref(false);
+const isLoadingUsers = ref(false);
+const isCreatingUser = ref(false);
+const errorMessage = ref('');
 const searchQuery = ref('');
 const roleFilter = ref('All Roles');
-const newUser = ref({ 
+const newUser = ref({
   id: '', 
   title: 'Mr.', 
   name: '', 
@@ -26,25 +27,71 @@ const newUser = ref({
   email: '', 
   username: '', 
   password: '', 
-  role: 'Teacher' 
+  roleId: null as number | null,
 });
 
-const toggleStatus = (id: number) => {
-  users.value = users.value.map(u => u.id === id ? { ...u, status: u.status === 'Active' ? 'Inactive' : 'Active' } : u);
+const mapUser = (u: any): UserItem => ({
+  id: Number(u.id),
+  name: String(u.name ?? ''),
+  role: String(u.role?.name ?? u.roles?.[0]?.name ?? 'Unknown'),
+  roleId: u.role_id ?? u.role?.id ?? u.roles?.[0]?.id ?? null,
+  email: String(u.email ?? ''),
+  status: u.is_active ? 'Active' : 'Inactive',
+});
+
+const loadRoles = async () => {
+  const { data } = await api.get('/admin/roles');
+  roles.value = Array.isArray(data) ? data : [];
+
+  if (!newUser.value.roleId) {
+    const preferred = roles.value.find((r) => r.slug === 'teacher') ?? roles.value[0];
+    newUser.value.roleId = preferred ? preferred.id : null;
+  }
 };
 
-const handleCreateUser = () => {
-  if (newUser.value.name && newUser.value.email) {
-    const user = {
-      id: users.value.length + 1,
-      name: `${newUser.value.title} ${newUser.value.name}`,
-      role: newUser.value.role,
-      email: newUser.value.email,
-      status: 'Active' as const
+const loadUsers = async () => {
+  isLoadingUsers.value = true;
+  errorMessage.value = '';
+  try {
+    const { data } = await api.get('/admin/users');
+    users.value = Array.isArray(data) ? data.map(mapUser) : [];
+  } catch (error: any) {
+    errorMessage.value = error?.message || 'Failed to load users.';
+  } finally {
+    isLoadingUsers.value = false;
+  }
+};
+
+const toggleStatus = async (id: number) => {
+  const current = users.value.find((u) => u.id === id);
+  if (!current) return;
+
+  const nextActive = current.status !== 'Active';
+  await api.put(`/admin/users/${id}`, { is_active: nextActive });
+  users.value = users.value.map((u) => (u.id === id ? { ...u, status: nextActive ? 'Active' : 'Inactive' } : u));
+};
+
+const handleCreateUser = async () => {
+  if (!newUser.value.name || !newUser.value.email || !newUser.value.password || !newUser.value.roleId) {
+    errorMessage.value = 'Please fill in Name, Email, Password, and User Type.';
+    return;
+  }
+
+  isCreatingUser.value = true;
+  errorMessage.value = '';
+  try {
+    const payload = {
+      name: `${newUser.value.title} ${newUser.value.name}`.trim(),
+      email: newUser.value.email.trim(),
+      password: newUser.value.password,
+      role_id: newUser.value.roleId,
+      is_active: true,
     };
-    users.value.push(user);
+
+    const { data } = await api.post('/admin/users', payload);
+    users.value.push(mapUser(data));
     isCreateModalOpen.value = false;
-    newUser.value = { 
+    newUser.value = {
       id: '', 
       title: 'Mr.', 
       name: '', 
@@ -52,8 +99,12 @@ const handleCreateUser = () => {
       email: '', 
       username: '', 
       password: '', 
-      role: 'Teacher' 
+      roleId: roles.value.find((r) => r.slug === 'teacher')?.id ?? roles.value[0]?.id ?? null,
     };
+  } catch (error: any) {
+    errorMessage.value = error?.message || 'Failed to create user.';
+  } finally {
+    isCreatingUser.value = false;
   }
 };
 
@@ -77,6 +128,11 @@ const filteredUsers = computed(() => {
     return matchesSearch && matchesRole;
   });
 });
+
+onMounted(async () => {
+  await loadRoles();
+  await loadUsers();
+});
 </script>
 
 <template>
@@ -96,6 +152,9 @@ const filteredUsers = computed(() => {
     </div>
 
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div v-if="errorMessage" class="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        {{ errorMessage }}
+      </div>
       <div class="p-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
         <div class="relative max-w-xs w-full">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
@@ -118,6 +177,7 @@ const filteredUsers = computed(() => {
           </select>
         </div>
       </div>
+      <div v-if="isLoadingUsers" class="px-6 py-6 text-sm text-slate-500">Loading users...</div>
 
       <table class="w-full text-left text-sm">
         <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
@@ -254,12 +314,10 @@ const filteredUsers = computed(() => {
               <div class="grid grid-cols-3 items-center gap-4">
                 <label class="text-xs font-bold text-slate-600">User Type</label>
                 <select 
-                  v-model="newUser.role"
+                  v-model="newUser.roleId"
                   class="col-span-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-sm outline-none focus:ring-2 focus:ring-primary/20"
                 >
-                  <option>Teacher</option>
-                  <option>Staff</option>
-                  <option>Admin</option>
+                  <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
                 </select>
               </div>
             </div>
@@ -268,9 +326,10 @@ const filteredUsers = computed(() => {
           <div class="flex gap-3">
             <button 
               @click="handleCreateUser"
+              :disabled="isCreatingUser"
               class="flex-1 py-2 bg-white border border-slate-300 rounded shadow-sm text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all"
             >
-              Save
+              {{ isCreatingUser ? 'Saving...' : 'Save' }}
             </button>
             <button class="flex-1 py-2 bg-white border border-slate-300 rounded shadow-sm text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all">
               Update

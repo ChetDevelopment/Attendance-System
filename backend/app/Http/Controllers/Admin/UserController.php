@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -13,7 +12,7 @@ class UserController extends Controller
 {
     public function index()
     {
-        return response()->json(User::with('roles')->get());
+        return response()->json(User::with(['role', 'roles'])->get());
     }
 
     public function store(Request $request)
@@ -22,15 +21,21 @@ class UserController extends Controller
             'name' => 'required|string',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
+            'role_id' => 'required|exists:roles,id',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'role_id' => $request->role_id,
+            'is_active' => $request->boolean('is_active', true),
         ]);
 
-        return response()->json($user, 201);
+        $user->roles()->syncWithoutDetaching([$request->role_id]);
+
+        return response()->json($user->load(['role', 'roles']), 201);
     }
 
     public function show($id)
@@ -50,9 +55,11 @@ class UserController extends Controller
                 Rule::unique('users')->ignore($id),
             ],
             'password' => 'sometimes|min:6',
+            'role_id' => 'sometimes|exists:roles,id',
+            'is_active' => 'sometimes|boolean',
         ]);
 
-        $data = $request->only(['name', 'email']);
+        $data = $request->only(['name', 'email', 'role_id', 'is_active']);
 
         if ($request->password) {
             $data['password'] = Hash::make($request->password);
@@ -60,7 +67,11 @@ class UserController extends Controller
 
         $user->update($data);
 
-        return response()->json($user);
+        if ($request->filled('role_id')) {
+            $user->roles()->syncWithoutDetaching([$request->role_id]);
+        }
+
+        return response()->json($user->load(['role', 'roles']));
     }
 
     public function destroy($id)
@@ -77,6 +88,8 @@ class UserController extends Controller
         ]);
 
         $user = User::findOrFail($id);
+        $user->role_id = $request->role_id;
+        $user->save();
         $user->roles()->sync([$request->role_id]);
 
         return response()->json(['message' => 'Role assigned successfully']);

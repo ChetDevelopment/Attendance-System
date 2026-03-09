@@ -1,30 +1,14 @@
-<template>
-  <div class="flex h-screen overflow-hidden bg-background-light">
-    <Sidebar :current-module="currentModule" @module-change="setCurrentModule" />
-
-    <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
-      <Navbar @navigate="setCurrentModule" />
-
-      <div class="flex-1 overflow-y-auto p-8 scroll-smooth">
-        <Transition name="module-fade" mode="out-in">
-          <component :is="activeModule" :key="currentModule" />
-        </Transition>
-      </div>
-    </main>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import Sidebar from './Sidebar.vue';
 import Navbar from './Navbar.vue';
-import Dashboard from '../components/Admin/Dashboard.vue';
-import UserManagement from '../components/Admin/UserManagement.vue';
-import AcademicStructure from '../components/Admin/AcademicStructure.vue';
-import StudentManagement from '../components/Admin/StudentManagement.vue';
-import AttendanceControl from '../components/Admin/AttendanceControl.vue';
-import SystemSettings from '../components/Admin/SystemSettings.vue';
-import Profile from '../components/Admin/Profile.vue';
+import Dashboard from '../components/admin/Dashboard.vue';
+import UserManagement from '../components/admin/UserManagement.vue';
+import AcademicStructure from '../components/admin/AcademicStructure.vue';
+import StudentManagement from '../components/admin/StudentManagement.vue';
+import AttendanceControl from '../components/admin/AttendanceControl.vue';
+import SystemSettings from '../components/admin/SystemSettings.vue';
+import Profile from '../components/admin/Profile.vue';
 
 const currentModule = ref('dashboard');
 
@@ -46,6 +30,22 @@ const setCurrentModule = (module: string) => {
   currentModule.value = module;
 };
 </script>
+
+<template>
+  <div class="flex h-screen overflow-hidden bg-background-light">
+    <Sidebar :current-module="currentModule" @module-change="setCurrentModule" />
+
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <Navbar @navigate="setCurrentModule" />
+
+      <div class="flex-1 overflow-y-auto p-8 scroll-smooth">
+        <Transition name="module-fade" mode="out-in">
+          <component :is="activeModule" :key="currentModule" />
+        </Transition>
+      </div>
+    </main>
+  </div>
+</template>
 
 <style scoped>
 .module-fade-enter-active,

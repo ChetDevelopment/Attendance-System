@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import StatCard from './StatCard.vue';
 import ActiveSession from './ActiveSession.vue';
 import AbsenceChart from './AbsenceChart.vue';
 import RiskTable from './RiskTable.vue';
 import Modal from './Modal.vue';
+import api from '../../services/api';
 import {
   CheckCircle2,
   XCircle,
@@ -18,6 +19,8 @@ import {
 const isLateModalOpen = ref(false);
 const lateSearchQuery = ref('');
 const selectedPeriod = ref<'Today' | 'Weekly' | 'Monthly'>('Today');
+const isTodayStatsLoading = ref(false);
+let todayStatsInterval: ReturnType<typeof setInterval> | null = null;
 const notifications = ref([
   {
     id: 1,
@@ -27,10 +30,44 @@ const notifications = ref([
   },
 ]);
 
-const stats = {
-  Today: { present: '1,142', absent: '34', late: '12', rate: '94.2%', offsite: '2' },
+const stats = ref({
+  Today: { present: '0', absent: '0', late: '0', rate: '-', offsite: '0' },
   Weekly: { present: '5,820', absent: '156', late: '84', rate: '92.8%', offsite: '15' },
   Monthly: { present: '24,150', absent: '412', late: '320', rate: '93.5%', offsite: '42' },
+});
+
+const formatNumber = (value: number): string => new Intl.NumberFormat().format(value);
+
+const fetchTodayStats = async () => {
+  isTodayStatsLoading.value = true;
+
+  try {
+    const { data } = await api.get('/dashboard/today-attendance');
+
+    const present = Number(data?.present_today ?? 0);
+    const absent = Number(data?.absent_today ?? 0);
+    const late = Number(data?.late_today ?? 0);
+    const total = present + absent + late;
+    const attendanceRate = total > 0 ? `${((present / total) * 100).toFixed(1)}%` : '0.0%';
+
+    stats.value.Today = {
+      ...stats.value.Today,
+      present: formatNumber(present),
+      absent: formatNumber(absent),
+      late: formatNumber(late),
+      rate: attendanceRate,
+    };
+  } catch (error) {
+    stats.value.Today = {
+      ...stats.value.Today,
+      present: '0',
+      absent: '0',
+      late: '0',
+      rate: '0.0%',
+    };
+  } finally {
+    isTodayStatsLoading.value = false;
+  }
 };
 
 const lateStudents = [
@@ -47,11 +84,22 @@ const filteredLateStudents = computed(() =>
   )
 );
 
-const currentStats = computed(() => stats[selectedPeriod.value]);
+const currentStats = computed(() => stats.value[selectedPeriod.value]);
 
 const dismissNotification = (id: number) => {
   notifications.value = notifications.value.filter((n) => n.id !== id);
 };
+
+onMounted(() => {
+  fetchTodayStats();
+  todayStatsInterval = setInterval(fetchTodayStats, 30000);
+});
+
+onBeforeUnmount(() => {
+  if (todayStatsInterval) {
+    clearInterval(todayStatsInterval);
+  }
+});
 </script>
 
 <template>

@@ -1,8 +1,14 @@
 import axios from 'axios'
-import { clearToken, getToken } from './auth'
+import { clearToken, clearUser, clearUserRole, getToken } from './auth'
+
+const envBaseUrl = import.meta.env.VITE_API_BASE_URL
+const normalizedBaseUrl = typeof envBaseUrl === 'string' && envBaseUrl.trim()
+  ? envBaseUrl.replace(/\/+$/, '')
+  : '/api'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api',
+  baseURL: normalizedBaseUrl,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -24,6 +30,8 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       clearToken()
+      clearUser()
+      clearUserRole()
     }
 
     return Promise.reject(error)
@@ -31,3 +39,14 @@ api.interceptors.response.use(
 )
 
 export default api
+
+// Student attendance history
+export const fetchAttendanceHistory = async () => {
+  try {
+    const response = await api.get('/student/attendance/history')
+    return response.data
+  } catch (error) {
+    console.error('Failed to fetch attendance history:', error)
+    throw error
+  }
+}

@@ -1,200 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
-<<<<<<< HEAD
 
 @theme {
-<<<<<<< HEAD
-  --color-primary: #135bec;
-  --color-background-light: #f8fafc;
-}
-
-@layer base {
-  body {
-    margin: 0;
-    min-width: 320px;
-    font-family: "Segoe UI", sans-serif;
-  }
-
-  #app {
-    min-height: 100vh;
-  }
-}
-
-@layer components {
-  .app-shell {
-    display: grid;
-    grid-template-columns: 240px 1fr;
-    min-height: 100vh;
-  }
-
-  .sidebar {
-    background: #111827;
-    color: #f9fafb;
-    padding: 24px 18px;
-  }
-
-  .brand {
-    font-size: 1.2rem;
-    font-weight: 700;
-    margin-bottom: 20px;
-  }
-
-  .menu a {
-    display: block;
-    color: #cbd5e1;
-    padding: 10px 12px;
-    border-radius: 8px;
-    text-decoration: none;
-  }
-
-  .menu a.router-link-active {
-    background: #1f2937;
-    color: #f9fafb;
-  }
-
-  .content-wrap {
-    display: grid;
-    grid-template-rows: auto 1fr;
-  }
-
-  .navbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 24px;
-    border-bottom: 1px solid #e5e7eb;
-    background: #ffffff;
-  }
-
-  .content {
-    padding: 24px;
-  }
-
-  .auth-page {
-    min-height: 100vh;
-    display: grid;
-    place-items: center;
-    background: linear-gradient(145deg, #eff6ff, #f8fafc);
-  }
-
-  .card {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
-  }
-
-  .form {
-    width: min(420px, 92vw);
-    display: grid;
-    gap: 10px;
-  }
-
-  .btn {
-    border: 0;
-    border-radius: 8px;
-    padding: 10px 14px;
-    background: #1d4ed8;
-    color: #ffffff;
-    cursor: pointer;
-  }
-
-  .btn-outline {
-    background: transparent;
-    color: #1f2937;
-    border: 1px solid #d1d5db;
-  }
-
-  .error {
-    color: #b91c1c;
-    margin: 0;
-  }
-
-  .switch-text {
-    margin: 0;
-    font-size: 0.9rem;
-  }
-}
-
-@layer base {
-  input {
-    width: 100%;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    padding: 10px 12px;
-    font: inherit;
-  }
-}
-
-@media (max-width: 860px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    display: none;
-=======
-
-@layer base {
-  body {
-    @apply antialiased;
->>>>>>> feature/login
-  }
-=======
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --color-primary: #4285F4;
-  
-  @keyframes scan {
-    0% { top: 0%; opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
-    100% { top: 100%; opacity: 0; }
-  }
-}
-
-@layer utilities {
-  .animate-scan {
-    animation: scan 3s linear infinite;
-  }
+  --color-primary: #135bec;
+  --color-background-light: #f6f6f8;
+  --color-pnc-blue: #3b82f6;
+  --color-pnc-dark: #0f172a;
 }
 
 @layer base {
   body {
-    @apply font-sans bg-[#F8FAFC] text-slate-900 transition-colors duration-200;
+    @apply font-sans antialiased bg-background-light text-slate-900;
   }
 }
 
-.dark {
-  --background: #0F172A;
-  --foreground: #F8FAFC;
-}
-
-.dark body {
-  @apply bg-[#0F172A] text-slate-100;
-}
-
-.material-symbols-outlined {
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-}
-
-.circular-progress {
-  background: conic-gradient(#4285F4 316.8deg, #E2E8F0 0deg);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.dark .circular-progress {
-  background: conic-gradient(#4285F4 316.8deg, #334155 0deg);
->>>>>>> feature/student-Dashboard
-}
-
 @layer components {
+  .input-field {
+    @apply w-full bg-[#161b22] border border-[#30363d] rounded-lg py-3 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all;
+  }
+
   .btn-primary {
     @apply bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors;
   }
-  
+
   .btn-secondary {
     @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors;
   }

@@ -19,6 +19,7 @@ class Student extends Model
         'date_of_birth',
         'class_id',
         'qr_code',
+        'card_id',
         'face_image',
         'is_active',
     ];

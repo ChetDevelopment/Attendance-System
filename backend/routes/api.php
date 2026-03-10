@@ -4,6 +4,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Teacher\TeacherAttendanceController;
+use App\Http\Controllers\Student\StudentAttendanceController;
 
 Route::prefix('auth')->group(function () {
     Route::match(['get', 'post'], '/register', [AuthController::class, 'register']);
@@ -16,6 +17,13 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->apiResource('attendances', AttendanceController::class);
+
+Route::middleware('auth:sanctum')->prefix('student/attendance')->group(function () {
+    Route::post('/card-scan', [StudentAttendanceController::class, 'cardScan']);
+});
+
+// Alias for external devices/integrations (same handler as card-scan).
+Route::middleware('auth:sanctum')->post('/receive-card-id', [StudentAttendanceController::class, 'cardScan']);
 
 
 Route::middleware('auth:sanctum')->group(function () {

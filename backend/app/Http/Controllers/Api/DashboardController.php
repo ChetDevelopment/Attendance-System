@@ -18,10 +18,11 @@ class DashboardController extends Controller
             ->groupBy('status')
             ->pluck('total', 'status');
 
+        // Use lowercase keys since the enum stores lowercase values
         return [
-            'present_today' => (int) ($counts['PRESENT'] ?? $counts['present'] ?? 0),
-            'absent_today' => (int) ($counts['ABSENT'] ?? $counts['absent'] ?? 0),
-            'late_today' => (int) ($counts['LATE'] ?? $counts['late'] ?? 0),
+            'present_today' => (int) ($counts['present'] ?? 0),
+            'absent_today' => (int) ($counts['absent'] ?? 0),
+            'late_today' => (int) ($counts['late'] ?? 0),
         ];
     }
 

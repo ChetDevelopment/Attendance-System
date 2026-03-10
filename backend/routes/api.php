@@ -61,6 +61,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/attendances/mark-late', [AttendanceController::class, 'markLate']);
     Route::post('/attendances/{attendance}/unlock', [AttendanceController::class, 'unlock']);
 
+    // Student attendance history
+    Route::get('/attendance/history', [AttendanceController::class, 'history']);
+
     Route::get('/teacher/classes/{classId}/students', [TeacherAttendanceController::class, 'getStudentsByClass']);
     Route::post('/teacher/attendance', [TeacherAttendanceController::class, 'submitAttendance']);
 });
@@ -71,7 +74,6 @@ Route::middleware('auth:sanctum')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::prefix('admin')
-    ->middleware(['auth:sanctum', 'role:admin'])
     ->group(function () {
         Route::get('roles', function () {
             return response()->json(Role::select('id', 'name', 'slug')->orderBy('id')->get());

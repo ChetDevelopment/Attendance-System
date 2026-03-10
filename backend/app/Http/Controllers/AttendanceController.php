@@ -449,4 +449,42 @@ class AttendanceController extends Controller
 
         return response()->json(['message' => 'Attendance unlocked successfully.', 'attendance_id' => $attendance->id]);
     }
+
+    /**
+     * Get attendance history for the logged-in student.
+     */
+    public function history()
+    {
+        $user = auth()->user();
+
+        // Find the student record for this user
+        $student = Student::where('user_id', $user->id)->first();
+
+        if (!$student) {
+            return response()->json([
+                'message' => 'Student record not found for this user.'
+            ], 404);
+        }
+
+        // Get attendance records for this student
+        $records = AttendanceRecord::with(['student', 'session'])
+            ->where('student_id', $student->id)
+            ->orderBy('attendance_date', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get()
+            ->map(function ($record) {
+                return [
+                    'id' => $record->id,
+                    'status' => strtoupper($record->status),
+                    'date' => $record->attendance_date,
+                    'timeSlot' => $record->session ? $record->session->name : 'N/A',
+                    'courseName' => $record->student && $record->student->schoolClass
+                        ? $record->student->schoolClass->name
+                        : 'N/A',
+                ];
+            });
+
+        return response()->json($records);
+    }
 }

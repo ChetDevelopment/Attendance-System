@@ -16,6 +16,7 @@ const selectedUser = ref<any>(null);
 const resetSuccess = ref(false);
 const isLoadingUsers = ref(false);
 const isCreatingUser = ref(false);
+const isLoadingRoles = ref(false);
 const errorMessage = ref('');
 const searchQuery = ref('');
 const roleFilter = ref('All Roles');
@@ -40,12 +41,19 @@ const mapUser = (u: any): UserItem => ({
 });
 
 const loadRoles = async () => {
-  const { data } = await api.get('/admin/roles');
-  roles.value = Array.isArray(data) ? data : [];
+  isLoadingRoles.value = true;
+  try {
+    const { data } = await api.get('/admin/roles');
+    roles.value = Array.isArray(data) ? data : [];
 
-  if (!newUser.value.roleId) {
-    const preferred = roles.value.find((r) => r.slug === 'teacher') ?? roles.value[0];
-    newUser.value.roleId = preferred ? preferred.id : null;
+    if (!newUser.value.roleId) {
+      const preferred = roles.value.find((r) => r.slug === 'teacher') ?? roles.value[0];
+      newUser.value.roleId = preferred ? preferred.id : null;
+    }
+  } catch (error: any) {
+    errorMessage.value = error?.message || 'Failed to load user roles.';
+  } finally {
+    isLoadingRoles.value = false;
   }
 };
 
@@ -129,6 +137,17 @@ const filteredUsers = computed(() => {
   });
 });
 
+const roleFilterOptions = computed(() => {
+  const roleNames = new Set<string>();
+
+  roles.value.forEach((r) => roleNames.add(r.name));
+  users.value.forEach((u) => {
+    if (u.role) roleNames.add(u.role);
+  });
+
+  return ['All Roles', ...Array.from(roleNames)];
+});
+
 onMounted(async () => {
   await loadRoles();
   await loadUsers();
@@ -170,10 +189,9 @@ onMounted(async () => {
             v-model="roleFilter"
             class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none"
           >
-            <option>All Roles</option>
-            <option>Admin</option>
-            <option>Teacher</option>
-            <option>Staff</option>
+            <option v-for="roleName in roleFilterOptions" :key="roleName">
+              {{ roleName }}
+            </option>
           </select>
         </div>
       </div>
@@ -315,8 +333,11 @@ onMounted(async () => {
                 <label class="text-xs font-bold text-slate-600">User Type</label>
                 <select 
                   v-model="newUser.roleId"
+                  :disabled="isLoadingRoles || roles.length === 0"
                   class="col-span-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-sm outline-none focus:ring-2 focus:ring-primary/20"
                 >
+                  <option v-if="isLoadingRoles" :value="null">Loading roles...</option>
+                  <option v-else-if="roles.length === 0" :value="null">No roles found (seed roles)</option>
                   <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
                 </select>
               </div>
@@ -326,7 +347,7 @@ onMounted(async () => {
           <div class="flex gap-3">
             <button 
               @click="handleCreateUser"
-              :disabled="isCreatingUser"
+              :disabled="isCreatingUser || roles.length === 0"
               class="flex-1 py-2 bg-white border border-slate-300 rounded shadow-sm text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all"
             >
               {{ isCreatingUser ? 'Saving...' : 'Save' }}

@@ -130,13 +130,14 @@ const handleCheckIn = async () => {
   };
 
   try {
-    await checkIn(record);
-    showNotification("Attendance marked successfully!");
-  } catch (err: any) {
-    showNotification(err.message, "error");
-  } finally {
-    isProcessing.value = false;
-  }
+  await checkIn(record);
+  showNotification("Attendance marked successfully!");
+  props.refreshStats?.(); // <- This refreshes dashboard stats
+} catch (err: any) {
+  showNotification(err.message, "error");
+} finally {
+  isProcessing.value = false;
+}
 };
 
 const scanQRCode = () => {
@@ -242,6 +243,9 @@ onMounted(() => {
 onUnmounted(() => {
   stopWebcam();
 });
+const props = defineProps<{
+  refreshStats?: () => void
+}>;
 </script>
 
 <template>

@@ -96,11 +96,8 @@ class TeacherAttendanceController extends Controller
 
         $request->validate($rules);
 
-        // Verify teacher is assigned to this class
+        // Get the class (no teacher authorization check - teachers can mark attendance for any class)
         $class = SchoolClass::find($request->class_id);
-        if (!$class || $class->teacher_id !== auth()->id()) {
-            return response()->json(['message' => 'You are not authorized to mark attendance for this class'], 403);
-        }
 
         // Normalize inputs to use a common variable set
         $date = $request->input('attendance_date') ?? $request->input('date');
@@ -293,9 +290,8 @@ class TeacherAttendanceController extends Controller
             ->orderBy('start_time')
             ->get();
 
-        // Get only classes assigned to this teacher
+        // Get all active classes (for schools where one teacher can teach all classes)
         $classes = SchoolClass::where('is_active', true)
-            ->where('teacher_id', $teacherId)
             ->select('id', 'name', 'code')
             ->get();
 

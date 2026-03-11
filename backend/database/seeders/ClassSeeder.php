@@ -54,7 +54,7 @@ class ClassSeeder extends Seeder
         ];
 
         foreach ($classes as $class) {
-            SchoolClass::firstOrCreate(
+            SchoolClass::updateOrCreate(
                 ['code' => $class['code']],
                 $class
             );

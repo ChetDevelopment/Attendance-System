@@ -13,6 +13,12 @@ class SessionSeeder extends Seeder
      */
     public function run(): void
     {
+        // Disable foreign key checks temporarily to allow truncate
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+
+        // Delete all sessions to avoid duplicates
+        DB::table('sessions')->truncate();
+
         DB::table('sessions')->insert([
             [
                 'name' => 'Session 1',
@@ -51,5 +57,8 @@ class SessionSeeder extends Seeder
                 'updated_at' => now(),
             ],
         ]);
+
+        // Re-enable foreign key checks
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
     }
 }

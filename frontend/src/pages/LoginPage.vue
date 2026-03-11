@@ -30,10 +30,7 @@ const handleLogin = async () => {
   errorMessage.value = "";
 
   try {
-    const response = await login({
-      email: email.value,
-      password: password.value,
-    });
+    const response = await login(email.value, password.value);
 
     // Store token and user data
     setToken(response.token);

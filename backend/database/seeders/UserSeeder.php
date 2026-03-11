@@ -13,7 +13,7 @@ class UserSeeder extends Seeder
         $users = [
             [
                 'name' => 'Admin User',
-                'email' => '    ',
+                'email' => 'admin@pnc.com',
                 'password' => Hash::make('password'),
                 'role_id' => 1,
                 'is_active' => 1,

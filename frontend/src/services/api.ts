@@ -1,11 +1,11 @@
-import { clearToken, getToken } from './auth';
+import { clearToken, getToken } from "./auth";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 const parseResponse = async (response) => {
-  const contentType = response.headers.get('content-type') || '';
+  const contentType = response.headers.get("content-type") || "";
 
-  if (contentType.includes('application/json')) {
+  if (contentType.includes("application/json")) {
     return response.json();
   }
 
@@ -13,10 +13,10 @@ const parseResponse = async (response) => {
 };
 
 const request = async (path, options = {}) => {
-  const { method = 'GET', body, headers = {} } = options;
+  const { method = "GET", body, headers = {} } = options;
   const token = getToken();
   const requestHeaders = {
-    Accept: 'application/json',
+    Accept: "application/json",
     ...headers,
   };
 
@@ -26,7 +26,7 @@ const request = async (path, options = {}) => {
 
   let requestBody = body;
   if (body !== undefined && body !== null && !(body instanceof FormData)) {
-    requestHeaders['Content-Type'] = 'application/json';
+    requestHeaders["Content-Type"] = "application/json";
     requestBody = JSON.stringify(body);
   }
 
@@ -44,7 +44,7 @@ const request = async (path, options = {}) => {
 
   if (!response.ok) {
     const message =
-      (data && typeof data === 'object' && data.message) ||
+      (data && typeof data === "object" && data.message) ||
       `Request failed with status ${response.status}`;
     const error = new Error(message);
     error.response = { status: response.status, data };
@@ -55,25 +55,55 @@ const request = async (path, options = {}) => {
 };
 
 const api = {
-  get: (path, config = {}) => request(path, { ...config, method: 'GET' }),
-  post: (path, body, config = {}) => request(path, { ...config, method: 'POST', body }),
-  put: (path, body, config = {}) => request(path, { ...config, method: 'PUT', body }),
-  patch: (path, body, config = {}) => request(path, { ...config, method: 'PATCH', body }),
-  delete: (path, config = {}) => request(path, { ...config, method: 'DELETE' }),
+  get: (path, config = {}) => request(path, { ...config, method: "GET" }),
+  post: (path, body, config = {}) =>
+    request(path, { ...config, method: "POST", body }),
+  put: (path, body, config = {}) =>
+    request(path, { ...config, method: "PUT", body }),
+  patch: (path, body, config = {}) =>
+    request(path, { ...config, method: "PATCH", body }),
+  delete: (path, config = {}) => request(path, { ...config, method: "DELETE" }),
+};
+
+// Auth API functions
+export const login = async (credentials) => {
+  const { data } = await api.post("/auth/login", credentials);
+  return data;
+};
+
+export const register = async (userData) => {
+  const { data } = await api.post("/auth/register", userData);
+  return data;
+};
+
+export const logout = async () => {
+  const { data } = await api.post("/auth/logout");
+  return data;
+};
+
+export const getCurrentUser = async () => {
+  const { data } = await api.get("/auth/me");
+  return data;
+};
+
+// Dashboard API functions
+export const fetchTodayAttendance = async () => {
+  const { data } = await api.get("/dashboard/today-attendance");
+  return data;
 };
 
 export const fetchAttendanceHistory = async () => {
-  const { data } = await api.get('/attendance/history');
+  const { data } = await api.get("/attendance/history");
   return data;
 };
 
 export const checkIn = async (record) => {
-  const { data } = await api.post('/attendance/check-in', record);
+  const { data } = await api.post("/attendance/check-in", record);
   return data;
 };
 
 export const submitManualAttendanceRequest = async (payload) => {
-  const { data } = await api.post('/attendance/manual-request', payload);
+  const { data } = await api.post("/attendance/manual-request", payload);
   return data;
 };
 

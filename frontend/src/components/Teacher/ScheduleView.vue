@@ -39,6 +39,7 @@ const sessions = ref<any[]>([])
 const googleEvents = ref<GoogleEvent[]>([])
 const selectedTeacherId = ref<string>('')
 const showGoogleCalendar = ref(false)
+const googleCalendarLoading = ref(false)
 
 const loadSchedule = async () => {
   loading.value = true
@@ -49,11 +50,29 @@ const loadSchedule = async () => {
     teachers.value = Array.isArray(data.teachers) ? data.teachers : []
     sessions.value = Array.isArray(data.sessions) ? data.sessions : []
     
-    // Load Google Calendar events
+    if (!selectedTeacherId.value && teachers.value.length > 0) {
+      selectedTeacherId.value = String(teachers.value[0].id)
+    }
+  } catch (error: any) {
+    errorMessage.value = error.message || 'Failed to load schedule.'
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadGoogleCalendar = async () => {
+  if (showGoogleCalendar.value && googleEvents.value.length === 0 && !googleCalendarLoading.value) {
+    googleCalendarLoading.value = true
     try {
-      console.log('Attempting to load Google Calendar events...')
+      console.log('Loading Google Calendar events...')
       const calendarData = await teacherService.getGoogleCalendarEvents()
       console.log('Google Calendar API response:', calendarData)
+      
+      // Check if API key is configured
+      if (calendarData.error) {
+        console.warn('Google Calendar:', calendarData.error)
+        return
+      }
       
       if (calendarData && calendarData.items) {
         googleEvents.value = Array.isArray(calendarData.items) ? calendarData.items : []
@@ -63,22 +82,9 @@ const loadSchedule = async () => {
       }
     } catch (calendarError) {
       console.error('Failed to load Google Calendar events:', calendarError)
-      const errorObj = calendarError as any
-      console.error('Error details:', {
-        message: errorObj?.message,
-        status: errorObj?.response?.status,
-        statusText: errorObj?.response?.statusText,
-        data: errorObj?.response?.data
-      })
+    } finally {
+      googleCalendarLoading.value = false
     }
-    
-    if (!selectedTeacherId.value && teachers.value.length > 0) {
-      selectedTeacherId.value = String(teachers.value[0].id)
-    }
-  } catch (error: any) {
-    errorMessage.value = error.message || 'Failed to load schedule.'
-  } finally {
-    loading.value = false
   }
 }
 
@@ -187,7 +193,7 @@ onMounted(loadSchedule)
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-xl font-black text-slate-900">Google Calendar Events</h3>
             <button 
-              @click="showGoogleCalendar = !showGoogleCalendar"
+              @click="showGoogleCalendar = !showGoogleCalendar; showGoogleCalendar && loadGoogleCalendar()"
               class="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
             >
               <Calendar class="size-4" />

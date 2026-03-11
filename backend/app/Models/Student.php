@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\SchoolClass;
 use App\Models\AttendanceRecord;
 
@@ -20,8 +21,18 @@ class Student extends Model
         'class_id',
         'qr_code',
         'face_image',
+        'parent_number',
+        'contact',
         'is_active',
     ];
+
+    /**
+     * Get the class that owns the student.
+     */
+    public function class(): BelongsTo
+    {
+        return $this->belongsTo(SchoolClass::class, 'class_id');
+    }
 
     public function schoolClass()
     {

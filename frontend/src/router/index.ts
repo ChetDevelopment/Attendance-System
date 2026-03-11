@@ -1,8 +1,15 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { getToken } from "../services/auth";
+
 import AppLayout from "../layouts/AppLayout.vue";
 import LoginPage from "../pages/LoginPage.vue";
 import RegisterPage from "../pages/RegisterPage.vue";
+
+// Admin module pages
+import DashboardPage from "../components/admin/Dashboard.vue";
+import UserManagement from "../components/admin/UserManagement.vue";
+import AttendanceControl from "../components/admin/AttendanceControl.vue";
+import Profile from "../components/admin/Profile.vue";
 
 const routes = [
   {
@@ -23,9 +30,14 @@ const routes = [
   },
   {
     path: "/dashboard",
-    name: "dashboard",
     component: AppLayout,
     meta: { requiresAuth: true },
+    children: [
+      { path: "", name: "dashboard", component: DashboardPage },
+      { path: "users", name: "users", component: UserManagement },
+      { path: "attendance", name: "attendance", component: AttendanceControl },
+      { path: "profile", name: "profile", component: Profile },
+    ],
   },
 ];
 
@@ -34,6 +46,7 @@ const router = createRouter({
   routes,
 });
 
+// Navigation guard
 router.beforeEach((to, _from, next) => {
   const token = getToken();
 

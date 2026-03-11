@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -12,22 +13,37 @@ use App\Models\Role;
 use App\Models\Attendance;
 use App\Models\AttendanceRecord;
 use App\Models\AbsenceComment;
-use App\Models\ActivityLog;
+use App\Models\SchoolClass;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, Notifiable;
 
     protected $fillable = [
         'name',
         'email',
         'password',
-        'role_id',
-        'is_active',
+        'role_id'
     ];
+
+    /**
+     * Attributes hidden for serialization
+     *
+     * @var string[]
+     */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
     public function role()
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function classes(): HasMany
+    {
+        return $this->hasMany(SchoolClass::class, 'teacher_id');
     }
 
     public function attendances(): HasMany
@@ -50,18 +66,8 @@ class User extends Authenticatable
         return $this->hasMany(ActivityLog::class);
     }
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
-    protected $hidden = [
-        'password',
-        'remember_token',
+    protected $casts = [
+        'password' => 'hashed',
+        'is_active' => 'boolean',
     ];
-
-    public function roles()
-    {
-        return $this->belongsToMany(Role::class);
-    }
 }

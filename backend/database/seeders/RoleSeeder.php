@@ -1,13 +1,18 @@
 <?php
 
-namespace Database\Seeders;  // ✅ required
+namespace Database\Seeders;
 
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use App\Models\Role;
 
 class RoleSeeder extends Seeder
 {
-    public function run()
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
     {
         $roles = [
             [
@@ -38,8 +43,8 @@ class RoleSeeder extends Seeder
         ];
 
         foreach ($roles as $role) {
-            Role::updateOrCreate(
-                ['name' => $role['name']],
+            Role::firstOrCreate(
+                ['slug' => $role['slug']],
                 $role
             );
         }

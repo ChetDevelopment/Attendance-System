@@ -50,13 +50,6 @@ const emit = defineEmits<{
       >
         <Settings :size="20" />
       </button>
-      <button
-        @click="emit('logout')"
-        class="p-2 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
-        title="Logout"
-      >
-        <LogOut :size="20" />
-      </button>
     </div>
   </header>
 </template>

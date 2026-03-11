@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Search, Bell, Settings, UserCircle, AlertTriangle, CheckCircle2, TrendingUp } from 'lucide-vue-next';
+import { Search, Bell, Settings, UserCircle, AlertTriangle, CheckCircle2, TrendingUp, LogOut } from 'lucide-vue-next';
 import { cn } from '../../utils/cn';
 import api from '../../services/api';
+import { clearAllAuthData, logout } from '../../services/auth';
+import LogoutModal from './LogoutModal.vue';
 
 const props = defineProps<{
   isLoading: boolean;
@@ -18,6 +20,8 @@ const emit = defineEmits<{
   (e: 'update:isProfileOpen', val: boolean): void;
   (e: 'setActiveNav', val: string): void;
 }>();
+
+const isLogoutModalOpen = ref(false);
 
 const user = ref<any>(null);
 
@@ -38,13 +42,13 @@ const handleResetDb = async () => {
 </script>
 
 <template>
-  <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-10">
+  <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-50 shadow-sm">
     <div class="relative w-full max-w-md">
       <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" :size="18" />
       <input 
         type="text" 
         placeholder="Search students, classes or reports..." 
-        class="w-full bg-slate-50 border-none rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-[#135bec]/20 transition-all outline-none"
+        class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none"
       />
     </div>
 
@@ -66,7 +70,7 @@ const handleResetDb = async () => {
           }"
           :class="cn(
             'relative p-2 rounded-full transition-colors',
-            isNotificationOpen ? 'bg-[#135bec]/10 text-[#135bec]' : 'text-slate-500 hover:bg-slate-50'
+            isNotificationOpen ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-50'
           )"
         >
           <Bell :size="20" />
@@ -76,7 +80,7 @@ const handleResetDb = async () => {
         <div v-if="isNotificationOpen" class="absolute right-0 mt-2 w-80 bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 overflow-hidden">
           <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
             <h4 class="font-bold text-sm text-slate-900">Notifications</h4>
-            <span class="text-[10px] font-bold text-[#135bec] uppercase tracking-wider">2 New</span>
+            <span class="text-[10px] font-bold text-primary uppercase tracking-wider">2 New</span>
           </div>
           <div class="max-h-[300px] overflow-y-auto">
             <div class="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer">
@@ -104,7 +108,7 @@ const handleResetDb = async () => {
               </div>
             </div>
           </div>
-          <button class="w-full p-3 text-center text-[10px] font-bold text-slate-500 hover:text-[#135bec] transition-colors bg-slate-50/50">
+          <button class="w-full p-3 text-center text-[10px] font-bold text-slate-500 hover:text-primary transition-colors bg-slate-50/50">
             View All Notifications
           </button>
         </div>
@@ -119,7 +123,7 @@ const handleResetDb = async () => {
           }"
           :class="cn(
             'p-2 rounded-full transition-colors',
-            isSettingsOpen ? 'bg-[#135bec]/10 text-[#135bec]' : 'text-slate-500 hover:bg-slate-50'
+            isSettingsOpen ? 'bg-primary/10 text-primary' : 'text-slate-500 hover:bg-slate-50'
           )"
           title="Settings"
         >
@@ -167,7 +171,7 @@ const handleResetDb = async () => {
           }"
           :class="cn(
             'size-9 rounded-xl flex items-center justify-center transition-all overflow-hidden',
-            isProfileOpen ? 'bg-[#135bec] text-white shadow-lg shadow-[#135bec]/20' : 'bg-[#135bec]/10 text-[#135bec] hover:bg-[#135bec]/20'
+            isProfileOpen ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-primary/10 text-primary hover:bg-primary/20'
           )"
         >
           <img v-if="user?.avatar_url" :src="user.avatar_url" alt="Profile" class="size-full object-cover" referrerPolicy="no-referrer" />
@@ -176,7 +180,7 @@ const handleResetDb = async () => {
 
         <div v-if="isProfileOpen" class="absolute right-0 mt-2 w-64 bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 overflow-hidden">
           <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-            <div class="size-10 rounded-full bg-[#135bec]/10 flex items-center justify-center text-[#135bec] overflow-hidden">
+            <div class="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary overflow-hidden">
               <img v-if="user?.avatar_url" :src="user.avatar_url" alt="Profile" class="size-full object-cover" referrerPolicy="no-referrer" />
               <UserCircle v-else :size="24" />
             </div>
@@ -206,9 +210,23 @@ const handleResetDb = async () => {
               <Settings :size="16" />
               Account Settings
             </button>
+            <div class="border-t border-slate-100 my-2"></div>
+            <button 
+              @click="isLogoutModalOpen = true"
+              class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition-all"
+            >
+              <LogOut :size="16" />
+              Logout
+            </button>
           </div>
         </div>
       </div>
     </div>
+
+    <LogoutModal 
+      :isOpen="isLogoutModalOpen" 
+      @close="isLogoutModalOpen = false"
+      @confirm="logout"
+    />
   </header>
 </template>

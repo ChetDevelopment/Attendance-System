@@ -1,23 +1,15 @@
-import tailwindcss from '@tailwindcss/vite';
-import vue from '@vitejs/plugin-vue';
-import path from 'path';
-import {defineConfig, loadEnv} from 'vite';
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
 
-export default defineConfig(({mode}) => {
-  const env = loadEnv(mode, '.', '');
-
-  return {
-    plugins: [vue(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, 'src'),
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [vue()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
       },
     },
-    server: {
-      hmr: process.env.DISABLE_HMR !== 'true',
-    },
-  };
-});
+  },
+})

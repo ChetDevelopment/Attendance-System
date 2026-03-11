@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\User;
 
 class Attendance extends Model
@@ -36,5 +37,20 @@ class Attendance extends Model
     public function submitter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    public function class(): BelongsTo
+    {
+        return $this->belongsTo(SchoolClass::class, 'class_id');
+    }
+
+    public function session(): BelongsTo
+    {
+        return $this->belongsTo(Session::class);
+    }
+
+    public function records(): HasMany
+    {
+        return $this->hasMany(AttendanceRecord::class);
     }
 }

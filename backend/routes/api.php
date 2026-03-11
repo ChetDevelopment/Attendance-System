@@ -1,40 +1,37 @@
 <?php
 
-use App\Http\Controllers\Admin\AcademicYearController;
-use App\Http\Controllers\Admin\ClassController;
-use App\Http\Controllers\Admin\StudentController;
-use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\Teacher\TeacherAttendanceController;
-use App\Models\Role;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Teacher\TeacherAttendanceController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\StudentController;
+use App\Http\Controllers\Admin\ClassController;
+use App\Http\Controllers\Admin\AcademicYearController;
 
-Route::get('/', function () {
-    return response()->json([
-        'message' => 'Attendance API is working',
-    ]);
-});
+Route::prefix('admin')
+    ->middleware(['auth:sanctum'])
+    ->group(function () {
 
-/*
-|--------------------------------------------------------------------------
-| Public Dashboard Routes
-|--------------------------------------------------------------------------
-*/
-Route::prefix('dashboard')->group(function () {
-    Route::get('/today-attendance', [DashboardController::class, 'todayAttendance']);
-    Route::get('/present-today', [DashboardController::class, 'presentToday']);
-    Route::get('/absent-today', [DashboardController::class, 'absentToday']);
-    Route::get('/late-today', [DashboardController::class, 'lateToday']);
-});
+        // User CRUD
+        Route::apiResource('users', UserController::class);
 
-/*
-|--------------------------------------------------------------------------
-| Auth Routes
-|--------------------------------------------------------------------------
-*/
+        // Assign role
+        Route::put('users/{id}/role', [UserController::class, 'assignRole']);
+
+        // Student CRUD
+        Route::apiResource('students', StudentController::class);
+
+        // Class CRUD
+        Route::apiResource('classes', ClassController::class);
+
+        // Academic Year CRUD
+        Route::apiResource('academic-years', AcademicYearController::class);
+        Route::put('academic-years/{id}/activate', [AcademicYearController::class, 'activate']);
+    });
+
 Route::prefix('auth')->group(function () {
+    // Use POST for register/login for consistency and security
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
 
@@ -44,47 +41,50 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-/*
-|--------------------------------------------------------------------------
-| Attendance Routes (Authenticated Users)
-|--------------------------------------------------------------------------
-*/
+Route::middleware('auth:sanctum')->apiResource('attendances', AttendanceController::class);
+
+// General attendance mark endpoint
+Route::middleware('auth:sanctum')->post('/attendance/mark', [AttendanceController::class, 'mark']);
+
+// Admin: view attendances across teachers/classes
+Route::middleware('auth:sanctum')->get('/admin/attendances', [AttendanceController::class, 'adminIndex']);
+
+// Custom attendance actions (keep names consistent with resource route)
+Route::middleware('auth:sanctum')->post('/attendances/mark-present', [AttendanceController::class, 'markPresent']);
+Route::middleware('auth:sanctum')->post('/attendances/mark-absent', [AttendanceController::class, 'markAbsent']);
+Route::middleware('auth:sanctum')->post('/attendances/mark-late', [AttendanceController::class, 'markLate']);
+Route::middleware('auth:sanctum')->post('/attendances/{attendance}/unlock', [AttendanceController::class, 'unlock']);
+
+
 Route::middleware('auth:sanctum')->group(function () {
-    Route::apiResource('attendances', AttendanceController::class);
 
-    // Admin view across teachers/classes
-    Route::get('/admin/attendances', [AttendanceController::class, 'adminIndex']);
+    // Teacher: Get all students (no class filter)
+    Route::get('/teacher/students', [TeacherAttendanceController::class, 'getAllStudents']);
 
-    // Teacher attendance actions
-    Route::post('/attendances/mark-present', [AttendanceController::class, 'markPresent']);
-    Route::post('/attendances/mark-absent', [AttendanceController::class, 'markAbsent']);
-    Route::post('/attendances/mark-late', [AttendanceController::class, 'markLate']);
-    Route::post('/attendances/{attendance}/unlock', [AttendanceController::class, 'unlock']);
+    // Teacher: Get students by class
+    Route::get(
+        '/teacher/classes/{classId}/students',
+        [TeacherAttendanceController::class, 'getStudentsByClass']
+    );
 
-    // Student attendance history
-    Route::get('/attendance/history', [AttendanceController::class, 'history']);
+    // Teacher: Get schedule/sessions
+    Route::get('/teacher/schedule', [TeacherAttendanceController::class, 'getSchedule']);
 
-    Route::get('/teacher/classes/{classId}/students', [TeacherAttendanceController::class, 'getStudentsByClass']);
-    Route::post('/teacher/attendance', [TeacherAttendanceController::class, 'submitAttendance']);
+    // Teacher: Get dashboard data
+    Route::get('/teacher/dashboard', [TeacherAttendanceController::class, 'getDashboard']);
+
+    // Teacher: Get justifications/absence requests
+    Route::get('/teacher/justifications', [TeacherAttendanceController::class, 'getJustifications']);
+
+    // Teacher: Get attendance history
+    Route::get('/teacher/history', [TeacherAttendanceController::class, 'getHistory']);
+
+    // Teacher: Get notifications
+    Route::get('/teacher/notifications', [TeacherAttendanceController::class, 'getNotifications']);
+
+    // Teacher: Submit attendance
+    Route::post(
+        '/teacher/attendance',
+        [TeacherAttendanceController::class, 'submitAttendance']
+    );
 });
-
-/*
-|--------------------------------------------------------------------------
-| Admin Routes (Protected)
-|--------------------------------------------------------------------------
-*/
-Route::prefix('admin')
-    ->group(function () {
-        Route::get('roles', function () {
-            return response()->json(Role::select('id', 'name', 'slug')->orderBy('id')->get());
-        });
-
-        Route::apiResource('users', UserController::class);
-        Route::put('users/{id}/role', [UserController::class, 'assignRole']);
-
-        Route::apiResource('students', StudentController::class);
-        Route::apiResource('classes', ClassController::class);
-
-        Route::apiResource('academic-years', AcademicYearController::class);
-        Route::put('academic-years/{id}/activate', [AcademicYearController::class, 'activate']);
-    });

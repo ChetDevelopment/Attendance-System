@@ -20,6 +20,7 @@ const router = useRouter()
 
 const loggedUser = getUser()
 
+// Only show the current logged-in user, not all teachers
 const MOCK_USERS = ref<User[]>([
   {
     name: loggedUser?.name || 'Teacher',
@@ -53,29 +54,6 @@ const handleLogout = async () => {
     router.push({ name: 'login' })
   }
 }
-
-const loadTeachers = async () => {
-  try {
-    const data = await teacherService.getSchedule()
-    const teachers = Array.isArray(data.teachers) ? data.teachers : []
-    const mapped: User[] = teachers.map((t: any) => ({
-      name: t.name,
-      role: 'teacher',
-      department: 'Education',
-      photo: `https://picsum.photos/seed/teacher-${t.id}/200/200`,
-    }))
-    if (mapped.length > 0) {
-      MOCK_USERS.value = mapped
-      if (!mapped.find((m) => m.name === user.value.name)) {
-        user.value = mapped[0]
-      }
-    }
-  } catch {
-    // keep currently loaded user
-  }
-}
-
-loadTeachers()
 </script>
 
 <template>

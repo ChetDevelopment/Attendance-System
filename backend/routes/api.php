@@ -18,6 +18,9 @@ Route::prefix('auth')->group(function () {
 
 Route::middleware('auth:sanctum')->apiResource('attendances', AttendanceController::class);
 
+// General attendance mark endpoint
+Route::middleware('auth:sanctum')->post('/attendance/mark', [AttendanceController::class, 'mark']);
+
 // Admin: view attendances across teachers/classes
 Route::middleware('auth:sanctum')->get('/admin/attendances', [AttendanceController::class, 'adminIndex']);
 
@@ -30,11 +33,31 @@ Route::middleware('auth:sanctum')->post('/attendances/{attendance}/unlock', [Att
 
 Route::middleware('auth:sanctum')->group(function () {
 
+    // Teacher: Get all students (no class filter)
+    Route::get('/teacher/students', [TeacherAttendanceController::class, 'getAllStudents']);
+
+    // Teacher: Get students by class
     Route::get(
         '/teacher/classes/{classId}/students',
         [TeacherAttendanceController::class, 'getStudentsByClass']
     );
 
+    // Teacher: Get schedule/sessions
+    Route::get('/teacher/schedule', [TeacherAttendanceController::class, 'getSchedule']);
+
+    // Teacher: Get dashboard data
+    Route::get('/teacher/dashboard', [TeacherAttendanceController::class, 'getDashboard']);
+
+    // Teacher: Get justifications/absence requests
+    Route::get('/teacher/justifications', [TeacherAttendanceController::class, 'getJustifications']);
+
+    // Teacher: Get attendance history
+    Route::get('/teacher/history', [TeacherAttendanceController::class, 'getHistory']);
+
+    // Teacher: Get notifications
+    Route::get('/teacher/notifications', [TeacherAttendanceController::class, 'getNotifications']);
+
+    // Teacher: Submit attendance
     Route::post(
         '/teacher/attendance',
         [TeacherAttendanceController::class, 'submitAttendance']

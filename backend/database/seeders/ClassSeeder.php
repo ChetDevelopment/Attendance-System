@@ -6,6 +6,7 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use App\Models\AcademicYear;
+use App\Models\SchoolClass;
 use Carbon\Carbon;
 
 class ClassSeeder extends Seeder
@@ -17,38 +18,46 @@ class ClassSeeder extends Seeder
     {
         // Get active academic year
         $academicYear = AcademicYear::where('is_active', true)->first();
-         if (!$academicYear) {
+        if (!$academicYear) {
             return; // stop if no academic year exists
         }
 
-        DB::table('classes')->insert([
+        // Get teacher users
+        $teacher1 = DB::table('users')->where('email', 'teacher@pnc.com')->first();
+        $teacher2 = DB::table('users')->where('email', 'radyy@pnc.com')->first();
+
+        $classes = [
             [
                 'name' => 'WEP A',
                 'code' => 'WEP-A-2026' . $academicYear->id,
                 'academic_year_id' => $academicYear->id,
                 'description' => 'Web Programming Class A',
+                'teacher_id' => $teacher1->id ?? null,
                 'is_active' => true,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
             ],
             [
                 'name' => 'WEP B',
                 'code' => 'WEP-B-2026' . $academicYear->id,
                 'academic_year_id' => $academicYear->id,
                 'description' => 'Web Programming Class B',
+                'teacher_id' => $teacher2->id ?? null,
                 'is_active' => true,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
             ],
             [
                 'name' => 'WEP C',
                 'code' => 'WEP-C-2026' . $academicYear->id,
                 'academic_year_id' => $academicYear->id,
                 'description' => 'Web Programming Class C',
+                'teacher_id' => $teacher1->id ?? null,
                 'is_active' => true,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
             ],
-            ]);
+        ];
+
+        foreach ($classes as $class) {
+            SchoolClass::firstOrCreate(
+                ['code' => $class['code']],
+                $class
+            );
+        }
     }
 }

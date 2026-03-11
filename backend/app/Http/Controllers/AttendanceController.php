@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\Student;
 use App\Models\AttendanceRecord;
 use App\Models\Session as SessionModel;
+use App\Models\SchoolClass;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use App\Enums\AttendanceStatus;
@@ -15,6 +16,46 @@ use Illuminate\Support\Facades\Log;
 
 class AttendanceController extends Controller
 {
+    /**
+     * Mark attendance for a student (general endpoint)
+     * Payload: { class_id, student_id, status, attendance_date (optional), session_id (optional) }
+     */
+    public function mark(Request $request)
+    {
+        if (auth()->user()->role->slug !== 'teacher') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'class_id' => 'required|exists:classes,id',
+            'student_id' => 'required|exists:students,id',
+            'status' => 'required|in:present,absent,late,Present,Absent,Late',
+            'attendance_date' => 'sometimes|date',
+            'date' => 'sometimes|date',
+            'session_id' => 'nullable|exists:sessions,id',
+        ]);
+
+        // Verify teacher is assigned to this class
+        $class = SchoolClass::find($request->class_id);
+        if (!$class || $class->teacher_id !== auth()->id()) {
+            return response()->json(['message' => 'You are not authorized to mark attendance for this class'], 403);
+        }
+
+        $status = strtolower($request->status);
+
+        // Map to specific handler
+        switch ($status) {
+            case 'present':
+                return $this->markPresent($request);
+            case 'absent':
+                return $this->markAbsent($request);
+            case 'late':
+                return $this->markLate($request);
+            default:
+                return response()->json(['message' => 'Invalid status'], 422);
+        }
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -132,93 +173,7 @@ class AttendanceController extends Controller
      */
     public function markPresent(Request $request)
     {
-        // ensure teacher role
-        if (auth()->user()->role->slug !== 'teacher') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $request->validate([
-            'class_id' => 'required|exists:classes,id',
-            'student_id' => 'required|exists:students,id',
-            'attendance_date' => 'sometimes|date',
-            'date' => 'sometimes|date',
-            'session_id' => 'nullable|exists:sessions,id',
-        ]);
-
-        $date = $request->input('attendance_date') ?? $request->input('date') ?? Carbon::today()->toDateString();
-
-        // allowed past days
-        $allowedDays = (int) env('ATTENDANCE_ALLOWED_PAST_DAYS', 0);
-        try {
-            $attendanceDate = Carbon::parse($date)->startOfDay();
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Invalid attendance date.'], 422);
-        }
-
-        $today = Carbon::today();
-        $minDate = $today->copy()->subDays($allowedDays)->startOfDay();
-        if ($attendanceDate->gt($today) || $attendanceDate->lt($minDate)) {
-            return response()->json(['message' => 'Attendance date must be today or within the allowed range.'], 422);
-        }
-
-        $classId = $request->class_id;
-        $studentId = $request->student_id;
-
-        // Validate student belongs to class
-        $student = Student::find($studentId);
-        if (!$student || $student->class_id != $classId) {
-            return response()->json(['message' => 'Student does not belong to the provided class.'], 422);
-        }
-
-        // Determine session
-        $sessionId = $request->input('session_id') ?? SessionModel::where('is_active', true)->value('id');
-        if (!$sessionId) {
-            return response()->json(['message' => 'No active session found. Provide session_id.'], 422);
-        }
-
-        DB::beginTransaction();
-        try {
-            // Find or create attendance main record
-            $attendance = Attendance::where('class_id', $classId)
-                ->where('session_id', $sessionId)
-                ->whereDate('date', $attendanceDate->toDateString())
-                ->first();
-
-            if ($attendance) {
-                if ($attendance->is_locked) {
-                    return response()->json(['message' => 'Attendance for this class/session/date is locked.'], 400);
-                }
-            } else {
-                $attendance = Attendance::create([
-                    'class_id' => $classId,
-                    'session_id' => $sessionId,
-                    'date' => $attendanceDate->toDateString(),
-                    'submitted_by' => auth()->id(),
-                    'is_locked' => false,
-                ]);
-            }
-
-            // Upsert attendance record for the student
-            $record = AttendanceRecord::updateOrCreate(
-                [
-                    'student_id' => $studentId,
-                    'session_id' => $sessionId,
-                    'attendance_date' => $attendanceDate->toDateString(),
-                ],
-                [
-                    'status' => AttendanceStatus::PRESENT->value,
-                    'recorded_by' => auth()->id(),
-                    'recorded_at' => Carbon::now(),
-                ]
-            );
-
-            DB::commit();
-
-            return response()->json(['message' => 'Student marked present.', 'record' => $record], 201);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Something went wrong.', 'error' => $e->getMessage()], 500);
-        }
+        return $this->markStudentAttendance($request, AttendanceStatus::PRESENT);
     }
 
     /**
@@ -228,93 +183,7 @@ class AttendanceController extends Controller
      */
     public function markAbsent(Request $request)
     {
-        // ensure teacher role
-        if (auth()->user()->role->slug !== 'teacher') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $request->validate([
-            'class_id' => 'required|exists:classes,id',
-            'student_id' => 'required|exists:students,id',
-            'attendance_date' => 'sometimes|date',
-            'date' => 'sometimes|date',
-            'session_id' => 'nullable|exists:sessions,id',
-        ]);
-
-        $date = $request->input('attendance_date') ?? $request->input('date') ?? Carbon::today()->toDateString();
-
-        // allowed past days
-        $allowedDays = (int) env('ATTENDANCE_ALLOWED_PAST_DAYS', 0);
-        try {
-            $attendanceDate = Carbon::parse($date)->startOfDay();
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Invalid attendance date.'], 422);
-        }
-
-        $today = Carbon::today();
-        $minDate = $today->copy()->subDays($allowedDays)->startOfDay();
-        if ($attendanceDate->gt($today) || $attendanceDate->lt($minDate)) {
-            return response()->json(['message' => 'Attendance date must be today or within the allowed range.'], 422);
-        }
-
-        $classId = $request->class_id;
-        $studentId = $request->student_id;
-
-        // Validate student belongs to class
-        $student = Student::find($studentId);
-        if (!$student || $student->class_id != $classId) {
-            return response()->json(['message' => 'Student does not belong to the provided class.'], 422);
-        }
-
-        // Determine session
-        $sessionId = $request->input('session_id') ?? SessionModel::where('is_active', true)->value('id');
-        if (!$sessionId) {
-            return response()->json(['message' => 'No active session found. Provide session_id.'], 422);
-        }
-
-        DB::beginTransaction();
-        try {
-            // Find or create attendance main record
-            $attendance = Attendance::where('class_id', $classId)
-                ->where('session_id', $sessionId)
-                ->whereDate('date', $attendanceDate->toDateString())
-                ->first();
-
-            if ($attendance) {
-                if ($attendance->is_locked) {
-                    return response()->json(['message' => 'Attendance for this class/session/date is locked.'], 400);
-                }
-            } else {
-                $attendance = Attendance::create([
-                    'class_id' => $classId,
-                    'session_id' => $sessionId,
-                    'date' => $attendanceDate->toDateString(),
-                    'submitted_by' => auth()->id(),
-                    'is_locked' => false,
-                ]);
-            }
-
-            // Upsert attendance record for the student
-            $record = AttendanceRecord::updateOrCreate(
-                [
-                    'student_id' => $studentId,
-                    'session_id' => $sessionId,
-                    'attendance_date' => $attendanceDate->toDateString(),
-                ],
-                [
-                    'status' => AttendanceStatus::ABSENT->value,
-                    'recorded_by' => auth()->id(),
-                    'recorded_at' => Carbon::now(),
-                ]
-            );
-
-            DB::commit();
-
-            return response()->json(['message' => 'Student marked absent.', 'record' => $record], 201);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Something went wrong.', 'error' => $e->getMessage()], 500);
-        }
+        return $this->markStudentAttendance($request, AttendanceStatus::ABSENT);
     }
 
     /**
@@ -324,23 +193,48 @@ class AttendanceController extends Controller
      */
     public function markLate(Request $request)
     {
-        // ensure teacher role
+        return $this->markStudentAttendance($request, AttendanceStatus::LATE, $request->input('check_in_time'));
+    }
+
+    /**
+     * Private helper to mark student attendance.
+     *
+     * @param Request $request
+     * @param AttendanceStatus $status
+     * @param string|null $checkInTime
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function markStudentAttendance(Request $request, AttendanceStatus $status, ?string $checkInTime = null)
+    {
+        // Ensure teacher role
         if (auth()->user()->role->slug !== 'teacher') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $request->validate([
+        $rules = [
             'class_id' => 'required|exists:classes,id',
             'student_id' => 'required|exists:students,id',
             'attendance_date' => 'sometimes|date',
             'date' => 'sometimes|date',
             'session_id' => 'nullable|exists:sessions,id',
-            'check_in_time' => 'nullable|date_format:H:i',
-        ]);
+        ];
+
+        // Add check_in_time rule for late status
+        if ($status === AttendanceStatus::LATE) {
+            $rules['check_in_time'] = 'nullable|date_format:H:i';
+        }
+
+        $request->validate($rules);
+
+        // Verify teacher is assigned to this class
+        $class = SchoolClass::find($request->class_id);
+        if (!$class || $class->teacher_id !== auth()->id()) {
+            return response()->json(['message' => 'You are not authorized to mark attendance for this class'], 403);
+        }
 
         $date = $request->input('attendance_date') ?? $request->input('date') ?? Carbon::today()->toDateString();
 
-        // allowed past days
+        // Allowed past days
         $allowedDays = (int) env('ATTENDANCE_ALLOWED_PAST_DAYS', 0);
         try {
             $attendanceDate = Carbon::parse($date)->startOfDay();
@@ -369,11 +263,11 @@ class AttendanceController extends Controller
             return response()->json(['message' => 'No active session found. Provide session_id.'], 422);
         }
 
-        // Optional late/check-in time
+        // Parse check-in time for late status
         $checkIn = null;
-        if ($request->filled('check_in_time')) {
+        if ($status === AttendanceStatus::LATE && $checkInTime) {
             try {
-                $checkIn = Carbon::parse($attendanceDate->toDateString() . ' ' . $request->input('check_in_time'));
+                $checkIn = Carbon::parse($attendanceDate->toDateString() . ' ' . $checkInTime);
             } catch (\Exception $e) {
                 return response()->json(['message' => 'Invalid check_in_time format. Use H:i.'], 422);
             }
@@ -401,29 +295,31 @@ class AttendanceController extends Controller
                 ]);
             }
 
-            // Upsert attendance record for the student
-            $data = [
-                'status' => AttendanceStatus::LATE->value,
+            // Build record data
+            $recordData = [
+                'status' => $status->value,
                 'recorded_by' => auth()->id(),
                 'recorded_at' => Carbon::now(),
             ];
 
             if ($checkIn) {
-                $data['check_in_time'] = $checkIn;
+                $recordData['check_in_time'] = $checkIn;
             }
 
+            // Upsert attendance record for the student
             $record = AttendanceRecord::updateOrCreate(
                 [
                     'student_id' => $studentId,
                     'session_id' => $sessionId,
                     'attendance_date' => $attendanceDate->toDateString(),
                 ],
-                $data
+                $recordData
             );
 
             DB::commit();
 
-            return response()->json(['message' => 'Student marked late.', 'record' => $record], 201);
+            $statusText = strtolower($status->value);
+            return response()->json(['message' => "Student marked {$statusText}.", 'record' => $record], 201);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Something went wrong.', 'error' => $e->getMessage()], 500);

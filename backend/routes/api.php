@@ -3,9 +3,7 @@
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
-<<<<<<< HEAD
 use App\Http\Controllers\Teacher\TeacherAttendanceController;
-=======
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\ClassController;
@@ -31,7 +29,6 @@ Route::prefix('admin')
         Route::apiResource('academic-years', AcademicYearController::class);
         Route::put('academic-years/{id}/activate', [AcademicYearController::class, 'activate']);
     });
->>>>>>> feature/admin_management_api
 
 Route::prefix('auth')->group(function () {
     Route::match(['get', 'post'], '/register', [AuthController::class, 'register']);

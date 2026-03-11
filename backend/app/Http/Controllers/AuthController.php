@@ -64,13 +64,8 @@ class AuthController extends Controller
             ]);
         }
 
-        // Only allow teachers to login via this endpoint
-        $roleName = strtolower($user->role->name ?? '') ;
-        if ($roleName !== 'teacher') {
-            return response()->json([
-                'message' => 'Only teachers can login via this endpoint.'
-            ], 403);
-        }
+        // Allow all roles to login
+        $roleName = strtolower($user->role->name ?? '');
 
         $token = $user->createToken('auth-token')->plainTextToken;
 

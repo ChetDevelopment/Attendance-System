@@ -71,9 +71,9 @@ export const clearUser = () => {
    Authentication API
 ----------------------------- */
 export const login = async (email: string, password: string) => {
-  const res = await axios.post("http://localhost:8000/api/login", {
+  const res = await axios.post("http://localhost:8000/api/auth/login", {
     email,
-    password
+    password,
   });
 
   const data = res.data;
@@ -84,11 +84,15 @@ export const login = async (email: string, password: string) => {
   return data;
 };
 
-export const register = async (name: string, email: string, password: string) => {
-  const res = await axios.post("http://localhost:8000/api/register", {
+export const register = async (
+  name: string,
+  email: string,
+  password: string,
+) => {
+  const res = await axios.post("http://localhost:8000/api/auth/register", {
     name,
     email,
-    password
+    password,
   });
 
   return res.data;

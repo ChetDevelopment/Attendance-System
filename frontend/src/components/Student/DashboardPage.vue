@@ -1,12 +1,6 @@
-<<<<<<< HEAD:frontend/src/components/Student/DashboardPage.vue
 <script setup>
 import { onMounted, ref } from 'vue'
 import api from '../../services/api'
-=======
-<script setup lang="ts">
-import AppLayout from '../layouts/AppLayout.vue';
-import { CheckCircle2 as CheckCircle2Icon, AlertCircle as AlertCircleIcon } from 'lucide-vue-next';
->>>>>>> feature/login:frontend/src/pages/DashboardPage.vue
 
 const user = JSON.parse(localStorage.getItem('user_data') || '{}');
 const activities = [

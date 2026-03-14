@@ -64,8 +64,8 @@ class AuthController extends Controller
             ]);
         }
 
-        // Allow all roles to login
-        $roleName = strtolower($user->role->name ?? '');
+        // Load the role relationship for the frontend
+        $user->load('role');
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
@@ -87,8 +87,11 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
+        $user = $request->user();
+        $user->load('role');
+
         return response()->json([
-            'user' => $request->user(),
+            'user' => $user,
         ]);
     }
 }

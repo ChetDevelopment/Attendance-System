@@ -35,7 +35,7 @@ services:
     container_name: mysql_db
     restart: always
     environment:
-      MYSQL_DATABASE: vanda_db
+      MYSQL_DATABASE: attendance_system
       MYSQL_USER: root
       MYSQL_PASSWORD: secret
       MYSQL_ROOT_PASSWORD: root_secret

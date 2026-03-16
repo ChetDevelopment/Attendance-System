@@ -49,6 +49,5 @@ jobs:
             docker rm laravel_app || true
             docker rm vue_app || true
 
-            # Using attendance-backend/frontend images here
             docker run -d -p 9000:9000 --name laravel_app ${{ secrets.DOCKER_USERNAME }}/attendance-backend
             docker run -d -p 5173:5173 --name vue_app ${{ secrets.DOCKER_USERNAME }}/attendance-frontend

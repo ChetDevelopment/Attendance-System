@@ -4,11 +4,11 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Teacher\TeacherAttendanceController;
-use App\Http\Controllers\Student\StudentAttendanceController;
 
 Route::prefix('auth')->group(function () {
-    Route::match(['get', 'post'], '/register', [AuthController::class, 'register']);
-    Route::match(['get', 'post'], '/login', [AuthController::class, 'login']);
+    // Use POST for register/login for consistency and security
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -18,24 +18,36 @@ Route::prefix('auth')->group(function () {
 
 Route::middleware('auth:sanctum')->apiResource('attendances', AttendanceController::class);
 
-Route::middleware('auth:sanctum')->prefix('student/attendance')->group(function () {
-    Route::post('/card-scan', [StudentAttendanceController::class, 'cardScan']);
-});
-
-// Alias for external devices/integrations (same handler as card-scan).
-Route::middleware('auth:sanctum')->post('/receive-card-id', [StudentAttendanceController::class, 'cardScan']);
-
 
 Route::middleware('auth:sanctum')->group(function () {
 
+    // Teacher: Get all students (no class filter)
+    Route::get('/teacher/students', [TeacherAttendanceController::class, 'getAllStudents']);
+
+    // Teacher: Get students by class
     Route::get(
         '/teacher/classes/{classId}/students',
         [TeacherAttendanceController::class, 'getStudentsByClass']
     );
 
+    // Teacher: Get schedule/sessions
+    Route::get('/teacher/schedule', [TeacherAttendanceController::class, 'getSchedule']);
+
+    // Teacher: Get dashboard data
+    Route::get('/teacher/dashboard', [TeacherAttendanceController::class, 'getDashboard']);
+
+    // Teacher: Get justifications/absence requests
+    Route::get('/teacher/justifications', [TeacherAttendanceController::class, 'getJustifications']);
+
+    // Teacher: Get attendance history
+    Route::get('/teacher/history', [TeacherAttendanceController::class, 'getHistory']);
+
+    // Teacher: Get notifications
+    Route::get('/teacher/notifications', [TeacherAttendanceController::class, 'getNotifications']);
+
+    // Teacher: Submit attendance
     Route::post(
         '/teacher/attendance',
         [TeacherAttendanceController::class, 'submitAttendance']
     );
-
 });

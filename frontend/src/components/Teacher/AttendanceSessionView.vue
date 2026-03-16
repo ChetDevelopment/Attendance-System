@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { attendanceService } from '../../services/attendanceService'
 import { biometricService } from '../../services/biometricService'
 import { teacherService } from '../../services/teacherService'
@@ -15,35 +15,64 @@ const cardScanValue = ref('')
 const cardScanLoading = ref(false)
 
 const sessions = ref<any[]>([])
+const classes = ref<any[]>([])
 const students = ref<any[]>([])
 const selectedSessionId = ref<string>('')
+const classId = ref<string>('')
 const statuses = reactive<Record<number, StatusType>>({})
 
 const loadData = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [scheduleData, studentsData] = await Promise.all([
-      teacherService.getSchedule(),
-      teacherService.getStudents(),
-    ])
+    const scheduleData = await teacherService.getSchedule()
 
     sessions.value = Array.isArray(scheduleData.sessions) ? scheduleData.sessions : []
-    students.value = Array.isArray(studentsData) ? studentsData : []
+    classes.value = Array.isArray(scheduleData.classes) ? scheduleData.classes : []
+
+    // Set default class to first available class for this teacher
+    const classIdValue = scheduleData.class_id ?? classId.value ?? classes.value[0]?.id ?? null
+    classId.value = String(classIdValue ?? '')
+
+    if (classIdValue) {
+      const studentsData = await teacherService.getStudents(classIdValue)
+      students.value = Array.isArray(studentsData) ? studentsData : []
+
+      students.value.forEach((student) => {
+        if (!statuses[student.id]) statuses[student.id] = 'Present'
+      })
+    }
 
     if (!selectedSessionId.value && sessions.value.length > 0) {
       selectedSessionId.value = String(sessions.value[0].id)
     }
-
-    students.value.forEach((student) => {
-      if (!statuses[student.id]) statuses[student.id] = 'Present'
-    })
   } catch (error: any) {
     errorMessage.value = error.message || 'Failed to load attendance session data.'
   } finally {
     loading.value = false
   }
 }
+
+// Watch for class changes and reload students
+watch(classId, async (newClassId) => {
+  if (newClassId) {
+    loading.value = true
+    try {
+      const studentsData = await teacherService.getStudents(newClassId)
+      students.value = Array.isArray(studentsData) ? studentsData : []
+      
+      // Reset statuses when class changes
+      Object.keys(statuses).forEach(key => delete statuses[key])
+      students.value.forEach((student) => {
+        if (!statuses[student.id]) statuses[student.id] = 'Present'
+      })
+    } catch (error: any) {
+      errorMessage.value = error.message || 'Failed to load students for selected class.'
+    } finally {
+      loading.value = false
+    }
+  }
+})
 
 const filteredStudents = computed(() =>
   students.value.filter((student) => {
@@ -61,6 +90,10 @@ const saveAttendance = async () => {
     errorMessage.value = 'Please select a session before saving attendance.'
     return
   }
+  if (!classId.value) {
+    errorMessage.value = 'No class selected. Please refresh and try again.'
+    return
+  }
 
   saving.value = true
   errorMessage.value = ''
@@ -69,6 +102,7 @@ const saveAttendance = async () => {
   try {
     for (const student of filteredStudents.value) {
       await attendanceService.markAttendance({
+        class_id: Number(classId.value),
         student_id: student.id,
         session_id: Number(selectedSessionId.value),
         status: statuses[student.id] || 'Present',
@@ -148,6 +182,15 @@ onMounted(loadData)
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div class="md:col-span-1">
+        <label class="text-xs font-bold text-slate-500 uppercase">Class</label>
+        <select v-model="classId" class="mt-1 w-full px-3 py-2 border rounded-lg bg-white">
+          <option value="">Select class</option>
+          <option v-for="cls in classes" :key="cls.id" :value="String(cls.id)">
+            {{ cls.name }} ({{ cls.code }})
+          </option>
+        </select>
+      </div>
+      <div class="md:col-span-1">
         <label class="text-xs font-bold text-slate-500 uppercase">Session</label>
         <select v-model="selectedSessionId" class="mt-1 w-full px-3 py-2 border rounded-lg bg-white">
           <option value="">Select session</option>
@@ -156,7 +199,7 @@ onMounted(loadData)
           </option>
         </select>
       </div>
-      <div class="md:col-span-2">
+      <div class="md:col-span-1">
         <label class="text-xs font-bold text-slate-500 uppercase">Search Student</label>
         <input v-model="searchQuery" class="mt-1 w-full px-3 py-2 border rounded-lg bg-white" placeholder="Search by name or code" />
       </div>
@@ -191,6 +234,8 @@ onMounted(loadData)
       <table class="w-full text-left">
         <thead class="bg-slate-50">
           <tr>
+            <th class="px-4 py-3 text-xs text-slate-500 uppercase w-16">NO</th>
+            <th class="px-4 py-3 text-xs text-slate-500 uppercase w-20">PHOTOS</th>
             <th class="px-4 py-3 text-xs text-slate-500 uppercase">Student</th>
             <th class="px-4 py-3 text-xs text-slate-500 uppercase">Code</th>
             <th class="px-4 py-3 text-xs text-slate-500 uppercase">Status</th>
@@ -198,9 +243,16 @@ onMounted(loadData)
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500">Loading students...</td>
+            <td colspan="5" class="px-4 py-8 text-center text-sm text-slate-500">Loading students...</td>
           </tr>
-          <tr v-for="student in filteredStudents" :key="student.id" class="border-t">
+          <tr v-for="(student, index) in filteredStudents" :key="student.id" class="border-t">
+            <td class="px-4 py-3 text-sm text-slate-600">{{ index + 1 }}</td>
+            <td class="px-4 py-3">
+              <img v-if="student.photo" :src="student.photo" alt="Photo" class="w-10 h-10 rounded-full object-cover border border-slate-200" />
+              <div v-else class="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+                <span class="text-xs text-slate-400">N/A</span>
+              </div>
+            </td>
             <td class="px-4 py-3 text-sm font-semibold">{{ student.name }}</td>
             <td class="px-4 py-3 text-sm text-slate-600">{{ student.student_code }}</td>
             <td class="px-4 py-3">
@@ -213,7 +265,7 @@ onMounted(loadData)
             </td>
           </tr>
           <tr v-if="!loading && filteredStudents.length === 0">
-            <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500">No students found.</td>
+            <td colspan="5" class="px-4 py-8 text-center text-sm text-slate-500">No students found.</td>
           </tr>
         </tbody>
       </table>

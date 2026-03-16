@@ -43,10 +43,22 @@ export const teacherService = {
     }
   },
 
-  async getStudents() {
+  async getStudents(classId = null) {
     try {
-      const response = await api.get('/teacher/students')
-      return response.data
+      if (classId) {
+        const response = await api.get(`/teacher/classes/${classId}/students`)
+        // backend returns { class_id, students }
+        return response.data.students ?? response.data
+      }
+
+      // Fallback: try a general endpoint if available
+      try {
+        const response = await api.get('/teacher/students')
+        return response.data
+      } catch (err) {
+        // If no general endpoint exists, return empty array instead of throwing
+        return []
+      }
     } catch (error) {
       throw new Error(toError(error, 'Failed to load students.'))
     }
@@ -71,11 +83,11 @@ export const teacherService = {
       const response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?key=${apiKey}`
       )
-      
+
       if (!response.ok) {
         throw new Error(`Google Calendar API error: ${response.status}`)
       }
-      
+
       const data = await response.json()
       return data
     } catch (error) {

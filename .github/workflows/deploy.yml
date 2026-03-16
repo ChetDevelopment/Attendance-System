@@ -21,25 +21,25 @@ jobs:
 
       - name: Build Backend Image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/attendance-backend ./backend
+          docker build -t vichet12/attendance-backend ./backend
 
       - name: Build Frontend Image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/attendance-frontend ./frontend
+          docker build -t vichet12/attendance-frontend ./frontend
 
       - name: Push Backend Image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/attendance-backend
+        run: docker push vichet12/attendance-backend
 
       - name: Push Frontend Image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/attendance-frontend
+        run: docker push vichet12/attendance-frontend
 
-      - name: Deploy to Server
+      - name: Deploy to AWS Server
         uses: appleboy/ssh-action@v0.1.6
         with:
-          host: ${{ secrets.HOST }}
+          host: ${{ secrets.SERVER_IP }}
           username: ubuntu
-          key: ${{ secrets.KEY }}
-          port: 22 # Ensure this is exactly aligned under 'host'
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
           script: |
             sudo docker pull vichet12/attendance-backend
             sudo docker pull vichet12/attendance-frontend
@@ -50,5 +50,8 @@ jobs:
             sudo docker rm laravel_app || true
             sudo docker rm vue_app || true
 
+            # Backend running on 9000
             sudo docker run -d -p 9000:9000 --name laravel_app vichet12/attendance-backend
+
+            # Frontend mapping public port 80 to internal 5173
             sudo docker run -d -p 80:5173 --name vue_app vichet12/attendance-frontend

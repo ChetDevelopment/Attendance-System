@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import Modal from './Modal.vue';
-import ConfirmationModal from './ConfirmationModal.vue';
+import ConfirmationModal from '../common/ConfirmationModal.vue';
 import {
   Search,
   UserPlus,
@@ -49,7 +49,6 @@ type StudentForm = {
   // Biometric fields
   cardId: string;
   fingerprintEnrolled: boolean;
-  password: string;
 };
 
 type BackendStudent = {
@@ -97,6 +96,12 @@ const classFilter = ref('All Classes');
 const subjectFilter = ref('All Subjects');
 const sectionFilter = ref('All Sections');
 const viewMode = ref<'table' | 'grid'>('table');
+const studentsPerPage = 12;
+const currentPage = ref(1);
+const totalStudents = ref(0);
+const totalPages = ref(1);
+const pageFrom = ref(0);
+const pageTo = ref(0);
 const newStudent = ref<StudentForm>({
   name: '',
   class: '',
@@ -108,7 +113,6 @@ const newStudent = ref<StudentForm>({
   photo: '',
   cardId: '',
   fingerprintEnrolled: false,
-  password: 'student123',
 });
 const bulkData = ref('');
 
@@ -194,20 +198,49 @@ const normalizeStudentData = (payload: any): BackendStudent[] => {
   return [];
 };
 
+const buildStudentFilters = () => {
+  const filters: Record<string, string | number> = {};
+  const search = searchQuery.value.trim();
+
+  if (search) {
+    filters.search = search;
+  }
+
+  if (subjectFilter.value !== 'All Subjects') {
+    filters.generation = subjectFilter.value;
+  }
+
+  if (sectionFilter.value !== 'All Sections') {
+    filters.section = sectionFilter.value;
+  }
+
+  if (classFilter.value !== 'All Classes') {
+    const selected = classOptions.value.find((item) => item.name === classFilter.value);
+    if (selected) {
+      filters.class_id = selected.id;
+    }
+  }
+
+  return filters;
+};
+
 const loadStudents = async () => {
-  let page = 1;
-  let lastPage = 1;
-  const allStudents: BackendStudent[] = [];
+  const response = await studentService.getStudents(
+    currentPage.value,
+    studentsPerPage,
+    buildStudentFilters()
+  );
+  const batch = normalizeStudentData(response);
 
-  do {
-    const response = await studentService.getStudents(page);
-    const batch = normalizeStudentData(response);
-    allStudents.push(...batch);
-    lastPage = Number(response?.last_page || 1);
-    page += 1;
-  } while (page <= lastPage);
+  students.value = batch.map(toUiStudent);
+  totalStudents.value = Number(response?.total || batch.length || 0);
+  totalPages.value = Math.max(Number(response?.last_page || 1), 1);
+  pageFrom.value = Number(response?.from || (batch.length ? 1 : 0));
+  pageTo.value = Number(response?.to || batch.length || 0);
 
-  students.value = allStudents.map(toUiStudent);
+  if (batch.length === 0 && totalStudents.value > 0 && currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value;
+  }
 };
 
 const loadClasses = async () => {
@@ -356,7 +389,6 @@ const resetNewStudent = () => {
     photo: '',
     cardId: '',
     fingerprintEnrolled: false,
-    password: 'student123',
   };
 };
 
@@ -383,7 +415,6 @@ const handleAddStudent = async () => {
       gender: newStudent.value.gender,
       parent_number: newStudent.value.parent,
       contact: newStudent.value.contact,
-      password: newStudent.value.password,
       // Biometric fields
       card_id: newStudent.value.cardId || null,
       fingerprint_enrolled: newStudent.value.fingerprintEnrolled,
@@ -430,11 +461,11 @@ const handleBulkAdd = async () => {
   let nextId = getNextIdForGeneration(generation);
 
   try {
-    for (const name of names) {
+    const studentsPayload = names.map((name) => {
       const username = `${generation}-${String(nextId).padStart(3, '0')}`;
       nextId += 1;
 
-      await studentService.createStudent({
+      return {
         fullname: name,
         username,
         email: buildEmailFromName(name), // Auto-generate email from name
@@ -446,9 +477,13 @@ const handleBulkAdd = async () => {
         gender: 'Male',
         parent_number: 'N/A',
         contact: 'N/A',
-        password: 'student123',
-      });
-    }
+      };
+    });
+
+    await studentService.bulkCreateStudents({
+      students: studentsPayload,
+      default_password: 'password123',
+    });
 
     isBulkModalOpen.value = false;
     bulkData.value = '';
@@ -557,21 +592,34 @@ const handlePrint = () => {
   window.print();
 };
 
-const filteredStudents = computed(() =>
-  students.value.filter((s) => {
-    const matchesSearch =
-      s.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      s.id.toLowerCase().includes(searchQuery.value.toLowerCase());
-    const matchesClass = classFilter.value === 'All Classes' || s.class === classFilter.value;
-    const matchesSubject =
-      subjectFilter.value === 'All Subjects' ||
-      String(s.generation || '').toLowerCase() === subjectFilter.value.toLowerCase();
-    const matchesSection =
-      sectionFilter.value === 'All Sections' ||
-      String(s.class || '').toLowerCase() === sectionFilter.value.toLowerCase();
-    return matchesSearch && matchesClass && matchesSubject && matchesSection;
-  })
+const paginatedStudents = computed(() => students.value);
+
+const pageNumbers = computed(() =>
+  Array.from({ length: totalPages.value }, (_, index) => index + 1)
 );
+
+let studentReloadDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const reloadStudentsDebounced = () => {
+  if (studentReloadDebounce) {
+    clearTimeout(studentReloadDebounce);
+  }
+  studentReloadDebounce = setTimeout(() => {
+    loadStudents();
+  }, 250);
+};
+
+watch([searchQuery, classFilter, subjectFilter, sectionFilter], () => {
+  if (currentPage.value !== 1) {
+    currentPage.value = 1;
+    return;
+  }
+  reloadStudentsDebounced();
+});
+
+watch(currentPage, () => {
+  loadStudents();
+});
 
 const studentGeneration = (student: Student | null) =>
   student?.generation || student?.id?.split('-')[0] || 'PNC2026';
@@ -684,7 +732,7 @@ onMounted(async () => {
           <tr v-if="loading">
             <td :colspan="5" class="px-6 py-10 text-center text-slate-400 italic">Loading students...</td>
           </tr>
-          <tr v-for="s in filteredStudents" :key="s.dbId || s.id" class="hover:bg-slate-50 transition-colors">
+          <tr v-for="s in paginatedStudents" :key="s.dbId || s.id" class="hover:bg-slate-50 transition-colors">
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
                 <div class="size-8 rounded-full bg-slate-100 overflow-hidden">
@@ -741,7 +789,7 @@ onMounted(async () => {
       </table>
 
       <div v-else class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 bg-slate-50/30">
-        <div v-for="s in filteredStudents" :key="s.dbId || s.id" class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
+        <div v-for="s in paginatedStudents" :key="s.dbId || s.id" class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
           <div class="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
             <button @click="openEditStudent(s)" class="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-primary shadow-sm">
               <Edit3 class="size-3.5" />
@@ -774,7 +822,44 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="!loading && filteredStudents.length === 0" class="p-12 text-center">
+      <div v-if="!loading && totalStudents > 0" class="px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/70">
+        <div class="flex items-center gap-2 text-xs">
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700 font-semibold">
+            Showing {{ pageFrom }}-{{ pageTo }} of {{ totalStudents }}
+          </span>
+        </div>
+        <div v-if="totalPages > 1" class="w-full sm:w-auto flex items-center gap-1 overflow-x-auto">
+          <button
+            @click="currentPage = Math.max(currentPage - 1, 1)"
+            :disabled="currentPage === 1"
+            class="px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+          >
+            Previous
+          </button>
+          <button
+            v-for="page in pageNumbers"
+            :key="page"
+            @click="currentPage = page"
+            :class="[
+              'min-w-9 px-3 py-2 text-xs font-semibold rounded-lg border transition-colors',
+              page === currentPage
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100',
+            ]"
+          >
+            {{ page }}
+          </button>
+          <button
+            @click="currentPage = Math.min(currentPage + 1, totalPages)"
+            :disabled="currentPage === totalPages"
+            class="px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
+      <div v-if="!loading && totalStudents === 0" class="p-12 text-center">
         <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
           <Search class="size-8 text-slate-300" />
         </div>
@@ -845,10 +930,7 @@ onMounted(async () => {
               <label class="text-[10px] font-bold text-slate-500 uppercase">Contact Number</label>
               <input v-model="newStudent.contact" type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20" />
             </div>
-            <div class="space-y-1">
-              <label class="text-[10px] font-bold text-slate-500 uppercase">Password</label>
-              <input v-model="newStudent.password" type="password" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20" placeholder="student123" />
-            </div>
+            <p class="text-xs text-slate-500">Default password for new student account: <strong>password123</strong></p>
 
             <!-- Biometric Section -->
             <div class="border-t border-slate-200 pt-4 mt-4">
@@ -924,7 +1006,7 @@ onMounted(async () => {
     <Modal :is-open="isBulkModalOpen" title="Bulk Import Students" size="md" @close="isBulkModalOpen = false">
       <div class="space-y-4">
         <div class="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-          <p class="text-xs text-blue-700 leading-relaxed"><strong>Instructions:</strong> Enter student names one per line. We will automatically assign IDs and set the default class to 10A. You can edit individual details later.</p>
+          <p class="text-xs text-blue-700 leading-relaxed"><strong>Instructions:</strong> Enter student names one per line. We automatically assign IDs and create accounts with default password <strong>password123</strong>. You can edit details later.</p>
         </div>
         <div class="space-y-1">
           <label class="text-[10px] font-bold text-slate-500 uppercase">Student Names (One per line)</label>

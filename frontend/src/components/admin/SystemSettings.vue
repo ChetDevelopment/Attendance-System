@@ -16,6 +16,7 @@ import {
 import { dashboardService } from '../../services/dashboardService';
 import { profileService } from '../../services/profileService';
 import { adminAttendanceService } from '../../services/adminAttendanceService';
+import { sessionAdminService } from '../../services/sessionAdminService';
 import api from '../../services/api';
 
 type LogStatus = 'Success' | 'Failed';
@@ -52,8 +53,6 @@ const settingsForm = ref({
   default_session_start: '',
   default_session_end: '',
   late_threshold: 15,
-  telegram_group_id: '',
-  telegram_bot_token: '',
 });
 
 const maintenanceInfo = ref({
@@ -78,7 +77,7 @@ const statusTextClass = (status: string) => [
 
 const loadLogs = async () => {
   loadingLogs.value = true;
-  try {
+      try {
     const notificationData = await dashboardService.getNotifications();
     logs.value = Array.isArray(notificationData)
       ? notificationData.map((item: any) => ({
@@ -101,7 +100,7 @@ const loadConfig = async () => {
   try {
     const [profile, sessionData] = await Promise.all([
       profileService.getProfile(),
-      adminAttendanceService.getSessions(),
+      sessionAdminService.list().catch(() => adminAttendanceService.getSessions()),
     ]);
 
     sessions.value = Array.isArray(sessionData) ? sessionData : [];
@@ -109,8 +108,7 @@ const loadConfig = async () => {
 
     settingsForm.value.default_session_start = String(defaultSession?.start_time || '');
     settingsForm.value.default_session_end = String(defaultSession?.end_time || '');
-    settingsForm.value.telegram_group_id = String(import.meta.env.VITE_TELEGRAM_GROUP_ID || '');
-    settingsForm.value.telegram_bot_token = String(import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '');
+    settingsForm.value.late_threshold = Number(defaultSession?.late_threshold ?? settingsForm.value.late_threshold);
 
     profileSettings.value = {
       theme: String(profile?.theme || 'light'),
@@ -138,11 +136,86 @@ const saveSettings = async () => {
       notification_email: profileSettings.value.notification_email,
       notification_push: profileSettings.value.notification_push,
     });
+
+    // Persist attendance rules to sessions (best-effort).
+    const allSessions = sessions.value.length
+      ? sessions.value
+      : await sessionAdminService.list().catch(() => adminAttendanceService.getSessions());
+
+    if (Array.isArray(allSessions) && allSessions.length) {
+      const sessionOne = allSessions.find((s: any) => Number(s?.order || 0) === 1) ?? allSessions[0];
+
+      const updates = [];
+
+      if (sessionOne?.id) {
+        updates.push(sessionAdminService.update(sessionOne.id, {
+          name: sessionOne.name,
+          order: Number(sessionOne.order || 1),
+          start_time: settingsForm.value.default_session_start,
+          end_time: settingsForm.value.default_session_end,
+          late_threshold: Number(settingsForm.value.late_threshold || 0),
+          is_active: sessionOne.is_active ?? true,
+          description: sessionOne.description ?? null,
+          date: sessionOne.date ?? null,
+          academic_year_id: sessionOne.academic_year_id ?? null,
+        }));
+      }
+
+      // Apply late threshold across all sessions for consistency.
+      for (const s of allSessions) {
+        if (!s?.id || s?.id === sessionOne?.id) continue;
+        updates.push(sessionAdminService.update(s.id, {
+          name: s.name,
+          order: Number(s.order || 1),
+          start_time: s.start_time,
+          end_time: s.end_time,
+          late_threshold: Number(settingsForm.value.late_threshold || 0),
+          is_active: s.is_active ?? true,
+          description: s.description ?? null,
+          date: s.date ?? null,
+          academic_year_id: s.academic_year_id ?? null,
+        }));
+      }
+
+      await Promise.allSettled(updates);
+    }
+
     successMessage.value = 'Settings saved successfully.';
   } catch (error: any) {
     errorMessage.value = error?.message || 'Failed to save settings.';
   } finally {
     saving.value = false;
+  }
+};
+
+const clearSystemCache = async () => {
+  errorMessage.value = '';
+  successMessage.value = '';
+  try {
+    const response = await api.post('/admin/system/clear-cache');
+    successMessage.value = response?.data?.message || 'System cache cleared.';
+  } catch (error: any) {
+    errorMessage.value = error?.response?.data?.message || error?.message || 'Failed to clear system cache.';
+  }
+};
+
+const downloadConfigBackup = async () => {
+  errorMessage.value = '';
+  successMessage.value = '';
+  try {
+    const response = await api.get('/admin/system/export-config', { responseType: 'blob' });
+    const blob = new Blob([response.data], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `attendance-config-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    successMessage.value = 'Configuration exported.';
+    maintenanceInfo.value.last_backup = new Date().toLocaleString();
+    isBackupModalOpen.value = false;
+  } catch (error: any) {
+    errorMessage.value = error?.response?.data?.message || error?.message || 'Failed to export configuration.';
   }
 };
 
@@ -267,15 +340,9 @@ onUnmounted(() => {
             <h3 class="font-bold text-slate-900">Telegram Integration</h3>
           </div>
 
-          <div class="space-y-1">
-            <label class="text-[10px] font-bold text-slate-500 uppercase">Telegram Group ID</label>
-            <input v-model="settingsForm.telegram_group_id" type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20" />
-          </div>
-
-          <div class="space-y-1">
-            <label class="text-[10px] font-bold text-slate-500 uppercase">Bot API Token</label>
-            <input v-model="settingsForm.telegram_bot_token" type="password" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20" />
-          </div>
+          <p class="text-sm text-slate-600">
+            Telegram credentials are configured on the server (backend <code>.env</code>) for security. Use the test button to verify connectivity.
+          </p>
 
           <div class="pt-4">
             <button :disabled="testingTelegram" @click="testTelegramConnection" class="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold text-sm shadow-xl disabled:opacity-60">
@@ -309,15 +376,15 @@ onUnmounted(() => {
               class="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 transition-all"
             >
               <Download class="size-4" />
-              Download Backup
+              Export Config
             </button>
-            <button class="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 transition-all">
+            <button disabled class="flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-400 cursor-not-allowed">
               <HistoryIcon class="size-4" />
               Restore Point
             </button>
           </div>
 
-          <button class="w-full py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold text-xs hover:bg-red-100 transition-all">
+          <button @click="clearSystemCache" class="w-full py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold text-xs hover:bg-red-100 transition-all">
             Clear System Cache
           </button>
         </div>
@@ -412,22 +479,22 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <Modal :is-open="isBackupModalOpen" title="Confirm Database Backup" @close="isBackupModalOpen = false">
+    <Modal :is-open="isBackupModalOpen" title="Export Configuration" @close="isBackupModalOpen = false">
       <div class="space-y-4">
-        <p class="text-sm text-slate-600">This will generate a full SQL dump of the current database state. This process may take a few moments depending on the database size.</p>
+        <p class="text-sm text-slate-600">This exports sessions and system metadata to a JSON file for backup/restore or sharing configuration between environments.</p>
         <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
           <div class="flex justify-between text-[10px] font-bold">
             <span class="text-slate-500 uppercase">Format</span>
-            <span class="text-slate-900">SQL (.gz)</span>
+            <span class="text-slate-900">JSON</span>
           </div>
           <div class="flex justify-between text-[10px] font-bold">
             <span class="text-slate-500 uppercase">Estimated Size</span>
-            <span class="text-slate-900">~45 MB</span>
+            <span class="text-slate-900">&lt; 1 MB</span>
           </div>
         </div>
         <div class="pt-4 flex justify-end gap-3">
           <button @click="isBackupModalOpen = false" class="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-          <button class="px-4 py-2 text-sm font-bold text-white bg-primary rounded-lg shadow-lg shadow-primary/20">Start Backup</button>
+          <button @click="downloadConfigBackup" class="px-4 py-2 text-sm font-bold text-white bg-primary rounded-lg shadow-lg shadow-primary/20">Download</button>
         </div>
       </div>
     </Modal>

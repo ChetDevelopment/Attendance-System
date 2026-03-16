@@ -20,7 +20,9 @@ type Period = 'Today' | 'Weekly' | 'Monthly';
 type DashboardStats = { present: string; absent: string; late: string; rate: string; offsite: string };
 
 const isLateModalOpen = ref(false);
+const isOffsiteModalOpen = ref(false);
 const lateSearchQuery = ref('');
+const offsiteSearchQuery = ref('');
 const selectedPeriod = ref<Period>('Today');
 const loading = ref(false);
 const errorMessage = ref('');
@@ -38,6 +40,7 @@ const stats = ref<Record<Period, DashboardStats>>({
 });
 
 const lateStudents = ref<Array<{ name: string; class: string; time: string; status: string }>>([]);
+const offsiteStudents = ref<Array<{ name: string; class: string; time: string; status: string; distance_km: number; location: string }>>([]);
 
 const activeSession = ref<any>(null);
 const trendData = ref<Array<{ name: string; value: number }>>([]);
@@ -49,6 +52,13 @@ const filteredLateStudents = computed(() =>
     (s) =>
       s.name.toLowerCase().includes(lateSearchQuery.value.toLowerCase()) ||
       s.class.toLowerCase().includes(lateSearchQuery.value.toLowerCase())
+  )
+);
+const filteredOffsiteStudents = computed(() =>
+  offsiteStudents.value.filter(
+    (s) =>
+      s.name.toLowerCase().includes(offsiteSearchQuery.value.toLowerCase()) ||
+      s.class.toLowerCase().includes(offsiteSearchQuery.value.toLowerCase())
   )
 );
 const visibleNotifications = computed(() =>
@@ -98,19 +108,16 @@ const loadDashboard = async () => {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const [summaryResult, lateResult, sessionResult, trendsResult, riskResult] = await Promise.allSettled([
-      dashboardService.getSummary(),
-      dashboardService.getLateStudents(),
-      dashboardService.getActiveSession(),
-      dashboardService.getTrendData(),
-      dashboardService.getRiskStudents(),
-    ]);
-
-    const summaryRes = summaryResult.status === 'fulfilled' ? summaryResult.value : {};
-    const lateRes = lateResult.status === 'fulfilled' ? lateResult.value : [];
-    const sessionRes = sessionResult.status === 'fulfilled' ? sessionResult.value : null;
-    const trendsRes = trendsResult.status === 'fulfilled' ? trendsResult.value : [];
-    const riskRes = riskResult.status === 'fulfilled' ? riskResult.value : [];
+    const data = await dashboardService.getOverview();
+    
+    const summaryRes = data.summary || {};
+    const lateRes = data.late_students || [];
+    const offsiteRes = data.offsite_students || [];
+    const sessionRes = data.active_session || null;
+    
+    // Get trends and risk data from overview response (no extra API calls needed)
+    const trendsRes = data.trends || [];
+    const riskRes = data.risk_students || [];
 
     // Set active academic year from summary response
     if (summaryRes?.active_academic_year) {
@@ -121,7 +128,6 @@ const loadDashboard = async () => {
     const absent = Number(summaryRes?.total_absent_today || 0);
     const late = Number(summaryRes?.total_late_today || 0);
     const total = present + absent + late;
-    const absentTrend = Array.isArray(trendsRes) ? trendsRes : [];
 
     stats.value.Today = {
       present: formatCount(present),
@@ -149,36 +155,33 @@ const loadDashboard = async () => {
 
     lateStudents.value = Array.isArray(lateRes)
       ? lateRes.map((s: any) => ({
-          name: String(s?.student?.name || 'Unknown'),
-          class: String(s?.student?.class?.name || 'Unknown'),
-          time: String(s?.check_in_time || '--:--'),
+          name: String(s?.name || 'Unknown'),
+          class: String(s?.class || 'Unknown'),
+          time: String(s?.time || '--:--'),
           status: String(s?.status || 'Late'),
         }))
       : [];
 
+    offsiteStudents.value = Array.isArray(offsiteRes)
+      ? offsiteRes.map((s: any) => ({
+          name: String(s?.name || 'Unknown'),
+          class: String(s?.class || 'Unknown'),
+          time: String(s?.check_in_time || '--:--'),
+          status: String(s?.status || 'Present'),
+          distance_km: Number(s?.distance_km || 0),
+          location: String(s?.location || ''),
+        }))
+      : [];
+
     activeSession.value = sessionRes || null;
-    trendData.value = absentTrend;
+    trendData.value = trendsRes;
     riskStudents.value = Array.isArray(riskRes)
       ? riskRes.map((s: any) => ({
           name: String(s?.name || 'Unknown'),
-          class: String(s?.class?.name || 'Unknown'),
-          absence_count: Number(s?.absences_count || 0),
+          class: String(s?.class || 'Unknown'),
+          absence_count: Number(s?.absence_count || 0),
         }))
       : [];
-      
-    const failedCalls = [summaryResult, lateResult, sessionResult, trendsResult, riskResult]
-      .filter((result) => result.status === 'rejected')
-      .length;
-
-    if (failedCalls > 0) {
-      errorMessage.value = `${failedCalls} dashboard data source(s) failed to load.`;
-      notifications.value = [{
-        id: Date.now(),
-        title: 'Dashboard Partial Load',
-        subtitle: errorMessage.value,
-        type: 'error',
-      }, ...visibleNotifications.value];
-    }
   } catch (error: any) {
     errorMessage.value = error?.message || 'Failed to load dashboard data from backend.';
   } finally {
@@ -264,7 +267,11 @@ onMounted(async () => {
         border-color="border-red-500"
         subtitle="Outside school perimeter"
         footer-text="Requires verification"
-      />
+      >
+        <template #action>
+          <button @click="isOffsiteModalOpen = true" class="text-[10px] text-primary font-bold hover:underline">View Details</button>
+        </template>
+      </StatCard>
       <StatCard
         title="Telegram Alerts"
         value="Sent Status"
@@ -371,6 +378,45 @@ onMounted(async () => {
             </tr>
             <tr v-if="filteredLateStudents.length === 0">
               <td :colspan="4" class="px-4 py-10 text-center text-slate-400 italic">No late students found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Modal>
+
+    <Modal :is-open="isOffsiteModalOpen" title="Off-site Today (Outside PNC Geofence)" size="lg" @close="isOffsiteModalOpen = false">
+      <div class="space-y-4">
+        <div class="relative">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
+          <input
+            v-model="offsiteSearchQuery"
+            type="text"
+            placeholder="Filter by name or class..."
+            class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+        <table class="w-full text-left text-sm">
+          <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+            <tr>
+              <th class="px-4 py-2">Student</th>
+              <th class="px-4 py-2">Class</th>
+              <th class="px-4 py-2">Time</th>
+              <th class="px-4 py-2">Distance</th>
+              <th class="px-4 py-2">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="(s, i) in filteredOffsiteStudents" :key="`offsite-${i}`">
+              <td class="px-4 py-3 font-bold">{{ s.name }}</td>
+              <td class="px-4 py-3">{{ s.class }}</td>
+              <td class="px-4 py-3 font-mono">{{ s.time }}</td>
+              <td class="px-4 py-3 font-mono">{{ s.distance_km.toFixed(3) }} km</td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-0.5 bg-rose-100 text-rose-600 text-[10px] font-bold rounded uppercase">{{ s.status }}</span>
+              </td>
+            </tr>
+            <tr v-if="filteredOffsiteStudents.length === 0">
+              <td :colspan="5" class="px-4 py-10 text-center text-slate-400 italic">No off-site students found for today.</td>
             </tr>
           </tbody>
         </table>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import Modal from './Modal.vue'
-import ConfirmationModal from './ConfirmationModal.vue'
+import ConfirmationModal from '../common/ConfirmationModal.vue'
 import { Search, Key, Power, UserPlus, CheckCircle } from 'lucide-vue-next'
 import { userService } from '../../services/userService'
 
@@ -146,14 +146,20 @@ const confirmDeleteUser = async () => {
   }
 }
 
-const handleResetPassword = () => {
-  // Placeholder action for reset flow in UI; backend reset endpoint is not currently available.
-  resetSuccess.value = true
-  setTimeout(() => {
-    isResetModalOpen.value = false
-    resetSuccess.value = false
-    selectedUser.value = null
-  }, 1500)
+const handleResetPassword = async () => {
+  if (!selectedUser.value) return
+
+  try {
+    await userService.resetPassword(selectedUser.value.id)
+    resetSuccess.value = true
+    setTimeout(() => {
+      isResetModalOpen.value = false
+      resetSuccess.value = false
+      selectedUser.value = null
+    }, 1500)
+  } catch (error: any) {
+    errorMessage.value = error.message || 'Unable to reset password.'
+  }
 }
 
 const filteredUsers = computed(() =>
@@ -331,10 +337,11 @@ onMounted(loadData)
             <CheckCircle class="size-8 text-green-600" />
           </div>
           <div>
-            <h3 class="text-lg font-bold text-slate-900">Password Reset Triggered</h3>
+            <h3 class="text-lg font-bold text-slate-900">Password Reset Successful</h3>
             <p class="text-sm text-slate-500">
-              Reset action completed for<br />
-              <span class="font-bold text-slate-900">{{ selectedUser?.email }}</span>
+              Password for <span class="font-bold text-slate-900">{{ selectedUser?.name }}</span> 
+              has been reset to: <br/>
+              <span class="font-mono font-bold text-primary px-2 py-1 bg-primary/5 rounded border border-primary/10 mt-1 inline-block">password123</span>
             </p>
           </div>
         </div>

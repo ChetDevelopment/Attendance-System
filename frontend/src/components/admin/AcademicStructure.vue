@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import Modal from './Modal.vue'
+import ConfirmationModal from '../common/ConfirmationModal.vue'
 import { Plus, Search, Trash2, Pencil } from 'lucide-vue-next'
 import { adminAcademicService } from '../../services/adminAcademicService'
 
@@ -34,6 +35,11 @@ const isYearModalOpen = ref(false)
 const isClassModalOpen = ref(false)
 const editingYearId = ref<number | null>(null)
 const editingClassId = ref<number | null>(null)
+
+const isYearDeleteModalOpen = ref(false)
+const isClassDeleteModalOpen = ref(false)
+const yearToDelete = ref<AcademicYear | null>(null)
+const classToDelete = ref<SchoolClass | null>(null)
 
 const yearForm = ref({
   name: '',
@@ -136,13 +142,21 @@ const deleteYear = async (id: number) => {
   }
 }
 
-const confirmDeleteYear = (id: number) => {
-  const year = years.value.find(y => y.id === id)
-  if (!year) return
+const openYearDeleteModal = (year: AcademicYear) => {
+  yearToDelete.value = year
+  isYearDeleteModalOpen.value = true
+}
 
-  if (confirm(`Are you sure you want to delete academic year "${year.name}"? This action cannot be undone.`)) {
-    deleteYear(id)
-  }
+const closeYearDeleteModal = () => {
+  isYearDeleteModalOpen.value = false
+  yearToDelete.value = null
+}
+
+const confirmDeleteYear = async () => {
+  if (!yearToDelete.value) return
+  const id = yearToDelete.value.id
+  closeYearDeleteModal()
+  await deleteYear(id)
 }
 
 const openCreateClass = () => {
@@ -206,13 +220,21 @@ const deleteClass = async (id: number) => {
   }
 }
 
-const confirmDeleteClass = (id: number) => {
-  const classItem = classes.value.find(c => c.id === id)
-  if (!classItem) return
+const openClassDeleteModal = (item: SchoolClass) => {
+  classToDelete.value = item
+  isClassDeleteModalOpen.value = true
+}
 
-  if (confirm(`Are you sure you want to delete class "${classItem.class_name}"? This action cannot be undone.`)) {
-    deleteClass(id)
-  }
+const closeClassDeleteModal = () => {
+  isClassDeleteModalOpen.value = false
+  classToDelete.value = null
+}
+
+const confirmDeleteClass = async () => {
+  if (!classToDelete.value) return
+  const id = classToDelete.value.id
+  closeClassDeleteModal()
+  await deleteClass(id)
 }
 
 onMounted(loadData)
@@ -298,7 +320,7 @@ onMounted(loadData)
                 <button class="p-2 rounded-lg hover:bg-sky-50 text-sky-600" @click="openEditClass(item)">
                   <Pencil class="size-4" />
                 </button>
-                <button class="p-2 rounded-lg hover:bg-rose-50 text-rose-600" @click="confirmDeleteClass(item.id)">
+                <button class="p-2 rounded-lg hover:bg-rose-50 text-rose-600" @click="openClassDeleteModal(item)">
                   <Trash2 class="size-4" />
                 </button>
               </div>
@@ -345,7 +367,7 @@ onMounted(loadData)
                 <button class="p-2 rounded-lg hover:bg-sky-50 text-sky-600" @click="openEditYear(year)">
                   <Pencil class="size-4" />
                 </button>
-                <button class="p-2 rounded-lg hover:bg-rose-50 text-rose-600" @click="confirmDeleteYear(year.id)">
+                <button class="p-2 rounded-lg hover:bg-rose-50 text-rose-600" @click="openYearDeleteModal(year)">
                   <Trash2 class="size-4" />
                 </button>
               </div>
@@ -428,6 +450,30 @@ onMounted(loadData)
         </div>
       </div>
     </Modal>
+
+    <!-- Year Delete Confirmation -->
+    <ConfirmationModal
+      :is-open="isYearDeleteModalOpen"
+      title="Delete Academic Year"
+      :message="`Are you sure you want to delete academic year '${yearToDelete?.name}'? This will also affect all associated classes. This action cannot be undone.`"
+      confirm-text="Delete"
+      cancel-text="Cancel"
+      variant="danger"
+      @confirm="confirmDeleteYear"
+      @cancel="closeYearDeleteModal"
+    />
+
+    <!-- Class Delete Confirmation -->
+    <ConfirmationModal
+      :is-open="isClassDeleteModalOpen"
+      title="Delete Class"
+      :message="`Are you sure you want to delete class '${classToDelete?.class_name}'? This action cannot be undone.`"
+      confirm-text="Delete"
+      cancel-text="Cancel"
+      variant="danger"
+      @confirm="confirmDeleteClass"
+      @cancel="closeClassDeleteModal"
+    />
   </div>
 </template>
 

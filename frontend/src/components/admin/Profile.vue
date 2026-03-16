@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { Save, Upload } from 'lucide-vue-next'
 import { profileService } from '../../services/profileService'
 import { dashboardService } from '../../services/dashboardService'
+import { setUser } from '../../services/auth'
 
 type ProfileData = {
   id: number
@@ -40,12 +41,13 @@ const loadData = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [profileData, summaryData] = await Promise.all([
+    const [profileData, overviewData] = await Promise.all([
       profileService.getProfile(),
-      dashboardService.getSummary(),
+      dashboardService.getOverview(),
     ])
 
     profile.value = profileData
+    const summaryData = overviewData.summary || {}
     summary.value = {
       total_present_today: Number(summaryData.total_present_today || 0),
       total_absent_today: Number(summaryData.total_absent_today || 0),
@@ -87,6 +89,7 @@ const saveProfile = async () => {
     
     const updated = await profileService.updateProfile(payload)
     profile.value = updated
+    setUser(updated)
     isEditing.value = false
     successMessage.value = 'Profile updated successfully.'
   } catch (error: any) {
@@ -114,6 +117,7 @@ const handleAvatarUpload = async (event: Event) => {
       form.value.avatar_url = avatarUrl
       if (profile.value) {
         profile.value = { ...profile.value, avatar_url: avatarUrl }
+        setUser(profile.value)
       }
     }
 
@@ -186,6 +190,7 @@ onMounted(loadData)
           <div>
             <label class="text-[10px] font-bold text-slate-500 uppercase">Phone</label>
             <input v-model="form.phone" :disabled="!isEditing" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded disabled:opacity-70" />
+            <p v-if="validationErrors.phone" class="text-xs text-red-500 mt-1">{{ validationErrors.phone[0] }}</p>
           </div>
           <div v-if="isEditing">
             <label class="text-[10px] font-bold text-slate-500 uppercase">Avatar</label>
@@ -201,6 +206,7 @@ onMounted(loadData)
         <div>
           <label class="text-[10px] font-bold text-slate-500 uppercase">Bio</label>
           <textarea v-model="form.bio" rows="4" :disabled="!isEditing" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded resize-none disabled:opacity-70"></textarea>
+          <p v-if="validationErrors.bio" class="text-xs text-red-500 mt-1">{{ validationErrors.bio[0] }}</p>
         </div>
         <div v-if="isEditing" class="flex justify-end">
           <button class="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg text-sm font-bold disabled:opacity-60" :disabled="saving" @click="saveProfile">

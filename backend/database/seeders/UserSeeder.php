@@ -34,19 +34,12 @@ class UserSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'name' => 'Training Team User',
-                'email' => 'training@pnc.com',
-                'password' => Hash::make('training123'),
-                'role_id' => 4, // Training Team
-                'is_active' => true,
-            ],
-            [
-                'name' => 'Rady Y',
+                'name' => 'Rady',
                 'email' => 'radyy@pnc.com',
                 'password' => Hash::make('rady123'),
                 'role_id' => 2, // Teacher
                 'is_active' => true,
-            ],
+            ]
         ];
 
         foreach ($users as $user) {

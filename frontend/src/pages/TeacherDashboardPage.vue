@@ -1,59 +1,87 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import Sidebar, { ViewType, User } from '../components/Teacher/Sidebar.vue'
-import Header from '../components/Teacher/Header.vue'
-import TeacherDashboard from '../components/Teacher/TeacherDashboard.vue'
-import ScheduleView from '../components/Teacher/ScheduleView.vue'
-import AttendanceSessionView from '../components/Teacher/AttendanceSessionView.vue'
-import HistoryView from '../components/Teacher/HistoryView.vue'
-import StudentManagement from '../components/Teacher/StudentManagement.vue'
-import StudentRecordsView from '../components/Teacher/StudentRecordsView.vue'
-import MessagesView from '../components/Teacher/MessagesView.vue'
-import SettingsView from '../components/Teacher/SettingsView.vue'
-import NotificationsView from '../components/Teacher/NotificationsView.vue'
-import api from '../services/api'
-import { teacherService } from '../services/teacherService'
-import { clearStudentSession, clearToken, clearUser, clearUserRole, getUser } from '../services/auth'
+import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import Sidebar, { ViewType, User } from "../components/Teacher/Sidebar.vue";
+import Header from "../components/Teacher/Header.vue";
+import TeacherDashboard from "../components/Teacher/TeacherDashboard.vue";
+import ScheduleView from "../components/Teacher/ScheduleView.vue";
+import AttendanceSessionView from "../components/Teacher/AttendanceSessionView.vue";
+import HistoryView from "../components/Teacher/HistoryView.vue";
+import StudentManagement from "../components/Teacher/StudentManagement.vue";
+import StudentRecordsView from "../components/Teacher/StudentRecordsView.vue";
+import MessagesView from "../components/Teacher/MessagesView.vue";
+import SettingsView from "../components/Teacher/SettingsView.vue";
+import NotificationsView from "../components/Teacher/NotificationsView.vue";
+import api from "../services/api";
+import { teacherService } from "../services/teacherService";
+import {
+  clearStudentSession,
+  clearToken,
+  clearUser,
+  clearUserRole,
+  getUser,
+} from "../services/auth";
 
-const router = useRouter()
+const router = useRouter();
 
-const loggedUser = getUser()
+const loggedUser = getUser();
 
 // Only show the current logged-in user, not all teachers
 const MOCK_USERS = ref<User[]>([
   {
-    name: loggedUser?.name || 'Teacher',
-    role: 'teacher',
-    department: loggedUser?.department || 'Education',
-    photo: loggedUser?.photo || 'https://picsum.photos/seed/teacher/200/200',
+    name: loggedUser?.name || "Teacher",
+    role: "teacher",
+    department: loggedUser?.department || "Teacher",
+    photo:
+      loggedUser?.photo ||
+      "https://image2url.com/r2/default/images/1773553855939-e3b32a24-8b55-46a4-86fa-46b9710946fb.png",
   },
-])
+]);
 
-const currentView = ref<ViewType>('dashboard')
-const user = ref<User>(MOCK_USERS.value[0])
+const currentView = ref<ViewType>("dashboard");
+const user = ref<User>(MOCK_USERS.value[0]);
+
+// Academic year state
+const academicYears = ref<any[]>([]);
+const selectedAcademicYearId = ref<number | null>(null);
+
+const loadAcademicYears = async () => {
+  try {
+    const years = await teacherService.getAcademicYears();
+    academicYears.value = years;
+    // Set default to active year or first one
+    const activeYear = years.find((y: any) => y.is_active);
+    selectedAcademicYearId.value = activeYear?.id || years[0]?.id || null;
+  } catch (error) {
+    console.error("Failed to load academic years:", error);
+  }
+};
+
+onMounted(() => {
+  loadAcademicYears();
+});
 
 const handleViewChange = (view: ViewType) => {
-  currentView.value = view
-}
+  currentView.value = view;
+};
 
 const handleUserChange = (newUser: User) => {
-  user.value = newUser
-}
+  user.value = newUser;
+};
 
 const handleLogout = async () => {
   try {
-    await api.post('/auth/logout')
+    await api.post("/auth/logout");
   } catch {
     // Ignore API failures and proceed with local logout.
   } finally {
-    clearToken()
-    clearStudentSession()
-    clearUser()
-    clearUserRole()
-    router.push({ name: 'login' })
+    clearToken();
+    clearStudentSession();
+    clearUser();
+    clearUserRole();
+    router.push({ name: "login" });
   }
-}
+};
 </script>
 
 <template>
@@ -68,7 +96,11 @@ const handleLogout = async () => {
     />
 
     <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
-      <Header :user="user" @navigate="handleViewChange" @logout="handleLogout" />
+      <Header
+        :user="user"
+        @navigate="handleViewChange"
+        @logout="handleLogout"
+      />
 
       <div class="flex-1 overflow-y-auto p-8">
         <Transition name="fade" mode="out-in">
@@ -78,33 +110,28 @@ const handleLogout = async () => {
               :user="user"
               @navigate="handleViewChange"
             />
-            <ScheduleView
-              v-else-if="currentView === 'schedule'"
-              :user="user"
-            />
+            <ScheduleView v-else-if="currentView === 'schedule'" :user="user" />
             <AttendanceSessionView
               v-else-if="currentView === 'attendance'"
+              :academicYearId="selectedAcademicYearId"
+              :academicYearOptions="academicYears"
+              @update:academicYearId="selectedAcademicYearId = $event"
             />
-            <HistoryView
-              v-else-if="currentView === 'history'"
-            />
+            <HistoryView v-else-if="currentView === 'history'" />
             <StudentManagement
               v-else-if="currentView === 'management'"
+              :academicYearId="selectedAcademicYearId"
+              :academicYearOptions="academicYears"
+              @update:academicYearId="selectedAcademicYearId = $event"
             />
-            <StudentRecordsView
-              v-else-if="currentView === 'students'"
-            />
-            <MessagesView
-              v-else-if="currentView === 'messages'"
-              :user="user"
-            />
-            <SettingsView
-              v-else-if="currentView === 'settings'"
-            />
-            <NotificationsView
-              v-else-if="currentView === 'notifications'"
-            />
-            <div v-else class="flex items-center justify-center h-[60vh] text-slate-400">
+            <StudentRecordsView v-else-if="currentView === 'students'" />
+            <MessagesView v-else-if="currentView === 'messages'" :user="user" />
+            <SettingsView v-else-if="currentView === 'settings'" />
+            <NotificationsView v-else-if="currentView === 'notifications'" />
+            <div
+              v-else
+              class="flex items-center justify-center h-[60vh] text-slate-400"
+            >
               <p class="text-lg font-medium">This feature is coming soon...</p>
             </div>
           </div>
@@ -117,7 +144,9 @@ const handleLogout = async () => {
 <style>
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .fade-enter-from {

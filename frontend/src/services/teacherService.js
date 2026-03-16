@@ -16,9 +16,9 @@ export const teacherService = {
     }
   },
 
-  async getSchedule() {
+  async getSchedule(params = {}) {
     try {
-      const response = await api.get('/teacher/schedule')
+      const response = await api.get('/teacher/schedule', { params })
       return response.data
     } catch (error) {
       throw new Error(toError(error, 'Failed to load schedule data.'))
@@ -43,7 +43,7 @@ export const teacherService = {
     }
   },
 
-  async getStudents(classId = null) {
+  async getStudents(classId = null, academicYearId = null) {
     try {
       if (classId) {
         const response = await api.get(`/teacher/classes/${classId}/students`)
@@ -53,7 +53,8 @@ export const teacherService = {
 
       // Fallback: try a general endpoint if available
       try {
-        const response = await api.get('/teacher/students')
+        const params = academicYearId ? { academic_year_id: academicYearId } : {}
+        const response = await api.get('/teacher/students', { params })
         return response.data
       } catch (err) {
         // If no general endpoint exists, return empty array instead of throwing
@@ -92,6 +93,15 @@ export const teacherService = {
       return data
     } catch (error) {
       throw new Error(toError(error, 'Failed to load Google Calendar events.'))
+    }
+  },
+
+  async getAcademicYears() {
+    try {
+      const response = await api.get('/teacher/academic-years')
+      return response.data.academic_years ?? []
+    } catch (error) {
+      throw new Error(toError(error, 'Failed to load academic years.'))
     }
   },
 }

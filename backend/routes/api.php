@@ -57,6 +57,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Teacher: Get notifications
     Route::get('/teacher/notifications', [TeacherAttendanceController::class, 'getNotifications']);
 
+    // Teacher: Get academic years
+    Route::get('/teacher/academic-years', [TeacherAttendanceController::class, 'getAcademicYears']);
+
     // Teacher: Submit attendance
     Route::post(
         '/teacher/attendance',

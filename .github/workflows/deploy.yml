@@ -8,7 +8,6 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -19,17 +18,14 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and Push Backend
+      - name: Build and Push Images
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/attdenance-backend ./backend
-          docker push ${{ secrets.DOCKER_USERNAME }}/attdenance-backend
-
-      - name: Build and Push Frontend
-        run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/attdenance-frontend ./frontend
+          docker push ${{ secrets.DOCKER_USERNAME }}/attdenance-backend
           docker push ${{ secrets.DOCKER_USERNAME }}/attdenance-frontend
 
-      - name: Deploy to AWS Server via SSH
+      - name: Deploy to AWS
         uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.SERVER_IP }}
@@ -37,12 +33,8 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~/Attendance-System
-            # Update the local docker-compose file if needed
-            git pull origin main 
-
-            # Login to Docker on the server to pull private images if necessary
-            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-
-            # Pull and restart
+            git pull origin main
+            # Injecting the Docker Username into the environment
+            export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             docker compose pull
             docker compose up -d --force-recreate

@@ -33,21 +33,19 @@ jobs:
       - name: Push Frontend Image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/attendance-frontend
 
-      - name: Deploy to AWS Server
+      - name: Deploy to Server
         uses: appleboy/ssh-action@v0.1.6
         with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ubuntu
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.KEY }}
+          port: ${{ secrets.PORT }}
           script: |
-            docker pull ${{ secrets.DOCKER_USERNAME }}/attendance-backend
-            docker pull ${{ secrets.DOCKER_USERNAME }}/attendance-frontend
-
-            docker stop laravel_app || true
-            docker stop vue_app || true
-
-            docker rm laravel_app || true
-            docker rm vue_app || true
-
-            docker run -d -p 9000:9000 --name laravel_app ${{ secrets.DOCKER_USERNAME }}/attendance-backend
-            docker run -d -p 5173:5173 --name vue_app ${{ secrets.DOCKER_USERNAME }}/attendance-frontend
+            sudo docker pull ***/attendance-backend
+            sudo docker pull ***/attendance-frontend
+            sudo docker stop laravel_app || true
+            sudo docker stop vue_app || true
+            sudo docker rm laravel_app || true
+            sudo docker rm vue_app || true
+            sudo docker run -d -p 9000:9000 --name laravel_app ***/attendance-backend
+            sudo docker run -d -p 5173:5173 --name vue_app ***/attendance-frontend

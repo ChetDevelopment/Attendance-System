@@ -24,13 +24,12 @@ class User extends Authenticatable
         'role_id'
     ];
 
-    protected $hidden = ['password'];
+    protected $hidden = ['password', 'remember_token'];
 
     public function role()
     {
         return $this->belongsTo(Role::class);
     }
-<<<<<<< HEAD
 
     public function attendances(): HasMany
     {
@@ -53,16 +52,6 @@ class User extends Authenticatable
     }
 
     /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
-    protected $hidden = [
-        'password',
-        'remember_token',
-    ];
-
-    /**
      * The attributes that should be cast.
      *
      * @var array<string, string>
@@ -71,10 +60,4 @@ class User extends Authenticatable
         'password' => 'hashed',
         'is_active' => 'boolean',
     ];
-
-    
-    
 }
-=======
-}
->>>>>>> feature/admin_management_api

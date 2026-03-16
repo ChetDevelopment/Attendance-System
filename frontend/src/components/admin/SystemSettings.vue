@@ -30,7 +30,8 @@ type ActivityLog = {
 const isBackupModalOpen = ref(false);
 const activeTab = ref<'config' | 'logs'>('config');
 const logSearchQuery = ref('');
-const serverTime = ref(new Date().toLocaleTimeString());
+const serverTime = ref(new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Phnom_Penh' }));
+const serverDate = ref(new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Phnom_Penh', day: '2-digit', month: '2-digit', year: 'numeric' }));
 const loadingLogs = ref(false);
 const loadingConfig = ref(false);
 const saving = ref(false);
@@ -184,7 +185,8 @@ const exportLogs = () => {
 
 onMounted(() => {
   timer = window.setInterval(() => {
-    serverTime.value = new Date().toLocaleTimeString();
+    serverTime.value = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Phnom_Penh' });
+    serverDate.value = new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Phnom_Penh', day: '2-digit', month: '2-digit', year: 'numeric' });
   }, 1000);
   loadLogs().then(loadConfig);
 });
@@ -334,8 +336,9 @@ onUnmounted(() => {
               <span class="text-primary">{{ maintenanceInfo.environment }}</span>
             </div>
             <div class="flex justify-between text-[10px] font-bold">
-              <span class="text-slate-500 uppercase">Server Time</span>
-              <span class="text-primary">{{ serverTime }}</span>
+              <span class="text-slate-500 uppercase">Server Time (UTC+7 - Phnom Penh)</span>
+              <span class="text-primary text-lg font-bold">{{ serverTime }}</span>
+              <span class="text-slate-400 text-sm">{{ serverDate }}</span>
             </div>
           </div>
         </div>

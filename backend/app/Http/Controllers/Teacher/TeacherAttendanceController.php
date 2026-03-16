@@ -361,26 +361,50 @@ class TeacherAttendanceController extends Controller
             ];
         });
 
-        // Get active session (currently happening)
+        // Get active session (currently happening based on current time)
+        $currentTime = $now->format('H:i:s');
         $activeSession = Session::where('is_active', true)
+            ->where('start_time', '<=', $currentTime)
+            ->where('end_time', '>=', $currentTime)
             ->orderBy('start_time')
             ->first();
 
-        // Get today's attendance counts
-        $todayAttendanceRecords = AttendanceRecord::whereHas('attendance', function ($query) use ($teacherId, $today) {
-            $query->whereDate('date', $today)
-                ->where('submitted_by', $teacherId);
-        })
-            ->get();
+        // If no session is currently happening, get the next upcoming session
+        if (!$activeSession) {
+            $activeSession = Session::where('is_active', true)
+                ->where('start_time', '>', $currentTime)
+                ->orderBy('start_time')
+                ->first();
+        }
 
-        $checkedInCount = $todayAttendanceRecords->where('status', 'present')->count();
-        $absentCount = $todayAttendanceRecords->where('status', 'absent')->count();
+        // Get today's attendance counts - show ALL records for today (not filtered by teacher)
+        $allTodayRecords = AttendanceRecord::whereHas('attendance', function ($query) use ($today) {
+            $query->whereDate('date', $today);
+        })->get();
 
-        // Get next upcoming session if there's an active session
+        $checkedInCount = $allTodayRecords->where('status', 'present')->count();
+        $absentCount = $allTodayRecords->whereIn('status', ['absent', 'late'])->count();
+
+        // Get next upcoming session (after current active session ends)
         $nextToday = null;
         if ($activeSession) {
             $nextSession = Session::where('is_active', true)
-                ->where('start_time', '>', $now->format('H:i:s'))
+                ->where('start_time', '>', $activeSession->end_time)
+                ->orderBy('start_time')
+                ->first();
+
+            if ($nextSession) {
+                $nextToday = [
+                    'id' => $nextSession->id,
+                    'subject' => $nextSession->name,
+                    'start_time' => $nextSession->start_time,
+                    'end_time' => $nextSession->end_time,
+                ];
+            }
+        } else {
+            // No active session - show next upcoming session
+            $nextSession = Session::where('is_active', true)
+                ->where('start_time', '>', $currentTime)
                 ->orderBy('start_time')
                 ->first();
 
@@ -405,6 +429,11 @@ class TeacherAttendanceController extends Controller
             'next_today' => $nextToday,
             'checked_in_count' => $checkedInCount,
             'absent_count' => $absentCount,
+            'debug' => [
+                'today' => $today->toDateString(),
+                'teacher_id' => $teacherId,
+                'total_records_today' => $allTodayRecords->count(),
+            ]
         ]);
     }
 
@@ -419,11 +448,11 @@ class TeacherAttendanceController extends Controller
 
         $teacherId = auth()->id();
 
-        // Get absent records that might need justification
+        // Get absent and late records that might need justification
         $absentRecords = AttendanceRecord::whereHas('attendance', function ($query) use ($teacherId) {
             $query->where('submitted_by', $teacherId);
         })
-            ->where('status', 'absent')
+            ->whereIn('status', ['absent', 'late'])
             ->with([
                 'student:id,first_name,last_name,student_code,class_id,face_image',
                 'session:id,name',
@@ -433,12 +462,22 @@ class TeacherAttendanceController extends Controller
             ->limit(50)
             ->get()
             ->map(function ($record) {
+                // Build photo URL
+                $photoUrl = null;
+                if ($record->student->face_image) {
+                    if (str_starts_with($record->student->face_image, 'http')) {
+                        $photoUrl = $record->student->face_image;
+                    } else {
+                        $photoUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $record->student->face_image;
+                    }
+                }
+
                 return [
                     'id' => $record->id,
                     'studentId' => $record->student->student_code,
                     'studentName' => $record->student->first_name . ' ' . $record->student->last_name,
                     'student_code' => $record->student->student_code,
-                    'studentPhoto' => $record->student->face_image ?? null,
+                    'studentPhoto' => $photoUrl,
                     'classCode' => $record->attendance->class->code ?? null,
                     'subject' => $record->attendance->class->name ?? null,
                     'sessionName' => $record->session->name ?? null,

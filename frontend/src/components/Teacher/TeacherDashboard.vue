@@ -228,7 +228,7 @@ onMounted(loadDashboard);
                   referrerPolicy="no-referrer"
                 />
                 <div v-else class="size-10 rounded-xl bg-slate-100" />
-                <div>
+                <div class="flex-1">
                   <p class="text-sm font-bold text-slate-900">
                     {{ j.studentName }}
                   </p>
@@ -238,6 +238,14 @@ onMounted(loadDashboard);
                     {{ j.classCode }}
                   </p>
                 </div>
+                <span
+                  :class="[
+                    'px-2 py-1 text-[10px] font-bold rounded-full uppercase',
+                    j.status === 'late' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                  ]"
+                >
+                  {{ j.status }}
+                </span>
               </div>
               <p class="text-xs text-slate-600 italic line-clamp-2">
                 "{{ j.educationComment }}"

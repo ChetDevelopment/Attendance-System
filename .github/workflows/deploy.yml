@@ -37,15 +37,18 @@ jobs:
         uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
+          username: ubuntu
           key: ${{ secrets.KEY }}
-          port: ${{ secrets.PORT }}
+          port: 22 # Ensure this is exactly aligned under 'host'
           script: |
-            sudo docker pull ***/attendance-backend
-            sudo docker pull ***/attendance-frontend
+            sudo docker pull vichet12/attendance-backend
+            sudo docker pull vichet12/attendance-frontend
+
             sudo docker stop laravel_app || true
             sudo docker stop vue_app || true
+
             sudo docker rm laravel_app || true
             sudo docker rm vue_app || true
-            sudo docker run -d -p 9000:9000 --name laravel_app ***/attendance-backend
-            sudo docker run -d -p 5173:5173 --name vue_app ***/attendance-frontend
+
+            sudo docker run -d -p 9000:9000 --name laravel_app vichet12/attendance-backend
+            sudo docker run -d -p 80:5173 --name vue_app vichet12/attendance-frontend

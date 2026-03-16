@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { attendanceService } from '../../services/attendanceService'
+import { biometricService } from '../../services/biometricService'
 import { teacherService } from '../../services/teacherService'
 
 type StatusType = 'Present' | 'Absent' | 'Late' | 'Excused'
@@ -10,6 +11,8 @@ const saving = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const searchQuery = ref('')
+const cardScanValue = ref('')
+const cardScanLoading = ref(false)
 
 const sessions = ref<any[]>([])
 const students = ref<any[]>([])
@@ -79,6 +82,55 @@ const saveAttendance = async () => {
   }
 }
 
+const toUiStatus = (status: string | null | undefined): StatusType => {
+  const s = String(status || '').toLowerCase()
+  if (s === 'late') return 'Late'
+  if (s === 'absent') return 'Absent'
+  if (s === 'excused') return 'Excused'
+  return 'Present'
+}
+
+const handleCardScan = async () => {
+  if (cardScanLoading.value) return
+  if (!selectedSessionId.value) {
+    errorMessage.value = 'Please select a session before scanning.'
+    return
+  }
+
+  const cardData = cardScanValue.value.trim()
+  if (!cardData) return
+
+  cardScanLoading.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const data = await biometricService.scanCard(Number(selectedSessionId.value), cardData)
+    const studentId = Number(data?.student?.id)
+
+    if (!Number.isFinite(studentId)) {
+      throw new Error('Invalid response from server.')
+    }
+
+    statuses[studentId] = toUiStatus(data?.attendance_record?.status)
+
+    const studentName = [
+      data?.student?.first_name,
+      data?.student?.last_name,
+    ].filter(Boolean).join(' ')
+
+    successMessage.value = studentName
+      ? `Checked in: ${studentName} (${statuses[studentId]})`
+      : `Checked in (${statuses[studentId]})`
+
+    cardScanValue.value = ''
+  } catch (error: any) {
+    errorMessage.value = error?.message || 'Card scan failed.'
+  } finally {
+    cardScanLoading.value = false
+  }
+}
+
 onMounted(loadData)
 </script>
 
@@ -107,6 +159,31 @@ onMounted(loadData)
       <div class="md:col-span-2">
         <label class="text-xs font-bold text-slate-500 uppercase">Search Student</label>
         <input v-model="searchQuery" class="mt-1 w-full px-3 py-2 border rounded-lg bg-white" placeholder="Search by name or code" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="md:col-span-1">
+        <label class="text-xs font-bold text-slate-500 uppercase">Card Scan</label>
+        <input
+          v-model="cardScanValue"
+          class="mt-1 w-full px-3 py-2 border rounded-lg bg-white"
+          :disabled="loading || saving || cardScanLoading"
+          placeholder="Tap card then press Enter"
+          @keyup.enter="handleCardScan"
+        />
+        <p class="mt-1 text-[11px] text-slate-500">
+          Uses backend `POST /student/attendance/card-scan`.
+        </p>
+      </div>
+      <div class="md:col-span-2 flex items-end">
+        <button
+          class="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-bold disabled:opacity-60"
+          :disabled="loading || saving || !selectedSessionId || !cardScanValue.trim() || cardScanLoading"
+          @click="handleCardScan"
+        >
+          {{ cardScanLoading ? 'Scanning...' : 'Submit Card ID' }}
+        </button>
       </div>
     </div>
 

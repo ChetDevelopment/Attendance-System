@@ -1,0 +1,49 @@
+name: CI/CD Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Backend
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/attdenance-backend ./backend
+          docker push ${{ secrets.DOCKER_USERNAME }}/attdenance-backend
+
+      - name: Build and Push Frontend
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/attdenance-frontend ./frontend
+          docker push ${{ secrets.DOCKER_USERNAME }}/attdenance-frontend
+
+      - name: Deploy to AWS Server via SSH
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # 1. Pull the latest images
+            docker pull ${{ secrets.DOCKER_USERNAME }}/attdenance-backend
+            docker pull ${{ secrets.DOCKER_USERNAME }}/attdenance-frontend
+
+            # 2. Stop and remove old containers if they exist
+            docker stop laravel_app vue_app || true
+            docker rm laravel_app vue_app || true
+
+            # 3. Run new containers
+            docker run -d --name laravel_app -p 9000:9000 ${{ secrets.DOCKER_USERNAME }}/attdenance-backend
+            docker run -d --name vue_app -p 5173:5173 ${{ secrets.DOCKER_USERNAME }}/attdenance-frontend

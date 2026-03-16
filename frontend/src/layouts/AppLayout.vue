@@ -18,14 +18,14 @@
 import { computed, ref } from 'vue';
 import Sidebar from './Sidebar.vue';
 import Navbar from './Navbar.vue';
-import Dashboard from '../components/Admin/Dashboard.vue';
-import UserManagement from '../components/Admin/UserManagement.vue';
-import AcademicStructure from '../components/Admin/AcademicStructure.vue';
-import StudentManagement from '../components/Admin/StudentManagement.vue';
-import Profile from '../components/Admin/Profile.vue';
-import AbsenceManagement from '../components/Admin/AbsenceManagement.vue';
-import AttendanceControl from '../components/Admin/AttendanceControl.vue';
-import SystemSettings from '../components/Admin/SystemSettings.vue';
+import Dashboard from '../components/admin/Dashboard.vue';
+import UserManagement from '../components/admin/UserManagement.vue';
+import AcademicStructure from '../components/admin/AcademicStructure.vue';
+import StudentManagement from '../components/admin/StudentManagement.vue';
+import Profile from '../components/admin/Profile.vue';
+import AbsenceManagement from '../components/admin/AbsenceManagement.vue';
+import AttendanceControl from '../components/admin/AttendanceControl.vue';
+import SystemSettings from '../components/admin/SystemSettings.vue';
 import { getUserRole } from '../services/auth';
 
 const currentModule = ref('dashboard');

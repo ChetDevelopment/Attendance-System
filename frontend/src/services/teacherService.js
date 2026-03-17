@@ -104,4 +104,13 @@ export const teacherService = {
       throw new Error(toError(error, 'Failed to load academic years.'))
     }
   },
+
+  async getTodaySchedule(params = {}) {
+    try {
+      const response = await api.get('/teacher/today-schedule', { params })
+      return response.data
+    } catch (error) {
+      throw new Error(toError(error, 'Failed to load today\'s schedule from timetable API.'))
+    }
+  },
 }

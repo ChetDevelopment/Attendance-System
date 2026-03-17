@@ -74,6 +74,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Teacher Calendar Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Default Google Calendar resource ID for teacher schedules.
+    | This is used to fetch schedules from timetables2.pnc.passerellesnumeriques.org
+    |
+    */
+
+    'teacher_calendar_id' => env('TEACHER_CALENDAR_ID', 'c_1886h9lqonri4ig0noe2vrfvp8fb8@resource.calendar.google.com'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

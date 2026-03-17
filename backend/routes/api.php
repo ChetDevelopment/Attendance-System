@@ -48,6 +48,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Teacher: Get dashboard data
     Route::get('/teacher/dashboard', [TeacherAttendanceController::class, 'getDashboard']);
 
+    // Teacher: Get today's schedule from external timetable API
+    Route::get('/teacher/today-schedule', [TeacherAttendanceController::class, 'getTodaySchedule']);
+
     // Teacher: Get justifications/absence requests
     Route::get('/teacher/justifications', [TeacherAttendanceController::class, 'getJustifications']);
 

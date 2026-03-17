@@ -11,6 +11,7 @@ use App\Models\Session;
 use App\Models\SchoolClass;
 use App\Models\AbsenceComment;
 use App\Models\AcademicYear;
+use App\Services\TimetableService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -435,6 +436,69 @@ class TeacherAttendanceController extends Controller
                 'total_records_today' => $allTodayRecords->count(),
             ]
         ]);
+    }
+
+    /**
+     * Get today's schedule from external timetable API
+     * This fetches the teacher's schedule from https://timetables2.pnc.passerellesnumeriques.org/
+     */
+    public function getTodaySchedule(Request $request)
+    {
+        if (auth()->user()->role->slug !== 'teacher') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $teacher = auth()->user();
+        $date = $request->input('date', Carbon::today()->toDateString());
+
+        // Get teacher's calendar ID from user profile first, then fall back to config/mapping
+        $calendarId = null;
+
+        // Check if teacher has a calendar_id in their profile
+        if (!empty($teacher->calendar_id)) {
+            $calendarId = $teacher->calendar_id;
+        }
+
+        // If no calendar_id in profile, try to get it from the TimetableService mapping by teacher name
+        if (empty($calendarId)) {
+            $timetableService = new TimetableService();
+            $calendarId = $timetableService->getCalendarIdByTeacherName($teacher->name);
+        }
+
+        // Fall back to default calendar ID from config
+        if (empty($calendarId)) {
+            $calendarId = config(
+                'app.teacher_calendar_id',
+                'c_1886h9lqonri4ig0noe2vrfvp8fb8@resource.calendar.google.com'
+            );
+        }
+
+        // Allow overriding calendar ID via request (for testing)
+        if ($request->has('calendar_id')) {
+            $calendarId = $request->input('calendar_id');
+        }
+
+        try {
+            $timetableService = new TimetableService();
+            $scheduleData = $timetableService->getTeacherSchedule($calendarId, $date);
+
+            return response()->json([
+                'success' => true,
+                'date' => $scheduleData['date'],
+                'sessions' => $scheduleData['sessions'],
+                'total_sessions' => $scheduleData['total_sessions'],
+                'teacher_name' => $teacher->name,
+                'calendar_id' => $calendarId,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch teacher schedule: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch schedule from timetable API',
+                'sessions' => [],
+                'total_sessions' => 0,
+            ], 500);
+        }
     }
 
     /**

@@ -15,7 +15,7 @@ use App\Models\AbsenceComment;
 
 class User extends Authenticatable
 {
-    use Notifiable;
+    use Notifiable, HasApiTokens;
 
     protected $fillable = [
         'name',

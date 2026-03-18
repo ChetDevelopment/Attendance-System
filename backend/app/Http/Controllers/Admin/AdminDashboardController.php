@@ -16,69 +16,92 @@ use Illuminate\Support\Facades\DB;
 
 class AdminDashboardController extends Controller
 {
+    // Cache TTL constants (in seconds)
+    const CACHE_TTL_SHORT = 60;      // 1 minute for frequently changing data
+    const CACHE_TTL_MEDIUM = 300;     // 5 minutes for moderately static data
+    const CACHE_TTL_LONG = 600;       // 10 minutes for static data
+    
     /**
      * Get comprehensive admin dashboard data
      * Combines all essential dashboard endpoints into one call
      * for better frontend performance.
+     * Optimized with Redis caching and efficient queries.
      */
     public function getDashboardData()
     {
-        return Cache::remember('admin_dashboard_complete_v1', 30, function () {
+        return Cache::remember('admin_dashboard_complete_v3', self::CACHE_TTL_MEDIUM, function () {
             $todayStart = Carbon::today();
-            $todayEnd = $todayStart->copy()->endOfDay();
             $weekStart = Carbon::today()->startOfWeek();
             $monthStart = Carbon::today()->startOfMonth();
             $now = Carbon::now();
 
-            // Get active academic year
-            $activeYear = AcademicYear::query()
-                ->where('status', 'Current')
-                ->select('id', 'name', 'current_term')
+            // Get active academic year - cached separately for longer
+            $activeYear = Cache::remember('admin_active_year', self::CACHE_TTL_LONG, function () {
+                return AcademicYear::query()
+                    ->where('status', 'Current')
+                    ->select('id', 'name', 'current_term')
+                    ->first();
+            });
+
+            // Single query for all stats
+            $allStats = DB::table('attendance_records')
+                ->where('created_at', '>=', $monthStart)
+                ->selectRaw("
+                    SUM(CASE WHEN created_at >= ? AND status = 'present' THEN 1 ELSE 0 END) as today_present,
+                    SUM(CASE WHEN created_at >= ? AND status = 'absent' THEN 1 ELSE 0 END) as today_absent,
+                    SUM(CASE WHEN created_at >= ? AND status = 'late' THEN 1 ELSE 0 END) as today_late,
+                    SUM(CASE WHEN created_at >= ? AND status = 'present' THEN 1 ELSE 0 END) as week_present,
+                    SUM(CASE WHEN created_at >= ? AND status = 'absent' THEN 1 ELSE 0 END) as week_absent,
+                    SUM(CASE WHEN created_at >= ? AND status = 'late' THEN 1 ELSE 0 END) as week_late,
+                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as month_present,
+                    SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as month_absent,
+                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as month_late
+                ", [$todayStart, $todayStart, $todayStart, $weekStart, $weekStart, $weekStart])
                 ->first();
 
-            // Calculate attendance statistics
-            $dailyStats = $this->getAttendanceStats($todayStart, $todayEnd);
-            $weeklyStats = $this->getAttendanceStats($weekStart, $now);
-            $monthlyStats = $this->getAttendanceStats($monthStart, $now);
+            $dailyStats = $this->formatStats($allStats->today_present, $allStats->today_absent, $allStats->today_late);
+            $weeklyStats = $this->formatStats($allStats->week_present, $allStats->week_absent, $allStats->week_late);
+            $monthlyStats = $this->formatStats($allStats->month_present, $allStats->month_absent, $allStats->month_late);
 
-            // Get student counts
-            $totalStudents = Student::count();
-            $activeStudents = Student::whereHas('user')
-                ->whereHasIn('role', ['student'])
-                ->count();
+            // Get counts using single optimized queries with caching
+            $counts = Cache::remember('admin_counts_v1', self::CACHE_TTL_MEDIUM, function () {
+                return [
+                    'total_students' => Student::count(),
+                    'active_students' => Student::whereHas('user', function ($q) {
+                        $q->whereNotNull('password');
+                    })->count(),
+                    'total_classes' => StudentClass::count(),
+                    'classes_with_sessions' => StudentClass::whereHas('sessions', function ($q) {
+                        $q->where('is_active', true);
+                    })->count(),
+                    'admin_count' => User::whereHas('role', function ($q) {
+                        $q->where('name', 'admin');
+                    })->count(),
+                    'teacher_count' => User::whereHas('role', function ($q) {
+                        $q->where('name', 'teacher');
+                    })->count(),
+                ];
+            });
 
-            // Get class statistics
-            $totalClasses = StudentClass::count();
-            $classesWithActiveSessions = StudentClass::whereHas('sessions', function ($q) {
-                $q->where('is_active', true);
-            })->count();
-
-            // Get user counts by role
-            $adminCount = User::whereHas('role', function ($q) {
-                $q->where('name', 'admin');
-            })->count();
-
-            $teacherCount = User::whereHas('role', function ($q) {
-                $q->where('name', 'teacher');
-            })->count();
-
-            // Get recent teacher activities
-            $recentActivities = TeacherActivity::query()
-                ->with('student:id,fullname')
-                ->latest()
-                ->limit(10)
-                ->get()
-                ->map(function ($activity) {
-                    return [
-                        'id' => $activity->id,
-                        'action' => $activity->action,
-                        'student_name' => $activity->student?->fullname ?? 'N/A',
-                        'created_at' => $activity->created_at->toDateTimeString(),
-                    ];
-                });
+            // Get recent teacher activities with eager loading
+            $recentActivities = Cache::remember('admin_recent_activities', self::CACHE_TTL_SHORT, function () {
+                return TeacherActivity::query()
+                    ->with('student:id,fullname')
+                    ->latest()
+                    ->limit(10)
+                    ->get()
+                    ->map(function ($activity) {
+                        return [
+                            'id' => $activity->id,
+                            'action' => $activity->action,
+                            'student_name' => $activity->student?->fullname ?? 'N/A',
+                            'created_at' => $activity->created_at->toDateTimeString(),
+                        ];
+                    });
+            });
 
             // Get today's late students
-            $lateStudents = $this->getLateStudents($todayStart, $todayEnd);
+            $lateStudents = $this->getLateStudents($todayStart, $now->copy()->endOfDay());
 
             // Get active session
             $activeSession = $this->getActiveSession($now);
@@ -96,11 +119,11 @@ class AdminDashboardController extends Controller
                         'name' => $activeYear->name,
                         'term' => $activeYear->current_term,
                     ] : null,
-                    'total_students' => $totalStudents,
-                    'active_students' => $activeStudents,
-                    'total_classes' => $totalClasses,
-                    'total_admins' => $adminCount,
-                    'total_teachers' => $teacherCount,
+                    'total_students' => $counts['total_students'],
+                    'active_students' => $counts['active_students'],
+                    'total_classes' => $counts['total_classes'],
+                    'total_admins' => $counts['admin_count'],
+                    'total_teachers' => $counts['teacher_count'],
                     'attendance' => [
                         'today' => $dailyStats,
                         'week' => $weeklyStats,
@@ -116,31 +139,63 @@ class AdminDashboardController extends Controller
         });
     }
 
+    private function formatStats($present, $absent, $late): array
+    {
+        $present = (int) $present;
+        $absent = (int) $absent;
+        $late = (int) $late;
+        $total = $present + $absent + $late;
+
+        return [
+            'present' => $present,
+            'absent' => $absent,
+            'late' => $late,
+            'excused' => 0,
+            'total' => $total,
+            'attendance_rate' => $total > 0 ? round(($present / $total) * 100, 2) : 0,
+        ];
+    }
+
     /**
      * Get attendance statistics for a date range
+     * Optimized with single query using conditional aggregation
      */
     private function getAttendanceStats(Carbon $start, Carbon $end): array
     {
-        $row = DB::table('attendance_records')
-            ->whereBetween('created_at', [$start, $end])
-            ->selectRaw("
-                SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present_count,
-                SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent_count,
-                SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late_count,
-                SUM(CASE WHEN status = 'Excused' THEN 1 ELSE 0 END) as excused_count
-            ")
-            ->first();
+        // Try to use the view first, fall back to direct table query
+        try {
+            $row = DB::table('v_admin_attendance_enriched as va')
+                ->whereBetween('va.created_at', [$start, $end])
+                ->selectRaw("
+                    SUM(CASE WHEN va.status = 'present' THEN 1 ELSE 0 END) as present_count,
+                    SUM(CASE WHEN va.status = 'absent' THEN 1 ELSE 0 END) as absent_count,
+                    SUM(CASE WHEN va.status = 'late' THEN 1 ELSE 0 END) as late_count
+                ")
+                ->first();
+        } catch (\Exception $e) {
+            // Fallback to direct table query
+            $row = DB::table('attendance_records')
+                ->whereBetween('created_at', [$start, $end])
+                ->selectRaw("
+                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count,
+                    SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_count,
+                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_count
+                ")
+                ->first();
+        }
+
+        $present = (int) ($row->present_count ?? 0);
+        $absent = (int) ($row->absent_count ?? 0);
+        $late = (int) ($row->late_count ?? 0);
+        $total = $present + $absent + $late;
 
         return [
-            'present' => (int) ($row->present_count ?? 0),
-            'absent' => (int) ($row->absent_count ?? 0),
-            'late' => (int) ($row->late_count ?? 0),
-            'excused' => (int) ($row->excused_count ?? 0),
-            'total' => (int) (($row->present_count ?? 0) + ($row->absent_count ?? 0) +
-                              ($row->late_count ?? 0) + ($row->excused_count ?? 0)),
-            'attendance_rate' => $row->present_count
-                ? round(($row->present_count / max(1, $row->present_count + $row->absent_count)) * 100, 2)
-                : 0,
+            'present' => $present,
+            'absent' => $absent,
+            'late' => $late,
+            'excused' => 0,
+            'total' => $total,
+            'attendance_rate' => $total > 0 ? round(($present / $total) * 100, 2) : 0,
         ];
     }
 
@@ -149,20 +204,25 @@ class AdminDashboardController extends Controller
      */
     private function getLateStudents(Carbon $start, Carbon $end)
     {
-        return DB::table('v_admin_attendance_enriched as va')
-            ->whereBetween('va.created_at', [$start, $end])
-            ->where('va.status', 'Late')
-            ->select([
-                'va.attendance_id as id',
-                'va.student_id',
-                'va.student_name as name',
-                'va.class_name as class',
-                'va.created_time as time',
-                'va.status',
-            ])
-            ->orderByDesc('va.created_at')
-            ->limit(20)
-            ->get();
+        try {
+            return DB::table('v_admin_attendance_enriched as va')
+                ->whereBetween('va.created_at', [$start, $end])
+                ->where('va.status', 'late')
+                ->select([
+                    'va.attendance_id as id',
+                    'va.student_id',
+                    'va.student_name as name',
+                    'va.class_name as class',
+                    'va.created_time as time',
+                    'va.status',
+                ])
+                ->orderByDesc('va.created_at')
+                ->limit(20)
+                ->get();
+        } catch (\Exception $e) {
+            // Fallback - return empty if view doesn't exist yet
+            return collect([]);
+        }
     }
 
     /**
@@ -170,29 +230,33 @@ class AdminDashboardController extends Controller
      */
     private function getActiveSession(Carbon $now)
     {
-        $session = DB::table('sessions')
-            ->where('start_time', '<=', $now->format('H:i:s'))
-            ->where('end_time', '>=', $now->format('H:i:s'))
-            ->orderBy('start_time')
-            ->first();
+        $cacheKey = 'admin_active_session_' . $now->format('H');
+        
+        return Cache::remember($cacheKey, 300, function () use ($now) {
+            $session = DB::table('sessions')
+                ->where('start_time', '<=', $now->format('H:i:s'))
+                ->where('end_time', '>=', $now->format('H:i:s'))
+                ->orderBy('start_time')
+                ->first();
 
-        if ($session) {
+            if ($session) {
+                return [
+                    'is_active' => true,
+                    'id' => (int) $session->id,
+                    'name' => $session->name,
+                    'start_time' => $session->start_time,
+                    'end_time' => $session->end_time,
+                ];
+            }
+
             return [
-                'is_active' => true,
-                'id' => (int) $session->id,
-                'name' => $session->name,
-                'start_time' => $session->start_time,
-                'end_time' => $session->end_time,
+                'is_active' => false,
+                'id' => null,
+                'name' => null,
+                'start_time' => null,
+                'end_time' => null,
             ];
-        }
-
-        return [
-            'is_active' => false,
-            'id' => null,
-            'name' => null,
-            'start_time' => null,
-            'end_time' => null,
-        ];
+        });
     }
 
     /**
@@ -200,28 +264,32 @@ class AdminDashboardController extends Controller
      */
     private function getAttendanceTrends(int $days)
     {
-        $startDate = Carbon::today()->subDays($days - 1);
-        $endDate = Carbon::today();
+        $cacheKey = 'admin_trends_' . $days . 'days';
+        
+        return Cache::remember($cacheKey, self::CACHE_TTL_MEDIUM, function () use ($days) {
+            $startDate = Carbon::today()->subDays($days - 1);
+            $endDate = Carbon::today()->endOfDay();
 
-        $records = DB::table('attendance_records')
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->selectRaw("
-                DATE(created_at) as date,
-                SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present,
-                SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent,
-                SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late
-            ")
-            ->groupBy('date')
-            ->orderBy('date')
-            ->get();
+            $records = DB::table('attendance_records')
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->selectRaw("
+                    DATE(created_at) as date,
+                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
+                    SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
+                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late
+                ")
+                ->groupBy('date')
+                ->orderBy('date')
+                ->get();
 
-        return $records->map(function ($row) {
-            return [
-                'date' => $row->date,
-                'present' => (int) $row->present,
-                'absent' => (int) $row->absent,
-                'late' => (int) $row->late,
-            ];
+            return $records->map(function ($row) {
+                return [
+                    'date' => $row->date,
+                    'present' => (int) $row->present,
+                    'absent' => (int) $row->absent,
+                    'late' => (int) $row->late,
+                ];
+            });
         });
     }
 
@@ -230,20 +298,29 @@ class AdminDashboardController extends Controller
      */
     private function getAtRiskStudents(int $days)
     {
-        return DB::table('v_admin_attendance_enriched as va')
-            ->where('va.status', 'Absent')
-            ->where('va.created_at', '>=', Carbon::today()->subDays($days))
-            ->groupBy('va.student_id', 'va.student_name', 'va.class_name')
-            ->havingRaw('COUNT(*) >= 3')
-            ->select([
-                'va.student_id',
-                'va.student_name as name',
-                'va.class_name as class',
-                DB::raw('COUNT(*) as absence_count'),
-            ])
-            ->orderByDesc('absence_count')
-            ->limit(20)
-            ->get();
+        $cacheKey = 'admin_risk_students_' . $days . 'days';
+        
+        return Cache::remember($cacheKey, self::CACHE_TTL_SHORT, function () use ($days) {
+            try {
+                return DB::table('v_admin_attendance_enriched as va')
+                    ->where('va.status', 'absent')
+                    ->where('va.created_at', '>=', Carbon::today()->subDays($days))
+                    ->groupBy('va.student_id', 'va.student_name', 'va.class_name')
+                    ->havingRaw('COUNT(*) >= 3')
+                    ->select([
+                        'va.student_id',
+                        'va.student_name as name',
+                        'va.class_name as class',
+                        DB::raw('COUNT(*) as absence_count'),
+                    ])
+                    ->orderByDesc('absence_count')
+                    ->limit(20)
+                    ->get();
+            } catch (\Exception $e) {
+                // Fallback - return empty if view doesn't exist yet
+                return collect([]);
+            }
+        });
     }
 
     /**
@@ -251,12 +328,11 @@ class AdminDashboardController extends Controller
      */
     public function getQuickStats()
     {
-        return Cache::remember('admin_quick_stats_v1', 60, function () {
+        return Cache::remember('admin_quick_stats_v2', self::CACHE_TTL_SHORT, function () {
             $todayStart = Carbon::today();
             $todayEnd = $todayStart->copy()->endOfDay();
 
             $todayStats = $this->getAttendanceStats($todayStart, $todayEnd);
-
             $activeSession = $this->getActiveSession(Carbon::now());
 
             return response()->json([
@@ -273,7 +349,7 @@ class AdminDashboardController extends Controller
      */
     public function getStudentAnalytics()
     {
-        return Cache::remember('admin_student_analytics_v1', 120, function () {
+        return Cache::remember('admin_student_analytics_v2', self::CACHE_TTL_LONG, function () {
             // Students by class
             $studentsByClass = Student::select('class')
                 ->selectRaw('COUNT(*) as count')
@@ -316,14 +392,14 @@ class AdminDashboardController extends Controller
      */
     public function getClassAnalytics()
     {
-        return Cache::remember('admin_class_analytics_v1', 120, function () {
+        return Cache::remember('admin_class_analytics_v2', self::CACHE_TTL_LONG, function () {
             $classes = StudentClass::withCount(['students', 'sessions'])
                 ->orderByDesc('id')
                 ->get()
                 ->map(function ($class) {
                     return [
                         'id' => $class->id,
-                        'class_name' => $class->class_name,
+                        'class_name' => $class->class_name ?? $class->name,
                         'student_count' => $class->students_count,
                         'session_count' => $class->sessions_count,
                     ];
@@ -345,19 +421,23 @@ class AdminDashboardController extends Controller
      */
     public function getSystemStats()
     {
-        return Cache::remember('admin_system_stats_v1', 300, function () {
+        return Cache::remember('admin_system_stats_v2', self::CACHE_TTL_LONG, function () {
             // Count records by table
             $attendanceRecords = AttendanceRecord::count();
             $sessions = Session::count();
             $teacherActivities = TeacherActivity::count();
 
             // Get database size info (MySQL specific)
-            $dbSize = DB::select("
-                SELECT
-                    SUM(data_length + index_length) / 1024 / 1024 as size_mb
-                FROM information_schema.tables
-                WHERE table_schema = '" . env('DB_DATABASE') . "'
-            ")[0]->size_mb ?? 0;
+            try {
+                $dbSize = DB::select("
+                    SELECT
+                        SUM(data_length + index_length) / 1024 / 1024 as size_mb
+                    FROM information_schema.tables
+                    WHERE table_schema = '" . env('DB_DATABASE') . "'
+                ")[0]->size_mb ?? 0;
+            } catch (\Exception $e) {
+                $dbSize = 0;
+            }
 
             // Get recent activity count (last 24 hours)
             $recentActivity = TeacherActivity::where('created_at', '>=', Carbon::now()->subHours(24))
@@ -379,3 +459,5 @@ class AdminDashboardController extends Controller
         });
     }
 }
+
+

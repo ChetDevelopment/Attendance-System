@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Save, Upload } from 'lucide-vue-next'
 import { profileService } from '../../services/profileService'
 import { dashboardService } from '../../services/dashboardService'
@@ -24,6 +24,13 @@ const successMessage = ref('')
 const validationErrors = ref<Record<string, string[]>>({})
 
 const profile = ref<ProfileData | null>(null)
+const avatarSrc = computed(() => {
+  if (!profile.value?.avatar_url) return null
+  const url = profile.value.avatar_url
+  // If it's a full URL, use it; otherwise prepend the API base URL
+  if (url.startsWith('http')) return url
+  return `${import.meta.env.VITE_API_BASE_URL?.replace('/api', '')}${url}`
+})
 const summary = ref({
   total_present_today: 0,
   total_absent_today: 0,
@@ -156,8 +163,8 @@ onMounted(loadData)
       <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
         <div class="flex items-center gap-3">
           <img
-            v-if="profile.avatar_url"
-            :src="profile.avatar_url"
+            v-if="avatarSrc"
+            :src="avatarSrc"
             alt="avatar"
             class="size-14 rounded-full object-cover border border-slate-200"
           />

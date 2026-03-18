@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use App\Services\SessionService;
 use App\Models\Session;
@@ -345,3 +345,5 @@ class SessionController extends Controller
         ]);
     }
 }
+
+

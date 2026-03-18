@@ -9,8 +9,10 @@ import {
   Headphones,
   ClipboardList,
   User,
+  Menu,
+  X,
 } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { getUserRole } from '../services/auth';
 
 defineProps<{
@@ -21,6 +23,7 @@ const emit = defineEmits<{
   moduleChange: [module: string];
 }>();
 
+const isCollapsed = ref(false);
 const userRole = computed(() => getUserRole());
 
 const navItems = computed(() => {
@@ -56,6 +59,7 @@ const navItems = computed(() => {
       { id: 'attendance', icon: Calendar, label: 'Attendance Control' },
       { id: 'absences', icon: ClipboardList, label: 'Absence Management' },
       { id: 'settings', icon: Settings, label: 'System Settings' },
+      { id: 'profile', icon: User, label: 'My Profile' },
     ];
   }
 });
@@ -64,48 +68,78 @@ const onSelect = (module: string) => emit('moduleChange', module);
 </script>
 
 <template>
-  <aside class="w-64 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-screen">
-    <div class="p-6 border-b border-slate-200 flex items-center gap-3">
-      <div class="size-10 rounded-lg border border-slate-200 bg-white flex items-center justify-center p-1.5">
-        <img src="/PictureUseInPageLogin.png" alt="Website logo" class="size-7 object-contain" />
-      </div>
-      <div>
-        <h1 class="text-lg font-bold tracking-tight text-slate-900">វត្តមាន-Attendance</h1>
-        <p class="text-[10px] text-slate-500 font-bold tracking-wider">វត្តមាន-Attendance</p>
-      </div>
-    </div>
-
-    <nav class="flex-1 overflow-y-auto p-4 space-y-1">
-      <button
-        v-for="item in navItems"
-        :key="item.id"
-        @click="onSelect(item.id)"
-        :class="[
-          'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors group',
-          currentModule === item.id
-            ? 'bg-primary text-white shadow-sm'
-            : 'text-slate-600 hover:bg-primary/10 hover:text-primary',
-        ]"
+  <aside 
+    class="flex-shrink-0 flex flex-col h-screen transition-all duration-300 ease-in-out"
+    :class="isCollapsed ? 'w-16' : 'w-64'"
+  >
+    <!-- Header Section -->
+    <div 
+      class="flex items-center justify-between p-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white"
+      :class="isCollapsed ? 'justify-center' : ''"
+    >
+      <div 
+        v-if="!isCollapsed" 
+        class="flex items-center gap-3"
       >
-        <component
-          :is="item.icon"
-          :class="[
-            'size-5',
-            currentModule === item.id ? 'text-white' : 'text-slate-500 group-hover:text-primary',
-          ]"
-        />
-        <span class="text-sm font-semibold">{{ item.label }}</span>
-      </button>
-    </nav>
-
-    <div class="p-4 border-t border-slate-200">
-      <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-        <div class="size-8 rounded-full bg-primary/20 flex items-center justify-center">
-          <Headphones class="size-4 text-primary" />
+        <div class="size-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+          <img src="/PictureUseInPageLogin.png" alt="Logo" class="size-7 object-contain" />
         </div>
         <div>
-          <p class="text-xs font-bold text-slate-900">Help Desk</p>
-          <p class="text-[10px] text-slate-500">Contact Support</p>
+          <h1 class="text-sm font-bold text-slate-900 tracking-tight">វត្តមាន</h1>
+          <p class="text-xs text-slate-500 font-medium">Attendance</p>
+        </div>
+      </div>
+      
+      <button
+        @click="isCollapsed = !isCollapsed"
+        class="p-2 rounded-lg hover:bg-slate-100 transition-colors group"
+        :class="isCollapsed ? 'mx-auto' : ''"
+      >
+        <Menu v-if="!isCollapsed" class="size-5 text-slate-600 group-hover:text-slate-900" />
+        <X v-else class="size-5 text-slate-600 group-hover:text-slate-900" />
+      </button>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="flex-1 overflow-y-auto p-3">
+      <div class="space-y-1">
+        <button
+          v-for="item in navItems"
+          :key="item.id"
+          @click="onSelect(item.id)"
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group hover:bg-slate-100"
+          :class="[
+            currentModule === item.id 
+              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20' 
+              : 'text-slate-600 hover:text-slate-900'
+          ]"
+        >
+          <component
+            :is="item.icon"
+            class="size-5 transition-colors"
+            :class="currentModule === item.id ? 'text-white' : 'text-slate-500 group-hover:text-blue-600'"
+          />
+          <span 
+            v-if="!isCollapsed" 
+            class="text-sm font-medium whitespace-nowrap"
+          >
+            {{ item.label }}
+          </span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Help Desk Section -->
+    <div class="p-3 border-t border-slate-200 bg-gradient-to-b from-slate-50/50 to-transparent">
+      <div class="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-3">
+          <div class="size-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
+            <Headphones class="size-5 text-white" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-semibold text-slate-900 truncate">Help Desk</p>
+            <p class="text-xs text-slate-500 truncate">Contact Support</p>
+          </div>
         </div>
       </div>
     </div>

@@ -1,10 +1,14 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Controller;
 use App\Models\AbsenceNotification;
+use App\Models\Student;
+use App\Models\Session;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Exception;
 
 class NotificationController extends Controller
 {
@@ -13,45 +17,52 @@ class NotificationController extends Controller
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        
-        if (!$user) {
+        try {
+            $user = $request->user();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Unauthorized'
+                ], 401);
+            }
+            
+            // Get notifications based on user role
+            $query = AbsenceNotification::with(['student', 'session']);
+            
+            // If user is a student, only show their notifications
+            if (isset($user->student_id) && $user->student_id) {
+                $query->where('student_id', $user->student_id);
+            }
+            
+            $notifications = $query
+                ->orderBy('created_at', 'desc')
+                ->limit(50)
+                ->get()
+                ->map(function ($notification) {
+                    return [
+                        'id' => $notification->id,
+                        'type' => $notification->notification_type ?? 'absence',
+                        'title' => $this->getNotificationTitle($notification),
+                        'message' => $notification->absence_reason ?? 'You have an absence notification',
+                        'status' => $notification->status,
+                        'student_id' => $notification->student_id,
+                        'session_id' => $notification->session_id,
+                        'date' => optional($notification->created_at)->toDateString(),
+                        'created_at' => optional($notification->created_at)->toDateTimeString(),
+                        'read' => strtolower($notification->status ?? '') !== 'pending',
+                    ];
+                });
+            
             return response()->json([
-                'message' => 'Unauthorized'
-            ], 401);
+                'notifications' => $notifications,
+                'unread_count' => $notifications->where('read', false)->count(),
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Failed to load notifications',
+                'error' => $e->getMessage()
+            ], 500);
         }
-        
-        // Get notifications based on user role
-        $query = AbsenceNotification::with(['student', 'session']);
-        
-        // If user is a student, only show their notifications
-        if ($user->student_id) {
-            $query->where('student_id', $user->student_id);
-        }
-        
-        $notifications = $query
-            ->orderBy('created_at', 'desc')
-            ->limit(50)
-            ->get()
-            ->map(function ($notification) {
-                return [
-                    'id' => $notification->id,
-                    'type' => $notification->notification_type ?? 'absence',
-                    'title' => $this->getNotificationTitle($notification),
-                    'message' => $notification->absence_reason ?? 'You have an absence notification',
-                    'status' => $notification->status,
-                    'student_id' => $notification->student_id,
-                    'session_id' => $notification->session_id,
-                    'date' => $notification->created_at->toDateString(),
-                    'created_at' => $notification->created_at,
-                    'read' => $notification->status !== 'pending',
-                ];
-            });
-        
-        return response()->json([
-            'notifications' => $notifications,
-            'unread_count' => $notifications->where('read', false)->count(),
-        ]);
     }
     
     /**

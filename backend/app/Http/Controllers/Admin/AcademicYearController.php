@@ -40,3 +40,5 @@ class AcademicYearController extends Controller
         return response()->json(['message' => 'Academic year deleted']);
     }
 }
+
+

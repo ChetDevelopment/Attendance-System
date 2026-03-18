@@ -26,6 +26,9 @@ const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
 const validationErrors = ref<Record<string, string[]>>({})
+const emit = defineEmits<{
+  (e: 'classes-updated'): void
+}>()
 
 const years = ref<AcademicYear[]>([])
 const classes = ref<SchoolClass[]>([])
@@ -203,6 +206,7 @@ const saveClass = async () => {
     }
     isClassModalOpen.value = false
     await loadData()
+    emit('classes-updated')
   } catch (error: any) {
     errorMessage.value = error.message || 'Failed to save class.'
     validationErrors.value = error.errors || {}
@@ -215,6 +219,7 @@ const deleteClass = async (id: number) => {
   try {
     await adminAcademicService.deleteClass(id)
     await loadData()
+    emit('classes-updated')
   } catch (error: any) {
     errorMessage.value = error.message || 'Failed to delete class.'
   }

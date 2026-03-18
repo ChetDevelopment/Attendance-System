@@ -39,8 +39,7 @@ class AttendanceRecordController extends Controller
         }
 
         if ($request->filled('date')) {
-            $date = Carbon::parse((string) $request->string('date'));
-            $query->whereBetween('ar.created_at', [$date->copy()->startOfDay(), $date->copy()->endOfDay()]);
+            $query->whereDate('ar.attendance_date', (string) $request->string('date'));
         }
 
         if ($request->filled('q')) {
@@ -110,12 +109,16 @@ class AttendanceRecordController extends Controller
             'student_id' => 'required|exists:students,id',
             'session_id' => 'required|exists:sessions,id',
             'status' => 'required|in:Present,Absent,Late,Excused',
+            'date' => 'sometimes|date',
         ]);
+
+        $date = $validated['date'] ?? Carbon::today()->toDateString();
 
         $attendance = AttendanceRecord::updateOrCreate(
             [
                 'student_id' => $validated['student_id'],
                 'session_id' => $validated['session_id'],
+                'attendance_date' => $date,
             ],
             [
                 'status' => $validated['status'],
@@ -177,3 +180,5 @@ class AttendanceRecordController extends Controller
         ];
     }
 }
+
+

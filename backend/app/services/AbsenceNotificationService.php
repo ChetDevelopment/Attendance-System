@@ -48,6 +48,7 @@ class AbsenceNotificationService
         
         // Get students who were marked present/late
         $attendedStudentIds = AttendanceRecord::where('session_id', $sessionId)
+            ->where('attendance_date', now()->toDateString())
             ->whereIn('status', ['Present', 'Late', 'present', 'late'])
             ->pluck('student_id')
             ->toArray();
@@ -137,10 +138,10 @@ class AbsenceNotificationService
             [
                 'student_id' => $studentId,
                 'session_id' => $sessionId,
+                'attendance_date' => now()->toDateString(),
             ],
             [
                 'status' => 'Absent',
-                'date' => now()->toDateString(),
                 'location' => 'Auto-marked by system',
             ]
         );
@@ -256,7 +257,7 @@ class AbsenceNotificationService
                     'class' => $student->class ?? 'Unknown',
                     'session_id' => $session?->id,
                     'session_name' => $session?->name,
-                    'date' => $attendance->date ?? now()->format('Y-m-d'),
+                    'date' => $attendance->attendance_date->format('Y-m-d'),
                     'status' => 'absent',
                     'notification_type' => 'absence_alert',
                 ]);
@@ -284,7 +285,7 @@ class AbsenceNotificationService
             'notification_type' => 'education_api',
             'status' => $result['success'] ? 'sent' : 'failed',
             'error_message' => $result['error'] ?? null,
-            'sent_at' => $result['success'] ? now() : null,
+            'sent_at' => now(),
         ]);
 
         return $result;
@@ -346,7 +347,7 @@ class AbsenceNotificationService
                     $student->fullname ?? $student->username ?? 'Unknown',
                     $student->username ?? (string) $student->id,
                     $student->class ?? 'Unknown Class',
-                    $attendance->date ?? now()->format('Y-m-d'),
+                    $attendance->attendance_date->format('Y-m-d'),
                     $session ? "{$session->start_time} - {$session->end_time}" : 'N/A'
                 );
 

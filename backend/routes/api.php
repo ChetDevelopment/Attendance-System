@@ -12,7 +12,12 @@ use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\AttendanceRecordController;
 use App\Http\Controllers\Admin\SystemMaintenanceController;
 use App\Http\Controllers\Admin\SessionController;
-use App\Http\Controllers\AbsenceManagementController;
+use App\Http\Controllers\Admin\AbsenceManagementController;
+use App\Http\Controllers\Admin\UserProfileController;
+use App\Http\Controllers\Admin\PredictionController;
+use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\NotificationController;
+use App\Http\Controllers\Admin\TeacherPortalController;
 use App\Http\Controllers\Teacher\TeacherAttendanceController;
 use App\Http\Controllers\Student\StudentAttendanceController;
 use Illuminate\Support\Facades\Route;
@@ -42,14 +47,27 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Student specific
     Route::prefix('student/attendance')->group(function () {
+        Route::get('/history', [StudentAttendanceController::class, 'history']);
         Route::post('/card-scan', [StudentAttendanceController::class, 'cardScan']);
     });
     
     // Alias for external devices
     Route::post('/receive-card-id', [StudentAttendanceController::class, 'cardScan']);
 
+    // User Profile
+    Route::get('user/profile', [UserProfileController::class, 'show']);
+    Route::post('user/profile', [UserProfileController::class, 'updateProfile']);
+    Route::post('user/profile/avatar', [UserProfileController::class, 'uploadAvatar']);
+    Route::post('user/settings', [UserProfileController::class, 'updateSettings']);
+
     // Teacher specific
     Route::prefix('teacher')->group(function () {
+        Route::get('/dashboard', [TeacherPortalController::class, 'dashboard']);
+        Route::get('/schedule', [TeacherPortalController::class, 'schedule']);
+        Route::get('/justifications', [TeacherPortalController::class, 'justifications']);
+        Route::get('/history', [TeacherPortalController::class, 'history']);
+        Route::get('/students', [TeacherPortalController::class, 'students']);
+        Route::get('/notifications', [TeacherPortalController::class, 'notifications']);
         Route::get('/classes/{classId}/students', [TeacherAttendanceController::class, 'getStudentsByClass']);
         Route::post('/attendance', [TeacherAttendanceController::class, 'submitAttendance']);
     });
@@ -100,7 +118,32 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(functi
 
     // System Maintenance
     Route::post('system/clear-cache', [SystemMaintenanceController::class, 'clearCache']);
+    Route::post('system/clear-dashboard-cache', [SystemMaintenanceController::class, 'clearDashboardCache']);
     Route::get('system/export-config', [SystemMaintenanceController::class, 'exportConfig']);
+
+    // Predictions & Analytics
+    Route::get('predictions/at-risk', [PredictionController::class, 'getAtRiskStudents']);
+    Route::get('predictions/student/{studentId}', [PredictionController::class, 'getStudentPrediction']);
+    Route::get('predictions/insights', [PredictionController::class, 'getInsights']);
+    Route::get('predictions/weekly', [PredictionController::class, 'getWeeklyPrediction']);
+    Route::get('predictions/historical', [PredictionController::class, 'getHistoricalData']);
+    Route::post('predictions/clear-cache', [PredictionController::class, 'clearCache']);
+
+    // Reports
+    Route::get('reports/student/{studentId}', [ReportController::class, 'getStudentReport']);
+    Route::get('reports/student/{studentId}/month/{month}/year/{year}', [ReportController::class, 'getStudentReportByMonth']);
+    Route::get('reports/student/{studentId}/year/{year}', [ReportController::class, 'getStudentReportByYear']);
+    Route::get('reports/class/{classId}', [ReportController::class, 'getClassReport']);
+    Route::get('reports/class/{classId}/month/{month}/year/{year}', [ReportController::class, 'getClassMonthlySummary']);
+    Route::get('reports/class/{classId}/range', [ReportController::class, 'getClassReportByDateRange']);
+    Route::get('reports/attendance', [ReportController::class, 'getAttendance']);
+    Route::post('reports/clear-cache', [ReportController::class, 'clearCache']);
+
+    // Notifications
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications/{notificationId}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+    Route::delete('notifications/{notificationId}', [NotificationController::class, 'destroy']);
 });
 
 // SHARED ADMIN ROUTES (admin + teacher + education)
@@ -113,6 +156,10 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin,teacher,educatio
     Route::get('/dashboard/offsite-students', [DashboardController::class, 'offsiteStudentsToday']);
     Route::get('/dashboard/notifications', [DashboardController::class, 'recentNotifications']);
     Route::get('/dashboard/active-session', [DashboardController::class, 'activeSession']);
+
+    // Risk Students & Trends (from overview)
+    Route::get('/students/risk', [DashboardController::class, 'riskStudents']);
+    Route::get('/reports/trends', [DashboardController::class, 'trends']);
 
     // Absence Management
     Route::get('/absences/stats', [AbsenceManagementController::class, 'stats']);

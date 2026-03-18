@@ -41,3 +41,5 @@ class ClassController extends Controller
         return response()->json(['message' => 'Class deleted']);
     }
 }
+
+

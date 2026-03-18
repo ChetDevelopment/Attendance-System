@@ -195,7 +195,12 @@ onMounted(loadData)
 
     <p v-if="errorMessage" class="p-3 rounded-lg bg-rose-50 text-rose-700 text-sm">{{ errorMessage }}</p>
 
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
+      <!-- Loading Progress Bar -->
+      <div v-if="loading" class="absolute top-0 left-0 right-0 h-0.5 bg-primary/10 overflow-hidden z-10">
+        <div class="h-full bg-primary animate-progress origin-left"></div>
+      </div>
+
       <div class="p-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
         <div class="relative max-w-xs w-full">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
@@ -227,10 +232,10 @@ onMounted(loadData)
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-          <tr v-if="loading">
+          <tr v-if="loading && filteredUsers.length === 0">
             <td :colspan="4" class="px-6 py-10 text-center text-slate-400 italic">Loading users...</td>
           </tr>
-          <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-slate-50 transition-colors">
+          <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-slate-50 transition-colors" :class="{ 'opacity-50 pointer-events-none': loading }">
             <td class="px-6 py-4">
               <div class="font-bold text-slate-900">{{ user.name }}</div>
               <div class="text-[10px] text-slate-400">{{ user.email }}</div>

@@ -5,7 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use App\Models\SchoolClass; 
+use App\Models\StudentClass; 
 use Carbon\Carbon;
 
 class StudentSeeder extends Seeder
@@ -16,7 +16,7 @@ class StudentSeeder extends Seeder
     public function run(): void
     {
          // Get first class
-        $class = SchoolClass::first();
+        $class = StudentClass::first();
 
         if (!$class) {
             return; // Stop if no class exists

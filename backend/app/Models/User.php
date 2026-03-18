@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -12,23 +11,43 @@ use App\Models\Role;
 use App\Models\Attendance;
 use App\Models\AttendanceRecord;
 use App\Models\AbsenceComment;
+use App\Models\ActivityLog;
 
 class User extends Authenticatable
 {
-    use Notifiable, HasApiTokens;
+    use HasFactory, Notifiable, HasApiTokens;
 
     protected $fillable = [
         'name',
         'email',
         'password',
-        'role_id'
+        'role_id',
+        'student_id',
+        'avatar_url',
+        'is_active',
+        'phone',
+        'bio',
     ];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+        'is_active' => 'boolean',
+    ];
 
     public function role()
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function student()
+    {
+        return $this->belongsTo(Student::class);
     }
 
     public function attendances(): HasMany
@@ -38,26 +57,16 @@ class User extends Authenticatable
 
     public function attendanceRecords()
     {
-        return $this->hasMany(AttendanceRecord::class, 'recorded_by');
+        return $this->hasMany(AttendanceRecord::class, 'submitted_by');
     }
 
     public function absenceComments()
     {
         return $this->hasMany(AbsenceComment::class, 'commented_by');
     }
-    
+
     public function activityLogs()
     {
         return $this->hasMany(ActivityLog::class);
     }
-
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
-    protected $casts = [
-        'password' => 'hashed',
-        'is_active' => 'boolean',
-    ];
 }

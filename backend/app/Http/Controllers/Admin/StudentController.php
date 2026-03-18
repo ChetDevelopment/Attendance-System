@@ -287,3 +287,5 @@ class StudentController extends Controller
         Cache::forever(self::INDEX_CACHE_VERSION_KEY, $next);
     }
 }
+
+

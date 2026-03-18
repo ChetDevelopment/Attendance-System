@@ -22,7 +22,19 @@ class StoreClassRequest extends FormRequest
                 'max:255',
                 Rule::unique('classes', 'class_name')->where(fn ($query) => $query->where('academic_year_id', $this->academic_year_id)),
             ],
-            'room_number' => ['required', 'string', 'max:255'],
+            'room_number' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    public function validated($key = null, $default = null): array
+    {
+        $data = parent::validated($key, $default);
+
+        // Ensure academic_year_id is present
+        if (!isset($data['academic_year_id'])) {
+            $data['academic_year_id'] = $this->academic_year_id;
+        }
+
+        return $data;
     }
 }

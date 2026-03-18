@@ -31,7 +31,7 @@ class ReportService
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($studentId) {
             $student = Student::with('class')->findOrFail($studentId);
             
-            // OPTIMIZATION: Single query with conditional aggregation instead of 4 separate queries
+            // OPTIMIZATION: Single query with conditional aggregation
             $stats = AttendanceRecord::where('student_id', $studentId)
                 ->selectRaw(
                     "COUNT(*) as total,
@@ -83,9 +83,9 @@ class ReportService
             $endDate = $startDate->copy()->endOfMonth();
 
             $records = AttendanceRecord::where('student_id', $studentId)
-                ->whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])
+                ->whereBetween('attendance_date', [$startDate->toDateString(), $endDate->toDateString()])
                 ->with('session')
-                ->orderBy('date', 'desc')
+                ->orderBy('attendance_date', 'desc')
                 ->get();
 
             $totalRecords = $records->count();
@@ -98,15 +98,17 @@ class ReportService
                 : 0;
 
             // Group by date for daily breakdown
-            $dailyBreakdown = $records->groupBy('date')->map(function ($dayRecords) {
+            $dailyBreakdown = $records->groupBy(function($item) {
+                return $item->attendance_date->format('Y-m-d');
+            })->map(function ($dayRecords, $date) {
                 return [
-                    'date' => $dayRecords->first()->date,
+                    'date' => $date,
                     'sessions' => $dayRecords->map(function ($record) {
                         return [
                             'session_id' => $record->session_id,
                             'session_name' => $record->session?->name,
                             'status' => $record->status,
-                            'check_in_time' => $record->created_at->toIso8601String(),
+                            'check_in_time' => $record->check_in_time ? $record->check_in_time->toIso8601String() : null,
                         ];
                     })->values(),
                 ];
@@ -150,7 +152,7 @@ class ReportService
             $endDate = $startDate->copy()->endOfYear();
 
             $records = AttendanceRecord::where('student_id', $studentId)
-                ->whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])
+                ->whereBetween('attendance_date', [$startDate->toDateString(), $endDate->toDateString()])
                 ->get();
 
             $totalRecords = $records->count();
@@ -166,8 +168,8 @@ class ReportService
             $monthlyBreakdown = [];
             for ($month = 1; $month <= 12; $month++) {
                 $monthRecords = $records->filter(function ($record) use ($year, $month) {
-                    return Carbon::parse($record->date)->year == $year 
-                        && Carbon::parse($record->date)->month == $month;
+                    $date = Carbon::parse($record->attendance_date);
+                    return $date->year == $year && $date->month == $month;
                 });
 
                 $monthTotal = $monthRecords->count();
@@ -222,7 +224,7 @@ class ReportService
             $students = Student::where('class_id', $classId)->get();
             $studentIds = $students->pluck('id');
 
-            // OPTIMIZATION: Single query with conditional aggregation instead of 4 separate queries
+            // OPTIMIZATION: Single query with conditional aggregation
             $stats = AttendanceRecord::whereIn('student_id', $studentIds)
                 ->selectRaw(
                     "COUNT(*) as total,
@@ -241,14 +243,13 @@ class ReportService
                 ? round(($presentRecords / $totalRecords) * 100, 2) 
                 : 0;
 
-            // Get recent sessions with attendance - optimized with eager loading
+            // Get recent sessions with attendance
             $recentSessions = AttendanceRecord::whereIn('student_id', $studentIds)
                 ->with('session')
                 ->select('session_id', DB::raw('COUNT(*) as total'), 
                     DB::raw('SUM(CASE WHEN status IN ("present", "late", "Present", "Late") THEN 1 ELSE 0 END) as present'),
                     DB::raw('SUM(CASE WHEN status IN ("absent", "Absent") THEN 1 ELSE 0 END) as absent'))
                 ->groupBy('session_id')
-                ->orderBy('date', 'desc')
                 ->limit(10)
                 ->get();
 
@@ -274,7 +275,6 @@ class ReportService
 
     /**
      * Get class attendance by date range
-     * OPTIMIZED: Single query with conditional aggregation
      */
     public function getClassReportByDateRange($classId, $startDate, $endDate): array
     {
@@ -288,7 +288,7 @@ class ReportService
 
             // OPTIMIZATION: Single query with conditional aggregation
             $stats = AttendanceRecord::whereIn('student_id', $studentIds)
-                ->whereBetween('date', [$startDate, $endDate])
+                ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->selectRaw(
                     "COUNT(*) as total,
                      SUM(CASE WHEN status IN ('present', 'late', 'Present', 'Late') THEN 1 ELSE 0 END) as present_count,
@@ -298,28 +298,26 @@ class ReportService
                 ->first();
 
             $totalRecords = (int) $stats->total;
-            $presentRecords = (int) $stats->present_count;
-            $absentRecords = (int) $stats->absent_count;
-            $lateRecords = (int) $stats->late_count;
 
-            // Get daily breakdown - optimized to fetch only necessary data
+            // Get daily breakdown
             $records = AttendanceRecord::whereIn('student_id', $studentIds)
-                ->whereBetween('date', [$startDate, $endDate])
-                ->select('date', 'status')
-                ->orderBy('date')
+                ->whereBetween('attendance_date', [$startDate, $endDate])
+                ->select('attendance_date', 'status')
+                ->orderBy('attendance_date')
                 ->get();
 
-            // Group by date in memory
-            $dailyBreakdown = $records->groupBy('date')->map(function ($dayRecords, $date) {
+            $dailyBreakdown = $records->groupBy(function($item) {
+                return Carbon::parse($item->attendance_date)->format('Y-m-d');
+            })->map(function ($dayRecords, $date) {
+                $total = $dayRecords->count();
+                $present = $dayRecords->whereIn('status', self::PRESENT_STATUSES)->count();
                 return [
                     'date' => $date,
-                    'total' => $dayRecords->count(),
-                    'present' => $dayRecords->whereIn('status', self::PRESENT_STATUSES)->count(),
+                    'total' => $total,
+                    'present' => $present,
                     'absent' => $dayRecords->whereIn('status', self::ABSENT_STATUSES)->count(),
                     'late' => $dayRecords->whereIn('status', self::LATE_STATUSES)->count(),
-                    'attendance_percentage' => $dayRecords->count() > 0 
-                        ? round(($dayRecords->whereIn('status', self::PRESENT_STATUSES)->count() / $dayRecords->count()) * 100, 2)
-                        : 0,
+                    'attendance_percentage' => $total > 0 ? round(($present / $total) * 100, 2) : 0,
                 ];
             })->values();
 
@@ -335,10 +333,10 @@ class ReportService
                 ],
                 'summary' => [
                     'total_attendance_records' => $totalRecords,
-                    'present' => $presentRecords,
-                    'absent' => $absentRecords,
-                    'late' => $lateRecords,
-                    'attendance_percentage' => $totalRecords > 0 ? round(($presentRecords / $totalRecords) * 100, 2) : 0,
+                    'present' => (int)$stats->present_count,
+                    'absent' => (int)$stats->absent_count,
+                    'late' => (int)$stats->late_count,
+                    'attendance_percentage' => $totalRecords > 0 ? round(((int)$stats->present_count / $totalRecords) * 100, 2) : 0,
                 ],
                 'daily_breakdown' => $dailyBreakdown,
                 'generated_at' => now()->toIso8601String(),
@@ -363,7 +361,7 @@ class ReportService
             $endDate = $startDate->copy()->endOfMonth();
 
             $records = AttendanceRecord::whereIn('student_id', $studentIds)
-                ->whereBetween('date', [$startDate->toDateString(), $endDate->toDateString()])
+                ->whereBetween('attendance_date', [$startDate->toDateString(), $endDate->toDateString()])
                 ->get();
 
             $totalRecords = $records->count();
@@ -374,7 +372,6 @@ class ReportService
             $sessionNames = Session::whereIn('id', $records->pluck('session_id')->unique()->values())
                 ->pluck('name', 'id');
 
-            // Avoid N+1 lookups by resolving all session names once.
             $sessionSummary = $records->groupBy('session_id')->map(function ($sessionRecords, $sessionId) use ($sessionNames) {
                 return [
                     'session_id' => $sessionId,
@@ -411,14 +408,13 @@ class ReportService
 
     /**
      * Get attendance records by date range
-     * OPTIMIZED: Added pagination and reduced data transfer
      */
     public function getAttendanceByDateRange($startDate, $endDate, $classId = null, $studentId = null): array
     {
-        $query = AttendanceRecord::with(['student:id,fullname', 'session:id,name,date']);
+        $query = AttendanceRecord::with(['student:id,fullname', 'session:id,name']);
 
         if ($startDate && $endDate) {
-            $query->whereBetween('date', [$startDate, $endDate]);
+            $query->whereBetween('attendance_date', [$startDate, $endDate]);
         }
 
         if ($classId) {
@@ -430,12 +426,10 @@ class ReportService
             $query->where('student_id', $studentId);
         }
 
-        // OPTIMIZATION: Add pagination to prevent returning too much data
-        $limit = 100; // Max records per request
-        $records = $query->orderBy('date', 'desc')->orderBy('created_at', 'desc')->limit($limit)->get();
+        $records = $query->orderBy('attendance_date', 'desc')->paginate(50);
 
         return [
-            'records' => $records->map(function ($record) {
+            'records' => collect($records->items())->map(function ($record) {
                 return [
                     'id' => $record->id,
                     'student' => [
@@ -445,14 +439,18 @@ class ReportService
                     'session' => [
                         'id' => $record->session_id,
                         'name' => $record->session?->name,
-                        'date' => $record->session?->date,
                     ],
                     'status' => $record->status,
-                    'date' => $record->date,
+                    'date' => $record->attendance_date->format('Y-m-d'),
                     'created_at' => $record->created_at->toIso8601String(),
                 ];
             }),
-            'total' => $records->count(),
+            'pagination' => [
+                'total' => $records->total(),
+                'per_page' => $records->perPage(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+            ],
             'generated_at' => now()->toIso8601String(),
         ];
     }
@@ -464,18 +462,8 @@ class ReportService
     {
         if ($type === 'student') {
             Cache::forget("report:student:{$id}");
-            // Clear all month and year caches
-            $currentYear = now()->year;
-            for ($month = 1; $month <= 12; $month++) {
-                Cache::forget("report:student:{$id}:month:{$currentYear}-{$month}");
-            }
-            Cache::forget("report:student:{$id}:year:{$currentYear}");
         } elseif ($type === 'class') {
             Cache::forget("report:class:{$id}");
-            $currentYear = now()->year;
-            for ($month = 1; $month <= 12; $month++) {
-                Cache::forget("report:class:{$id}:month:{$currentYear}-{$month}");
-            }
         }
     }
 }

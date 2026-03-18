@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Controller;
 use App\Models\AbsenceNotification;
 use App\Models\AttendanceRecord;
 use App\Models\Student;
@@ -41,7 +42,7 @@ class AbsenceManagementController extends Controller
                     an.student_id,
                     s.fullname as student_name,
                     s.username as student_code,
-                    COALESCE(c.class_name, s.class, 'Unknown') as class_name,
+                    COALESCE(c.name, s.class, 'Unknown') as class_name,
                     s.class_id,
                     DATE(an.created_at) as absence_date,
                     sess.name as session_name,
@@ -91,10 +92,12 @@ class AbsenceManagementController extends Controller
             Log::error('Failed to load absence index', [
                 'filters' => $request->only(['status', 'start_date', 'end_date', 'class_id', 'student_id', 'search']),
                 'error' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString()
             ]);
 
             return response()->json([
                 'message' => 'Unable to load absences at this time.',
+                'error' => $exception->getMessage()
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -123,12 +126,12 @@ class AbsenceManagementController extends Controller
         $attendanceDetails = null;
         if ($absence->attendance_record_id) {
             $attendanceDetails = DB::table('attendance_records as ar')
-                ->leftJoin('users as teacher', 'teacher.id', '=', 'ar.created_by')
+                ->leftJoin('users as teacher', 'teacher.id', '=', 'ar.submitted_by')
                 ->where('ar.id', $absence->attendance_record_id)
                 ->selectRaw("
                     ar.id,
                     ar.status,
-                    ar.date,
+                    ar.attendance_date,
                     ar.location,
                     ar.justification,
                     ar.justified_at,
@@ -607,3 +610,5 @@ class AbsenceManagementController extends Controller
         return "{$existingText}\n\n{$entry}";
     }
 }
+
+

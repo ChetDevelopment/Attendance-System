@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Controller;
 use App\Services\AttendancePredictionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -174,3 +175,5 @@ class PredictionController extends Controller
         }
     }
 }
+
+

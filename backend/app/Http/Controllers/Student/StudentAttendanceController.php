@@ -12,6 +12,63 @@ use Illuminate\Http\Request;
 
 class StudentAttendanceController extends Controller
 {
+    private function formatTimeValue($value): string
+    {
+        if (!$value) {
+            return '';
+        }
+
+        try {
+            return Carbon::parse($value)->format('H:i');
+        } catch (\Throwable $exception) {
+            return (string) $value;
+        }
+    }
+
+    public function history(Request $request)
+    {
+        $user = $request->user();
+        $studentId = (int) ($user?->student_id ?? 0);
+
+        if ($studentId <= 0) {
+            return response()->json([
+                'message' => 'Student account is not linked to a student record.',
+            ], 403);
+        }
+
+        $rows = AttendanceRecord::query()
+            ->with(['session:id,name,start_time,end_time'])
+            ->where('student_id', $studentId)
+            ->orderByDesc('attendance_date')
+            ->orderByDesc('check_in_time')
+            ->limit(50)
+            ->get()
+            ->map(function (AttendanceRecord $record) {
+                $status = strtoupper((string) $record->status);
+                $session = $record->session;
+
+                return [
+                    'id' => (string) $record->id,
+                    'studentId' => (string) $record->student_id,
+                    'status' => in_array($status, ['PRESENT', 'ABSENT', 'LATE', 'PENDING'], true)
+                        ? $status
+                        : 'PENDING',
+                    'date' => optional($record->attendance_date)->format('Y-m-d'),
+                    'timeSlot' => $session
+                        ? trim(collect([
+                            $this->formatTimeValue($session->start_time),
+                            $this->formatTimeValue($session->end_time),
+                        ])->filter()->join(' - '))
+                        : '',
+                    'courseName' => (string) ($session->name ?? 'Attendance Session'),
+                    'timestamp' => optional($record->check_in_time)->toIso8601String(),
+                ];
+            })
+            ->values();
+
+        return response()->json($rows);
+    }
+
     /**
      * Receive scanned card id (RFID/NFC) and mark attendance for a session.
      *
@@ -96,7 +153,7 @@ class StudentAttendanceController extends Controller
         $record = AttendanceRecord::create([
             'student_id' => $student->id,
             'session_id' => $session->id,
-            'recorded_by' => auth()->id(),
+            'submitted_by' => auth()->id(),
             'attendance_date' => $attendanceDate,
             'status' => $status,
             'check_in_time' => $now,
@@ -116,4 +173,3 @@ class StudentAttendanceController extends Controller
         ], 201);
     }
 }
-

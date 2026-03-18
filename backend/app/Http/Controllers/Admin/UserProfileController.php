@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -60,7 +60,10 @@ class UserProfileController extends Controller
 
     public function show(Request $request)
     {
-        return response()->json($this->payload($request->user()));
+        $user = $request->user();
+        // Refresh to get latest data from database
+        $user->refresh();
+        return response()->json($this->payload($user));
     }
 
     public function updateProfile(Request $request)
@@ -120,6 +123,9 @@ class UserProfileController extends Controller
                 return response()->json(['message' => 'Failed to save changes to database'], 500);
             }
 
+            // Refresh to get latest data
+            $user->refresh();
+
             Log::info('Profile updated successfully for user ' . $user->id);
 
             return response()->json($this->payload($user));
@@ -167,6 +173,9 @@ class UserProfileController extends Controller
             $user->fill($validated);
             $user->save();
 
+            // Refresh to get latest data
+            $user->refresh();
+
             return response()->json([
                 'message' => 'Settings saved successfully',
                 'user' => $this->payload($user),
@@ -211,6 +220,9 @@ class UserProfileController extends Controller
                 'avatar_url' => $url,
             ]);
 
+            // Refresh the user model to get updated values
+            $user->refresh();
+
             return response()->json([
                 'message' => 'Avatar updated successfully',
                 'avatar_url' => $url,
@@ -228,3 +240,5 @@ class UserProfileController extends Controller
         }
     }
 }
+
+

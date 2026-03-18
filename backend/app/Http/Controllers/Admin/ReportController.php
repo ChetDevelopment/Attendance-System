@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Controller;
 use App\Services\ReportService;
 use App\Models\Student;
 use App\Models\StudentClass;
@@ -428,3 +429,5 @@ class ReportController extends Controller
         ], Response::HTTP_INTERNAL_SERVER_ERROR);
     }
 }
+
+

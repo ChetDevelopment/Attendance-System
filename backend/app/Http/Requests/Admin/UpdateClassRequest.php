@@ -27,7 +27,12 @@ class UpdateClassRequest extends FormRequest
                     ->ignore($classId)
                     ->where(fn ($query) => $query->where('academic_year_id', $this->academic_year_id)),
             ],
-            'room_number' => ['sometimes', 'string', 'max:255'],
+            'room_number' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    public function validated($key = null, $default = null): array
+    {
+        return parent::validated($key, $default);
     }
 }

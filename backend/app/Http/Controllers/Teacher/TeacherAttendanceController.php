@@ -206,6 +206,7 @@ class TeacherAttendanceController extends Controller
                 AttendanceRecord::create([
                     'student_id' => $studentId,
                     'session_id' => $sessionId,
+                    'attendance_id' => $attendance->id,
                     'recorded_by' => auth()->id(),
                     'attendance_date' => $date,
                     'status' => $status,
@@ -383,8 +384,8 @@ class TeacherAttendanceController extends Controller
             $query->whereDate('date', $today);
         })->get();
 
-        $checkedInCount = $allTodayRecords->where('status', 'present')->count();
-        $absentCount = $allTodayRecords->whereIn('status', ['absent', 'late'])->count();
+        $checkedInCount = $allTodayRecords->where('status', 'PRESENT')->count();
+        $absentCount = $allTodayRecords->whereIn('status', ['ABSENT', 'LATE'])->count();
 
         // Get next upcoming session (after current active session ends)
         $nextToday = null;

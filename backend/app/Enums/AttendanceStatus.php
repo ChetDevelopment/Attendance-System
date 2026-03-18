@@ -4,9 +4,9 @@ namespace App\Enums;
 
 enum AttendanceStatus: string
 {
-    case PRESENT = 'present';
-    case ABSENT = 'absent';
-    case LATE = 'late';
+    case PRESENT = 'PRESENT';
+    case ABSENT = 'ABSENT';
+    case LATE = 'LATE';
 
     public static function fromString(string $value): self
     {

@@ -86,6 +86,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Timetable Date Offset
+    |--------------------------------------------------------------------------
+    |
+    | Date offset for timetable data. Set to -1 to use last year's data
+    | when the current system date is beyond the available timetable data.
+    |
+    */
+
+    'timetable_date_offset' => env('TIMETABLE_DATE_OFFSET', 0),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

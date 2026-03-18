@@ -21,6 +21,17 @@ class TimetableService
     {
         $date = $date ? Carbon::parse($date) : Carbon::today();
 
+        // Apply date offset if configured (for testing with timetable data)
+        // Set TIMETABLE_DATE_OFFSET in .env to adjust the date (e.g., -1 for last year)
+        $dateOffset = (int) config('app.timetable_date_offset', 0);
+        
+        // Debug log the offset
+        Log::info('TimetableService: Date offset from config: ' . $dateOffset);
+        
+        if ($dateOffset !== 0) {
+            $date = $date->addYears($dateOffset);
+        }
+
         // Set the date range to cover the entire day
         $startOfDay = $date->copy()->startOfDay();
         $endOfDay = $date->copy()->endOfDay();

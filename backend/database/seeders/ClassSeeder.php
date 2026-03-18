@@ -22,9 +22,10 @@ class ClassSeeder extends Seeder
             return; // stop if no academic year exists
         }
 
-        // Get teacher users
-        $teacher1 = DB::table('users')->where('email', 'teacher@pnc.com')->first();
-        $teacher2 = DB::table('users')->where('email', 'radyy@pnc.com')->first();
+        // Get teacher users (using actual teacher emails from UserSeeder)
+        $teacher1 = DB::table('users')->where('email', 'davy@pnc.com')->first();
+        $teacher2 = DB::table('users')->where('email', 'him@pnc.com')->first();
+        $teacher3 = DB::table('users')->where('email', 'mengheang@pnc.com')->first();
 
         foreach ($academicYears as $academicYear) {
             $yearPrefix = str_replace('-', '', $academicYear->name);
@@ -51,16 +52,19 @@ class ClassSeeder extends Seeder
                     'code' => 'WEP-C-' . $yearPrefix,
                     'academic_year_id' => $academicYear->id,
                     'description' => 'Web Programming Class C',
-                    'teacher_id' => $teacher1->id ?? null,
+                    'teacher_id' => $teacher3->id ?? null,
                     'is_active' => true,
                 ],
             ];
 
             foreach ($classes as $class) {
-                SchoolClass::updateOrCreate(
-                    ['code' => $class['code']],
-                    $class
-                );
+                // Update existing class or create new one
+                $existingClass = SchoolClass::where('code', $class['code'])->first();
+                if ($existingClass) {
+                    $existingClass->update(['teacher_id' => $class['teacher_id']]);
+                } else {
+                    SchoolClass::create($class);
+                }
             }
         }
     }

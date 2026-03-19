@@ -3,12 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly ActivityLogService $activityLogService)
+    {
+    }
+
     private function transformUser(User $user): array
     {
         $user->loadMissing('role');
@@ -42,6 +47,13 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
+        $this->activityLogService->recordFromRequest(
+            $user,
+            $request,
+            'User registered',
+            'Registered new account for ' . $user->email
+        );
+
         return response()->json([
             'message' => 'User registered successfully.',
             'token' => $token,
@@ -72,6 +84,13 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
+        $this->activityLogService->recordFromRequest(
+            $user,
+            $request,
+            'User login',
+            'User logged in successfully'
+        );
+
         return response()->json([
             'message' => 'Login successful.',
             'token' => $token,
@@ -81,6 +100,13 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        $this->activityLogService->recordFromRequest(
+            $request->user(),
+            $request,
+            'User logout',
+            'User logged out'
+        );
+
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([

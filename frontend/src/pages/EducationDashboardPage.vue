@@ -63,12 +63,12 @@ const fetchData = async () => {
   isLoading.value = true
   errorMessage.value = ''
   const results = await Promise.allSettled([
-    fetchJson('/api/dashboard/stats'),
-    fetchJson('/api/students/absent-today'),
-    fetchJson('/api/students/all-absent'),
-    fetchJson('/api/students/risk'),
-    fetchJson('/api/reports/class'),
-    fetchJson('/api/reports/trends'),
+    fetchJson('/api/education/dashboard/stats'),
+    fetchJson('/api/education/students/absent-today'),
+    fetchJson('/api/education/students/all-absent'),
+    fetchJson('/api/education/students/risk'),
+    fetchJson('/api/education/reports/class-summary'),
+    fetchJson('/api/admin/reports/trends'),
   ])
 
   const [stats, today, all, risk, reports, trends] = results
@@ -95,7 +95,7 @@ const fetchData = async () => {
 
 const handleOpenDetail = async (attendanceId: number) => {
   try {
-    const data = await fetchJson(`/api/attendance/detail/${attendanceId}`)
+    const data = await fetchJson(`/api/education/attendance/detail/${attendanceId}`)
     selectedAttendance.value = data
     followUpForm.value = {
       reason: data.reason || '',
@@ -114,7 +114,7 @@ const handleOpenDetail = async (attendanceId: number) => {
 
 const handleSubmitFollowUp = async () => {
   try {
-    const { status } = await api.post('/attendance/follow-up', {
+    const { status } = await api.post('/education/attendance/follow-up', {
       attendanceId: selectedAttendance.value.id,
       ...followUpForm.value,
       updatedBy: 'Education Team',
@@ -131,11 +131,11 @@ const handleSubmitFollowUp = async () => {
 
 const handleSendAlert = async () => {
   try {
-    const { data } = await api.post('/attendance/alert', {
+    const { data } = await api.post('/education/attendance/alert', {
+      attendanceId: selectedAttendance.value.id,
       studentName: selectedAttendance.value.name,
       className: selectedAttendance.value.class,
       date: selectedAttendance.value.date,
-      attendanceId: selectedAttendance.value.id,
     })
     if (data.success) {
       alert('Alert sent successfully!')

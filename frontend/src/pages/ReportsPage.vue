@@ -305,7 +305,7 @@ export default {
     async loadStudents() {
       try {
         const response = await studentService.getStudents();
-        this.students = response.data.data || [];
+        this.students = response?.data || [];
       } catch (error) {
         console.error('Error loading students:', error);
       }
@@ -313,7 +313,7 @@ export default {
     async loadClasses() {
       try {
         const response = await adminAcademicService.getClasses();
-        this.classes = response.data.data || [];
+        this.classes = response?.data || [];
       } catch (error) {
         console.error('Error loading classes:', error);
       }

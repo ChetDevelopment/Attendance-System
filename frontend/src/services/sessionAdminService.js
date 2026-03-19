@@ -18,7 +18,7 @@ export const sessionAdminService = {
   async list(params = {}) {
     try {
       const response = await api.get('/admin/sessions', { params })
-      return response.data
+      return Array.isArray(response.data?.data) ? response.data.data : []
     } catch (error) {
       throw formatError(error)
     }
@@ -27,7 +27,7 @@ export const sessionAdminService = {
   async get(id) {
     try {
       const response = await api.get(`/admin/sessions/${id}`)
-      return response.data
+      return response.data?.data ?? null
     } catch (error) {
       throw formatError(error)
     }
@@ -36,7 +36,7 @@ export const sessionAdminService = {
   async create(payload) {
     try {
       const response = await api.post('/admin/sessions', payload)
-      return response.data
+      return response.data?.data ?? null
     } catch (error) {
       throw formatError(error)
     }
@@ -45,7 +45,7 @@ export const sessionAdminService = {
   async update(id, payload) {
     try {
       const response = await api.patch(`/admin/sessions/${id}`, payload)
-      return response.data
+      return response.data?.data ?? null
     } catch (error) {
       throw formatError(error)
     }
@@ -63,7 +63,7 @@ export const sessionAdminService = {
   async toggle(id) {
     try {
       const response = await api.post(`/admin/sessions/${id}/toggle`)
-      return response.data
+      return response.data?.data ?? null
     } catch (error) {
       throw formatError(error)
     }

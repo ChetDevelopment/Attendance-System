@@ -4,17 +4,34 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Session;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 class SystemMaintenanceController extends Controller
 {
+    private const BACKUP_DISK = 'local';
+    private const BACKUP_DIRECTORY = 'system-backups';
+
+    public function __construct(private readonly ActivityLogService $activityLogService)
+    {
+    }
+
     public function clearCache(Request $request)
     {
         Artisan::call('optimize:clear');
+
+        $this->activityLogService->recordFromRequest(
+            $request->user(),
+            $request,
+            'Cleared system cache',
+            'Cleared application caches from system maintenance'
+        );
 
         return response()->json([
             'success' => true,
@@ -88,13 +105,147 @@ class SystemMaintenanceController extends Controller
 
         $fileName = 'attendance-config-' . now()->format('Ymd-His') . '.json';
 
+        $this->activityLogService->recordFromRequest(
+            $request->user(),
+            $request,
+            'Exported system config',
+            'Downloaded system configuration export'
+        );
+
         return response()->streamDownload(function () use ($payload): void {
             echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         }, $fileName, [
             'Content-Type' => 'application/json; charset=utf-8',
         ]);
     }
-}
 
+    public function listBackups()
+    {
+        $disk = Storage::disk(self::BACKUP_DISK);
+        $files = collect($disk->files(self::BACKUP_DIRECTORY))
+            ->filter(fn (string $path) => str_ends_with($path, '.json'))
+            ->map(function (string $path) use ($disk) {
+                return [
+                    'name' => basename($path),
+                    'path' => $path,
+                    'size' => $disk->size($path),
+                    'last_modified' => date('Y-m-d H:i:s', $disk->lastModified($path)),
+                ];
+            })
+            ->sortByDesc('last_modified')
+            ->values();
+
+        return response()->json($files);
+    }
+
+    public function createBackup(Request $request)
+    {
+        $payload = $this->buildDatabaseBackupPayload();
+        $fileName = 'database-backup-' . now()->format('Ymd-His') . '.json';
+        $path = self::BACKUP_DIRECTORY . '/' . $fileName;
+
+        Storage::disk(self::BACKUP_DISK)->put($path, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        $this->activityLogService->recordFromRequest(
+            $request->user(),
+            $request,
+            'Created database backup',
+            'Created backup file ' . $fileName
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Database backup created successfully.',
+            'backup' => [
+                'name' => $fileName,
+                'path' => $path,
+            ],
+        ]);
+    }
+
+    public function restoreBackup(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string'],
+        ]);
+
+        $path = self::BACKUP_DIRECTORY . '/' . basename($validated['name']);
+        $disk = Storage::disk(self::BACKUP_DISK);
+
+        if (!$disk->exists($path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Backup file not found.',
+            ], 404);
+        }
+
+        $payload = json_decode($disk->get($path), true);
+        $tables = collect($payload['tables'] ?? []);
+
+        DB::beginTransaction();
+
+        try {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
+            $tables->keys()->reverse()->each(function (string $tableName) {
+                DB::table($tableName)->truncate();
+            });
+
+            $tables->each(function (array $rows, string $tableName) {
+                if (empty($rows)) {
+                    return;
+                }
+
+                foreach (array_chunk($rows, 200) as $chunk) {
+                    DB::table($tableName)->insert($chunk);
+                }
+            });
+
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            DB::commit();
+
+            $this->activityLogService->recordFromRequest(
+                $request->user(),
+                $request,
+                'Restored database backup',
+                'Restored backup file ' . basename($path)
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Database restored successfully.',
+            ]);
+        } catch (\Throwable $exception) {
+            DB::rollBack();
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to restore backup.',
+                'error' => $exception->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function buildDatabaseBackupPayload(): array
+    {
+        $tables = collect(DB::select('SHOW TABLES'))
+            ->map(fn ($row) => array_values((array) $row)[0])
+            ->filter(fn (string $tableName) => $tableName !== 'migrations')
+            ->values();
+
+        $tablePayload = [];
+
+        foreach ($tables as $tableName) {
+            $tablePayload[$tableName] = DB::table($tableName)->get()->map(fn ($row) => (array) $row)->all();
+        }
+
+        return [
+            'generated_at' => now()->toIso8601String(),
+            'database' => config('database.connections.' . config('database.default') . '.database'),
+            'tables' => $tablePayload,
+        ];
+    }
+}
 
 

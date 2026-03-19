@@ -54,7 +54,7 @@ export const adminAttendanceService = {
   async getSessions() {
     try {
       const response = await api.get('/admin/sessions')
-      return response.data
+      return Array.isArray(response.data?.data) ? response.data.data : []
     } catch (error) {
       throw formatError(error)
     }

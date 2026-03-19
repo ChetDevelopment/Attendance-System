@@ -21,6 +21,7 @@ const route = useRoute();
 const currentUser = computed(() => getUser() || {});
 const currentStudentProfile = computed(() => studentProfile.value);
 const headerSearch = ref('');
+const keepAliveRoutes = ['student-dashboard', 'student-attendance', 'student-biometric-scan', 'student-history', 'student-settings'];
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/student/dashboard' },
@@ -189,9 +190,11 @@ watch(
 
       <!-- Content Area -->
       <div class="flex-1">
-        <router-view v-slot="{ Component }">
+        <router-view v-slot="{ Component, route: currentRoute }">
           <transition name="fade" mode="out-in">
-            <component :is="Component" />
+            <KeepAlive :include="keepAliveRoutes">
+              <component :is="Component" :key="currentRoute.name" />
+            </KeepAlive>
           </transition>
         </router-view>
       </div>

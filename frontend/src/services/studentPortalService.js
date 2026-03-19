@@ -28,13 +28,18 @@ const normalizeHistoryRecord = (record) => {
 }
 
 export const getStudentDashboardStats = async () => {
-  const response = await api.get(STUDENT_STATS_URL)
-  return response.data
+  return getDeduplicated(STUDENT_STATS_URL, {
+    cache: true,
+    cacheTTL: 30000,
+  })
 }
 
 export const getStudentHistory = async (limit = 50) => {
-  const response = await api.get(STUDENT_HISTORY_URL, { params: { limit } })
-  const data = response.data
+  const data = await getDeduplicated(STUDENT_HISTORY_URL, {
+    cache: true,
+    cacheTTL: 60000,
+    params: { limit },
+  })
   return Array.isArray(data) ? data.map(normalizeHistoryRecord) : []
 }
 
@@ -53,7 +58,7 @@ export const getStudentPortalData = async () => {
 
 export const prefetchStudentPortalData = () => {
   prefetch(STUDENT_STATS_URL, { cacheTTL: 30000 })
-  prefetch(STUDENT_HISTORY_URL, { cacheTTL: 60000 })
+  prefetch(STUDENT_HISTORY_URL, { cacheTTL: 60000, params: { limit: 50 } })
 }
 
 const invalidateStudentPortalCache = () => {

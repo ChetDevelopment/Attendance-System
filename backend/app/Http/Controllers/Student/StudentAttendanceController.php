@@ -17,6 +17,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 class StudentAttendanceController extends Controller
 {
+    private function baseStudentQuery()
+    {
+        return Student::query()
+            ->with('class:id,class_name');
+    }
+
     private function formatTimeValue($value): string
     {
         if (!$value) {
@@ -90,7 +96,7 @@ class StudentAttendanceController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $student = Student::query()
+        $student = $this->baseStudentQuery()
             ->where('card_id', $validated['cardData'])
             ->first();
 
@@ -316,7 +322,7 @@ class StudentAttendanceController extends Controller
 
     public function studentInfo(Request $request)
     {
-        $student = $this->resolveStudentFromRequest($request);
+        $student = $this->resolveStudentFromScanRequest($request) ?? $this->resolveStudentFromRequest($request);
 
         if (!$student) {
             return response()->json([
@@ -516,15 +522,27 @@ class StudentAttendanceController extends Controller
         $user = $this->resolveUserFromRequest($request);
 
         if ($user?->student_id) {
-            return Student::with('class')->find($user->student_id);
+            return $this->baseStudentQuery()->find($user->student_id);
         }
 
         if ($user?->email) {
-            return Student::with('class')->where('email', $user->email)->first();
+            return $this->baseStudentQuery()->where('email', $user->email)->first();
         }
 
         if ($request->hasHeader('X-Student-Session')) {
-            return Student::with('class')->where('card_id', $request->header('X-Student-Session'))->first();
+            return $this->baseStudentQuery()->where('card_id', $request->header('X-Student-Session'))->first();
+        }
+
+        return null;
+    }
+
+    private function resolveStudentFromScanRequest(Request $request): ?Student
+    {
+        $scanType = $request->string('scanType')->toString();
+        $scanData = trim($request->string('scanData')->toString());
+
+        if ($scanType === BiometricScan::SCAN_TYPE_CARD && $scanData !== '') {
+            return $this->baseStudentQuery()->where('card_id', $scanData)->first();
         }
 
         return null;
@@ -542,11 +560,14 @@ class StudentAttendanceController extends Controller
             return Session::find($sessionId);
         }
 
+        $currentTime = Carbon::now(config('sessions.timezone', 'Asia/Bangkok'))->format('H:i:s');
+
         return Session::query()
             ->active()
             ->ordered()
-            ->get()
-            ->first(fn (Session $session) => $session->isTimeWithinSession())
+            ->where('start_time', '<=', $currentTime)
+            ->where('end_time', '>=', $currentTime)
+            ->first()
             ?? Session::query()->active()->ordered()->first();
     }
 }

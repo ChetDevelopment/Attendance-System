@@ -1,15 +1,16 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { getUserRole, hasSession } from '../services/auth'
-import AppLayout from '../layouts/AppLayout.vue'
-import LoginPage from '../pages/LoginPage.vue'
-import TeacherDashboardPage from '../pages/TeacherDashboardPage.vue'
-import EducationDashboardPage from '../pages/EducationDashboardPage.vue'
-import StudentDashboardPage from '../pages/StudentDashboardPage.vue'
-import StudentAttendancePage from '../pages/StudentAttendancePage.vue'
-import StudentBiometricScanPage from '../pages/StudentBiometricScanPage.vue'
-import StudentHistoryPage from '../pages/StudentHistoryPage.vue'
-import StudentSettingsPage from '../pages/StudentSettingsPage.vue'
-import ReportsPage from '../pages/ReportsPage.vue'
+
+const AppLayout = () => import('../layouts/AppLayout.vue')
+const LoginPage = () => import('../pages/LoginPage.vue')
+const TeacherDashboardPage = () => import('../pages/TeacherDashboardPage.vue')
+const EducationDashboardPage = () => import('../pages/EducationDashboardPage.vue')
+const StudentDashboardPage = () => import('../pages/StudentDashboardPage.vue')
+const StudentAttendancePage = () => import('../pages/StudentAttendancePage.vue')
+const StudentBiometricScanPage = () => import('../pages/StudentBiometricScanPage.vue')
+const StudentHistoryPage = () => import('../pages/StudentHistoryPage.vue')
+const StudentSettingsPage = () => import('../pages/StudentSettingsPage.vue')
+const ReportsPage = () => import('../pages/ReportsPage.vue')
 
 const routes = [
   {
@@ -57,31 +58,31 @@ const routes = [
     path: '/student/dashboard',
     name: 'student-dashboard',
     component: StudentDashboardPage,
-    meta: { requiresAuth: true, layout: 'StudentLayout' },
+    meta: { requiresAuth: true, layout: 'StudentLayout', keepAlive: true },
   },
   {
     path: '/student/attendance',
     name: 'student-attendance',
     component: StudentAttendancePage,
-    meta: { requiresAuth: true, layout: 'StudentLayout' },
+    meta: { requiresAuth: true, layout: 'StudentLayout', keepAlive: true },
   },
   {
     path: '/student/biometric-scan',
     name: 'student-biometric-scan',
     component: StudentBiometricScanPage,
-    meta: { requiresAuth: true, layout: 'StudentLayout' },
+    meta: { requiresAuth: true, layout: 'StudentLayout', keepAlive: true },
   },
   {
     path: '/student/history',
     name: 'student-history',
     component: StudentHistoryPage,
-    meta: { requiresAuth: true, layout: 'StudentLayout' },
+    meta: { requiresAuth: true, layout: 'StudentLayout', keepAlive: true },
   },
   {
     path: '/student/settings',
     name: 'student-settings',
     component: StudentSettingsPage,
-    meta: { requiresAuth: true, layout: 'StudentLayout' },
+    meta: { requiresAuth: true, layout: 'StudentLayout', keepAlive: true },
   },
   {
     path: '/reports',

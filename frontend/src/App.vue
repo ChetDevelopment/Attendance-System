@@ -1,22 +1,13 @@
 <template>
-  <component :is="layout">
+  <StudentLayout v-if="route.meta?.layout === 'StudentLayout'">
     <router-view />
-  </component>
+  </StudentLayout>
+  <router-view v-else />
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import AppLayout from './layouts/AppLayout.vue'
 import StudentLayout from './components/Student/StudentLayout.vue'
 
 const route = useRoute()
-
-const layout = computed(() => {
-  const layoutName = route.meta?.layout
-  if (layoutName === 'StudentLayout') {
-    return StudentLayout
-  }
-  return AppLayout
-})
 </script>

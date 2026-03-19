@@ -72,7 +72,6 @@ const moduleMap = computed(() => {
       academic: AcademicStructure,
       students: StudentManagement,
       attendance: AttendanceControl,
-      sessions: SessionManagement,
       biometric: BiometricManagement,
       absences: AbsenceManagement,
       settings: SystemSettings,

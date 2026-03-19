@@ -7,6 +7,15 @@ const toError = (error) => {
 }
 
 export const dashboardService = {
+  async getOverview() {
+    try {
+      const response = await api.get('/admin/dashboard/overview')
+      return response.data
+    } catch (error) {
+      throw new Error(toError(error))
+    }
+  },
+
   async getSummary() {
     try {
       const response = await api.get('/admin/dashboard/summary')

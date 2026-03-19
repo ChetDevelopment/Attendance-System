@@ -97,7 +97,11 @@ const loadData = async (targetPage = 1) => {
     page.value = Number(recordData?.current_page || 1)
     lastPage.value = Number(recordData?.last_page || 1)
     total.value = Number(recordData?.total || 0)
-    sessions.value = Array.isArray(sessionData) ? sessionData : []
+    sessions.value = Array.isArray(sessionData)
+      ? sessionData
+      : Array.isArray((sessionData as any)?.data)
+        ? (sessionData as any).data
+        : []
   } catch (error: any) {
     errorMessage.value = error.message || 'Failed to load attendance records.'
   } finally {
@@ -352,4 +356,3 @@ onMounted(() => loadData(1))
     </Modal>
   </div>
 </template>
-

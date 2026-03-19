@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import Modal from './Modal.vue';
-import ConfirmationModal from './ConfirmationModal.vue';
+import ConfirmationModal from '../common/ConfirmationModal.vue';
 import {
   Search,
   UserPlus,
@@ -39,6 +39,7 @@ type Student = {
 
 type StudentForm = {
   name: string;
+  studentId: string;
   class: string;
   parent: string;
   contact: string;
@@ -49,7 +50,6 @@ type StudentForm = {
   // Biometric fields
   cardId: string;
   fingerprintEnrolled: boolean;
-  password: string;
 };
 
 type BackendStudent = {
@@ -79,9 +79,18 @@ type BackendClass = {
 };
 
 const DEFAULT_STUDENT_PHOTO = '/PictureUseInPageLogin.png';
+const props = withDefaults(
+  defineProps<{
+    classesRefreshKey?: number;
+  }>(),
+  {
+    classesRefreshKey: 0,
+  }
+);
 
 const students = ref<Student[]>([]);
 const classes = ref<BackendClass[]>([]);
+const academicYears = ref<any[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 const uploadingPhoto = ref(false);
@@ -89,6 +98,8 @@ const errorMessage = ref('');
 const isAddModalOpen = ref(false);
 const isBulkModalOpen = ref(false);
 const isEditModalOpen = ref(false);
+const bulkGeneration = ref('');
+const bulkClassId = ref('');
 const isPreviewModalOpen = ref(false);
 const selectedStudent = ref<Student | null>(null);
 const editingStudent = ref<Student | null>(null);
@@ -97,8 +108,15 @@ const classFilter = ref('All Classes');
 const subjectFilter = ref('All Subjects');
 const sectionFilter = ref('All Sections');
 const viewMode = ref<'table' | 'grid'>('table');
+const studentsPerPage = 12;
+const currentPage = ref(1);
+const totalStudents = ref(0);
+const totalPages = ref(1);
+const pageFrom = ref(0);
+const pageTo = ref(0);
 const newStudent = ref<StudentForm>({
   name: '',
+  studentId: '',
   class: '',
   parent: '',
   contact: '',
@@ -108,7 +126,6 @@ const newStudent = ref<StudentForm>({
   photo: '',
   cardId: '',
   fingerprintEnrolled: false,
-  password: 'student123',
 });
 const bulkData = ref('');
 
@@ -121,17 +138,28 @@ const classOptions = computed(() =>
 );
 
 const generationOptions = computed(() => {
-  const set = new Set(
+  // First try to get from academic years
+  const academicYearSet = new Set(
+    academicYears.value
+      .map((year) => String(year.start_year || year.name || '').trim())
+      .filter(Boolean)
+  );
+
+  // Also include generations from existing students
+  const studentSet = new Set(
     students.value
       .map((student) => String(student.generation || '').trim())
       .filter(Boolean)
   );
 
-  if (set.size === 0) {
-    set.add(`PNC${new Date().getFullYear()}`);
+  // Merge both sets
+  const mergedSet = new Set([...academicYearSet, ...studentSet]);
+
+  if (mergedSet.size === 0) {
+    mergedSet.add(`PNC${new Date().getFullYear()}`);
   }
 
-  return Array.from(set).sort();
+  return Array.from(mergedSet).sort();
 });
 
 const subjectOptions = computed(() => {
@@ -194,20 +222,49 @@ const normalizeStudentData = (payload: any): BackendStudent[] => {
   return [];
 };
 
+const buildStudentFilters = () => {
+  const filters: Record<string, string | number> = {};
+  const search = searchQuery.value.trim();
+
+  if (search) {
+    filters.search = search;
+  }
+
+  if (subjectFilter.value !== 'All Subjects') {
+    filters.generation = subjectFilter.value;
+  }
+
+  if (sectionFilter.value !== 'All Sections') {
+    filters.section = sectionFilter.value;
+  }
+
+  if (classFilter.value !== 'All Classes') {
+    const selected = classOptions.value.find((item) => item.name === classFilter.value);
+    if (selected) {
+      filters.class_id = selected.id;
+    }
+  }
+
+  return filters;
+};
+
 const loadStudents = async () => {
-  let page = 1;
-  let lastPage = 1;
-  const allStudents: BackendStudent[] = [];
+  const response = await studentService.getStudents(
+    currentPage.value,
+    studentsPerPage,
+    buildStudentFilters()
+  );
+  const batch = normalizeStudentData(response);
 
-  do {
-    const response = await studentService.getStudents(page);
-    const batch = normalizeStudentData(response);
-    allStudents.push(...batch);
-    lastPage = Number(response?.last_page || 1);
-    page += 1;
-  } while (page <= lastPage);
+  students.value = batch.map(toUiStudent);
+  totalStudents.value = Number(response?.total || batch.length || 0);
+  totalPages.value = Math.max(Number(response?.last_page || 1), 1);
+  pageFrom.value = Number(response?.from || (batch.length ? 1 : 0));
+  pageTo.value = Number(response?.to || batch.length || 0);
 
-  students.value = allStudents.map(toUiStudent);
+  if (batch.length === 0 && totalStudents.value > 0 && currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value;
+  }
 };
 
 const loadClasses = async () => {
@@ -215,11 +272,21 @@ const loadClasses = async () => {
   classes.value = Array.isArray(classData) ? classData : [];
 };
 
+const loadAcademicYears = async () => {
+  try {
+    const yearData = await adminAcademicService.getAcademicYears();
+    academicYears.value = Array.isArray(yearData) ? yearData : (yearData.data || []);
+  } catch (error) {
+    console.error('Failed to load academic years:', error);
+    academicYears.value = [];
+  }
+};
+
 const loadData = async () => {
   loading.value = true;
   errorMessage.value = '';
   try {
-    await Promise.all([loadStudents(), loadClasses()]);
+    await Promise.all([loadStudents(), loadClasses(), loadAcademicYears()]);
     if (!newStudent.value.class && classOptions.value.length > 0) {
       newStudent.value.class = classOptions.value[0].name;
       newStudent.value.classId = String(classOptions.value[0].id);
@@ -246,30 +313,35 @@ const applyClassSelection = (form: StudentForm) => {
 const buildEmail = (username: string) =>
   `${username.toLowerCase().replace(/[^a-z0-9.]/g, '')}@student.passerellesnumeriques.org`;
 
-// Generate email from student name (e.g., "Sok Thalita" → "thalita.sok@student.passerellesnumeriques.org")
-const buildEmailFromName = (name: string): string => {
+// Generate unique email from student name
+// Checks existing students to avoid duplicates
+const buildEmailFromName = (name: string, existingEmails: string[] = []): string => {
   if (!name) return '';
-  // Split name into parts
+  
   const nameParts = name.trim().split(/\s+/);
   if (nameParts.length === 0) return '';
   
-  // For "Sok Thalita": last name first, then first name
-  // Take all parts after first as last name, first part as first name
   const firstName = nameParts[0].toLowerCase().replace(/[^a-z0-9]/g, '');
   const lastName = nameParts.length > 1 
     ? nameParts[nameParts.length - 1].toLowerCase().replace(/[^a-z0-9]/g, '') 
     : '';
   
-  // Build email: lastName.firstName@domain or firstName@domain if no last name
-  // Ensure it doesn't start or end with a dot
   let emailPrefix = lastName 
     ? `${lastName}.${firstName}` 
     : firstName;
   
-  // Clean up any double dots or leading/trailing dots
   emailPrefix = emailPrefix.replace(/\.+/g, '.').replace(/^\.|\.$/g, '');
   
-  return `${emailPrefix}@student.passerellesnumeriques.org`;
+  let email = `${emailPrefix}@student.passerellesnumeriques.org`;
+  let counter = 1;
+  
+  // Keep adding suffix until we find a unique email
+  while (existingEmails.includes(email.toLowerCase())) {
+    counter++;
+    email = `${emailPrefix}${counter}@student.passerellesnumeriques.org`;
+  }
+  
+  return email;
 };
 
 const normalizeProfileValue = (value: string | undefined) => {
@@ -323,11 +395,6 @@ const getNextIdForGeneration = (gen: string) => {
   return maxId + 1;
 };
 
-const currentNextId = computed(() => getNextIdForGeneration(newStudent.value.generation));
-const currentNewStudentId = computed(
-  () => `${newStudent.value.generation}-${String(currentNextId.value).padStart(3, '0')}`
-);
-
 const previewNewStudent = computed<Student>(() => ({
   dbId: 0,
   name: newStudent.value.name,
@@ -340,13 +407,14 @@ const previewNewStudent = computed<Student>(() => ({
   email: '',
   photo: newStudent.value.photo,
   generation: newStudent.value.generation,
-  id: currentNewStudentId.value,
+  id: newStudent.value.studentId || 'Student ID',
 }));
 
 const resetNewStudent = () => {
   const defaultClass = classOptions.value[0] || null;
   newStudent.value = {
     name: '',
+    studentId: '',
     class: defaultClass?.name || '',
     parent: '',
     contact: '',
@@ -356,25 +424,58 @@ const resetNewStudent = () => {
     photo: '',
     cardId: '',
     fingerprintEnrolled: false,
-    password: 'student123',
   };
+};
+
+const syncStudentFormClassSelection = () => {
+  const selectedClass = classOptions.value.find(
+    (item) => String(item.id) === newStudent.value.classId
+  );
+
+  if (selectedClass) {
+    newStudent.value.class = selectedClass.name;
+    return;
+  }
+
+  const fallbackClass = classOptions.value[0] || null;
+  newStudent.value.classId = fallbackClass ? String(fallbackClass.id) : '';
+  newStudent.value.class = fallbackClass?.name || '';
 };
 
 const handleAddStudent = async () => {
   if (saving.value) return;
-  if (!newStudent.value.name || !newStudent.value.parent || !newStudent.value.contact) return;
+  if (!newStudent.value.name || !newStudent.value.parent || !newStudent.value.contact) {
+    errorMessage.value = 'Please fill in all required fields: Name, Parent Contact, and Contact Number.';
+    return;
+  }
+  if (!newStudent.value.studentId.trim()) {
+    errorMessage.value = 'Please enter a student ID.';
+    return;
+  }
+  if (!newStudent.value.gender) {
+    errorMessage.value = 'Please select a gender.';
+    return;
+  }
+  if (!newStudent.value.generation) {
+    errorMessage.value = 'Please select a generation.';
+    return;
+  }
 
   saving.value = true;
   errorMessage.value = '';
+  const optimisticStudent = previewNewStudent.value;
+
+  // Optimistic update - add instantly to UI
+  students.value.unshift({ ...optimisticStudent, isOptimistic: true } as any);
 
   const classSelection = applyClassSelection(newStudent.value);
-  const username = currentNewStudentId.value;
+  const username = newStudent.value.studentId.trim();
 
   try {
     const response = await studentService.createStudent({
       fullname: newStudent.value.name,
       username,
-      email: buildEmailFromName(newStudent.value.name), // Auto-generate email from name
+      email: buildEmailFromName(newStudent.value.name),
       generation: newStudent.value.generation,
       class: classSelection.className,
       class_id: classSelection.classId,
@@ -383,29 +484,22 @@ const handleAddStudent = async () => {
       gender: newStudent.value.gender,
       parent_number: newStudent.value.parent,
       contact: newStudent.value.contact,
-      password: newStudent.value.password,
-      // Biometric fields
       card_id: newStudent.value.cardId || null,
       fingerprint_enrolled: newStudent.value.fingerprintEnrolled,
     });
 
-    // Handle the new response format with student and user data
-    // Note: studentService returns response.data already, so we access response.student directly
-    if (response.student) {
-      // Normalize the backend student data before adding to list
-      const normalizedStudent = normalizeStudentData({ data: [response.student] });
-      if (normalizedStudent.length > 0) {
-        students.value.unshift(toUiStudent(normalizedStudent[0]));
-      }
-    } else {
-      // Fallback for other response formats
-      students.value.unshift(response);
+    // Replace optimistic entry with real data
+    const index = students.value.findIndex(s => (s as any).isOptimistic);
+    if (index > -1 && response.student) {
+      students.value[index] = toUiStudent(response.student);
     }
 
     isAddModalOpen.value = false;
     resetNewStudent();
-    await loadStudents();
+    // No need for full reload - optimistic + real data sync
   } catch (error: any) {
+    // Rollback optimistic update
+    students.value.shift();
     errorMessage.value = error?.message || 'Failed to create student.';
   } finally {
     saving.value = false;
@@ -425,19 +519,22 @@ const handleBulkAdd = async () => {
   saving.value = true;
   errorMessage.value = '';
 
-  const selectedClass = classOptions.value[0] || null;
-  const generation = generationOptions.value[0] || `PNC${new Date().getFullYear()}`;
+  const selectedClass = classOptions.value.find(c => String(c.id) === bulkClassId.value) || classOptions.value[0] || null;
+  const generation = bulkGeneration.value || generationOptions.value[0] || `PNC${new Date().getFullYear()}`;
   let nextId = getNextIdForGeneration(generation);
 
   try {
-    for (const name of names) {
+    // Collect existing emails to ensure uniqueness
+    const existingEmails = students.value.map((s) => (s.email || '').toLowerCase());
+    
+    const studentsPayload = names.map((name) => {
       const username = `${generation}-${String(nextId).padStart(3, '0')}`;
       nextId += 1;
 
-      await studentService.createStudent({
+      return {
         fullname: name,
         username,
-        email: buildEmailFromName(name), // Auto-generate email from name
+        email: buildEmailFromName(name, existingEmails), // Auto-generate unique email
         generation,
         class: selectedClass?.name || null,
         class_id: selectedClass?.id || null,
@@ -446,9 +543,13 @@ const handleBulkAdd = async () => {
         gender: 'Male',
         parent_number: 'N/A',
         contact: 'N/A',
-        password: 'student123',
-      });
-    }
+      };
+    });
+
+    await studentService.bulkCreateStudents({
+      students: studentsPayload,
+      default_password: 'password123',
+    });
 
     isBulkModalOpen.value = false;
     bulkData.value = '';
@@ -476,6 +577,14 @@ const handleEditStudent = async () => {
   saving.value = true;
   errorMessage.value = '';
 
+  const originalStudent = { ...editingStudent.value };
+  const optimisticIndex = students.value.findIndex(s => s.dbId === originalStudent.dbId);
+  
+  // Optimistic update
+  if (optimisticIndex > -1) {
+    students.value[optimisticIndex] = { ...editingStudent.value, isUpdating: true };
+  }
+
   const selected = classOptions.value.find(
     (item) => item.id === editingStudent.value?.classId || item.name === editingStudent.value?.class
   );
@@ -490,7 +599,6 @@ const handleEditStudent = async () => {
       gender: editingStudent.value.gender || 'Male',
       parent_number: editingStudent.value.parent,
       contact: editingStudent.value.contact || editingStudent.value.parent,
-      // Biometric fields
       card_id: editingStudent.value.cardId || null,
       fingerprint_enrolled: editingStudent.value.fingerprintEnrolled || false,
     };
@@ -500,27 +608,43 @@ const handleEditStudent = async () => {
       payload.generation = generation;
     }
 
-    await studentService.updateStudent(editingStudent.value.dbId, payload);
+    const response = await studentService.updateStudent(editingStudent.value.dbId, payload);
+    
+    // Update with server data
+    if (optimisticIndex > -1 && response.student) {
+      students.value[optimisticIndex] = toUiStudent(response.student);
+    }
 
     isEditModalOpen.value = false;
     editingStudent.value = null;
-    await loadStudents();
+    // No full reload needed
   } catch (error: any) {
+    // Rollback
+    if (optimisticIndex > -1) {
+      students.value[optimisticIndex] = originalStudent;
+    }
     errorMessage.value = error?.message || 'Failed to update student.';
   } finally {
+    if (optimisticIndex > -1) {
+      students.value[optimisticIndex].isUpdating = false;
+    }
     saving.value = false;
   }
 };
 
 const handleDeleteStudent = async (id: string) => {
-  const target = students.value.find((student) => student.id === id);
-  if (!target) return;
+  const targetIndex = students.value.findIndex((student) => student.id === id);
+  if (targetIndex === -1) return;
+
+  // Optimistic delete
+  const optimisticStudent = students.value.splice(targetIndex, 1)[0];
 
   errorMessage.value = '';
   try {
-    await studentService.deleteStudent(target.dbId);
-    await loadStudents();
+    await studentService.deleteStudent(optimisticStudent.dbId);
   } catch (error: any) {
+    // Rollback on error
+    students.value.splice(targetIndex, 0, optimisticStudent);
     errorMessage.value = error?.message || 'Failed to delete student.';
   }
 };
@@ -557,20 +681,44 @@ const handlePrint = () => {
   window.print();
 };
 
-const filteredStudents = computed(() =>
-  students.value.filter((s) => {
-    const matchesSearch =
-      s.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      s.id.toLowerCase().includes(searchQuery.value.toLowerCase());
-    const matchesClass = classFilter.value === 'All Classes' || s.class === classFilter.value;
-    const matchesSubject =
-      subjectFilter.value === 'All Subjects' ||
-      String(s.generation || '').toLowerCase() === subjectFilter.value.toLowerCase();
-    const matchesSection =
-      sectionFilter.value === 'All Sections' ||
-      String(s.class || '').toLowerCase() === sectionFilter.value.toLowerCase();
-    return matchesSearch && matchesClass && matchesSubject && matchesSection;
-  })
+const paginatedStudents = computed(() => students.value);
+
+const pageNumbers = computed(() =>
+  Array.from({ length: totalPages.value }, (_, index) => index + 1)
+);
+
+let studentReloadDebounce: ReturnType<typeof setTimeout> | null = null;
+
+// Removed manual debounce - global API loading + reactivity handles this
+watch([searchQuery, classFilter, subjectFilter, sectionFilter], async () => {
+  if (currentPage.value !== 1) {
+    currentPage.value = 1;
+    return;
+  }
+  await loadStudents();
+});
+
+watch(currentPage, () => {
+  loadStudents();
+});
+
+watch(
+  () => newStudent.value.classId,
+  () => {
+    syncStudentFormClassSelection();
+  }
+);
+
+watch(
+  () => props.classesRefreshKey,
+  async () => {
+    try {
+      await loadClasses();
+      syncStudentFormClassSelection();
+    } catch (error: any) {
+      errorMessage.value = error?.message || 'Failed to refresh classes.';
+    }
+  }
 );
 
 const studentGeneration = (student: Student | null) =>
@@ -594,7 +742,7 @@ onMounted(async () => {
       </div>
       <div class="flex items-center gap-3">
         <button
-          @click="isBulkModalOpen = true"
+          @click="isBulkModalOpen = true; bulkGeneration = generationOptions[0] || ''; bulkClassId = classOptions[0]?.id?.toString() || ''"
           class="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold text-sm hover:bg-slate-200 transition-all"
         >
           <Upload class="size-4" />
@@ -612,7 +760,12 @@ onMounted(async () => {
 
     <p v-if="errorMessage" class="p-3 rounded-lg bg-rose-50 text-rose-700 text-sm">{{ errorMessage }}</p>
 
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
+      <!-- Loading Progress Bar -->
+      <div v-if="loading" class="absolute top-0 left-0 right-0 h-0.5 bg-primary/10 overflow-hidden z-10">
+        <div class="h-full bg-primary animate-progress origin-left"></div>
+      </div>
+
       <div class="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
         <div class="flex flex-wrap items-center gap-3 flex-1">
           <div class="relative max-w-xs w-full">
@@ -681,10 +834,10 @@ onMounted(async () => {
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-          <tr v-if="loading">
+          <tr v-if="loading && students.length === 0">
             <td :colspan="5" class="px-6 py-10 text-center text-slate-400 italic">Loading students...</td>
           </tr>
-          <tr v-for="s in filteredStudents" :key="s.dbId || s.id" class="hover:bg-slate-50 transition-colors">
+          <tr v-for="s in paginatedStudents" :key="s.dbId || s.id" class="hover:bg-slate-50 transition-colors" :class="{ 'opacity-50 pointer-events-none': loading }">
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
                 <div class="size-8 rounded-full bg-slate-100 overflow-hidden">
@@ -741,7 +894,7 @@ onMounted(async () => {
       </table>
 
       <div v-else class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 bg-slate-50/30">
-        <div v-for="s in filteredStudents" :key="s.dbId || s.id" class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
+        <div v-for="s in paginatedStudents" :key="s.dbId || s.id" class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
           <div class="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
             <button @click="openEditStudent(s)" class="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-primary shadow-sm">
               <Edit3 class="size-3.5" />
@@ -774,7 +927,44 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="!loading && filteredStudents.length === 0" class="p-12 text-center">
+      <div v-if="!loading && totalStudents > 0" class="px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/70">
+        <div class="flex items-center gap-2 text-xs">
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700 font-semibold">
+            Showing {{ pageFrom }}-{{ pageTo }} of {{ totalStudents }}
+          </span>
+        </div>
+        <div v-if="totalPages > 1" class="w-full sm:w-auto flex items-center gap-1 overflow-x-auto">
+          <button
+            @click="currentPage = Math.max(currentPage - 1, 1)"
+            :disabled="currentPage === 1"
+            class="px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+          >
+            Previous
+          </button>
+          <button
+            v-for="page in pageNumbers"
+            :key="page"
+            @click="currentPage = page"
+            :class="[
+              'min-w-9 px-3 py-2 text-xs font-semibold rounded-lg border transition-colors',
+              page === currentPage
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100',
+            ]"
+          >
+            {{ page }}
+          </button>
+          <button
+            @click="currentPage = Math.min(currentPage + 1, totalPages)"
+            :disabled="currentPage === totalPages"
+            class="px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
+      <div v-if="!loading && totalStudents === 0" class="p-12 text-center">
         <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
           <Search class="size-8 text-slate-300" />
         </div>
@@ -815,8 +1005,13 @@ onMounted(async () => {
                 </select>
               </div>
               <div class="space-y-1">
-                <label class="text-[10px] font-bold text-slate-500 uppercase">Student ID (Auto)</label>
-                <input type="text" class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm outline-none" :value="currentNewStudentId" readonly />
+                <label class="text-[10px] font-bold text-slate-500 uppercase">Student ID</label>
+                <input
+                  v-model="newStudent.studentId"
+                  type="text"
+                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="e.g. PNC2026-001"
+                />
               </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
@@ -845,10 +1040,7 @@ onMounted(async () => {
               <label class="text-[10px] font-bold text-slate-500 uppercase">Contact Number</label>
               <input v-model="newStudent.contact" type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20" />
             </div>
-            <div class="space-y-1">
-              <label class="text-[10px] font-bold text-slate-500 uppercase">Password</label>
-              <input v-model="newStudent.password" type="password" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20" placeholder="student123" />
-            </div>
+            <p class="text-xs text-slate-500">Default password for new student account: <strong>password123</strong></p>
 
             <!-- Biometric Section -->
             <div class="border-t border-slate-200 pt-4 mt-4">
@@ -924,7 +1116,21 @@ onMounted(async () => {
     <Modal :is-open="isBulkModalOpen" title="Bulk Import Students" size="md" @close="isBulkModalOpen = false">
       <div class="space-y-4">
         <div class="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-          <p class="text-xs text-blue-700 leading-relaxed"><strong>Instructions:</strong> Enter student names one per line. We will automatically assign IDs and set the default class to 10A. You can edit individual details later.</p>
+          <p class="text-xs text-blue-700 leading-relaxed"><strong>Instructions:</strong> Enter student names one per line. We automatically assign IDs and create accounts with default password <strong>password123</strong>. You can edit details later.</p>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-[10px] font-bold text-slate-500 uppercase">Generation</label>
+            <select v-model="bulkGeneration" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20">
+              <option v-for="gen in generationOptions" :key="gen" :value="gen">{{ gen }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-slate-500 uppercase">Class</label>
+            <select v-model="bulkClassId" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20">
+              <option v-for="cls in classOptions" :key="cls.id" :value="String(cls.id)">{{ cls.name }}</option>
+            </select>
+          </div>
         </div>
         <div class="space-y-1">
           <label class="text-[10px] font-bold text-slate-500 uppercase">Student Names (One per line)</label>

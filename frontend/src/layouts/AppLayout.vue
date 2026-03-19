@@ -6,9 +6,14 @@
       <Navbar @navigate="setCurrentModule" />
 
       <div class="flex-1 overflow-y-auto p-8 scroll-smooth">
-        <Transition name="module-fade" mode="out-in">
-          <component :is="activeModule" :key="currentModule" />
-        </Transition>
+        <KeepAlive>
+          <component
+            :is="activeModule"
+            :key="currentModule"
+            :classes-refresh-key="classesRefreshKey"
+            @classes-updated="handleClassesUpdated"
+          />
+        </KeepAlive>
       </div>
     </main>
   </div>
@@ -19,6 +24,7 @@ import { computed, ref } from 'vue';
 import Sidebar from './Sidebar.vue';
 import Navbar from './Navbar.vue';
 import Dashboard from '../components/Admin/Dashboard.vue';
+
 import UserManagement from '../components/Admin/UserManagement.vue';
 import AcademicStructure from '../components/Admin/AcademicStructure.vue';
 import StudentManagement from '../components/Admin/StudentManagement.vue';
@@ -29,6 +35,7 @@ import SystemSettings from '../components/Admin/SystemSettings.vue';
 import { getUserRole } from '../services/auth';
 
 const currentModule = ref('dashboard');
+const classesRefreshKey = ref(0);
 const userRole = computed(() => getUserRole());
 
 const moduleMap = computed(() => {
@@ -74,26 +81,13 @@ const activeModule = computed(
 );
 
 const setCurrentModule = (module: string) => {
-  // Check if user has access to this module
   if (module in moduleMap.value) {
     currentModule.value = module;
   }
 };
+
+const handleClassesUpdated = () => {
+  classesRefreshKey.value += 1;
+};
 </script>
 
-<style scoped>
-.module-fade-enter-active,
-.module-fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.module-fade-enter-from {
-  opacity: 0;
-  transform: translateY(10px);
-}
-
-.module-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-</style>

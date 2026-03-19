@@ -13,13 +13,18 @@ class AttendanceRecord extends Model
     protected $fillable = [
         'student_id',
         'session_id',
-        'recorded_by',
+        'submitted_by',
         'attendance_date',
         'status',
         'check_in_time',
+<<<<<<< HEAD
         'recorded_at',
         'justification_status',
         'comment',
+=======
+        'is_locked',
+        'location',
+>>>>>>> admin-dashboard-backend
     ];
 
     protected $casts = [
@@ -40,7 +45,7 @@ class AttendanceRecord extends Model
 
     public function teacher()
     {
-        return $this->belongsTo(User::class, 'recorded_by');
+        return $this->belongsTo(User::class, 'submitted_by');
     }
 
     public function absenceComments()

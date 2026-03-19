@@ -1,7 +1,6 @@
 version: "3"
 
 services:
-
   backend:
     build: ./backend
     container_name: laravel_app
@@ -9,8 +8,6 @@ services:
       - ./backend:/var/www
     ports:
       - "9000:9000"
-    depends_on:
-      - database
 
   frontend:
     build: ./frontend
@@ -31,18 +28,12 @@ services:
       - frontend
 
   database:
-    image: mysql:8.0
+    image: mysql:8
     container_name: mysql_db
-    restart: always
     environment:
-      MYSQL_DATABASE: vanda_db
+      MYSQL_ROOT_PASSWORD: 
+      MYSQL_DATABASE: attendance_system
       MYSQL_USER: root
-      MYSQL_PASSWORD: secret
-      MYSQL_ROOT_PASSWORD: root_secret
+      MYSQL_PASSWORD: 
     ports:
       - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-
-volumes:
-  mysql_data:

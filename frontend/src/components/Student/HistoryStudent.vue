@@ -13,7 +13,7 @@ import {
   AlertCircle
 } from 'lucide-vue-next';
 import { fetchAttendanceHistory } from '../../services/api';
-import { AttendanceRecord } from '../../../types';
+import { AttendanceRecord } from '../types';
 
 const attendanceHistory = ref<AttendanceRecord[]>([]);
 const statusFilter = ref<'ALL' | 'PRESENT' | 'LATE' | 'ABSENT'>('ALL');

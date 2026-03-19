@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import StatCard from './StatCard.vue';
 import ActiveSession from './ActiveSession.vue';
 import AbsenceChart from './AbsenceChart.vue';
@@ -15,12 +15,15 @@ import {
   MapPin,
 } from 'lucide-vue-next';
 import { dashboardService } from '../../services/dashboardService';
+import adminDashboardService from '../../services/adminDashboardService';
 
 type Period = 'Today' | 'Weekly' | 'Monthly';
 type DashboardStats = { present: string; absent: string; late: string; rate: string; offsite: string };
 
 const isLateModalOpen = ref(false);
+const isOffsiteModalOpen = ref(false);
 const lateSearchQuery = ref('');
+const offsiteSearchQuery = ref('');
 const selectedPeriod = ref<Period>('Today');
 const loading = ref(false);
 const errorMessage = ref('');
@@ -38,11 +41,16 @@ const stats = ref<Record<Period, DashboardStats>>({
 });
 
 const lateStudents = ref<Array<{ name: string; class: string; time: string; status: string }>>([]);
+const offsiteStudents = ref<Array<{ name: string; class: string; time: string; status: string; distance_km: number; location: string }>>([]);
 
 const activeSession = ref<any>(null);
 const trendData = ref<Array<{ name: string; value: number }>>([]);
 const riskStudents = ref<Array<{ name: string; class: string; absence_count: number }>>([]);
 const activeAcademicYear = ref<{ id: number; name: string; current_term: number } | null>(null);
+
+// Admin Analytics Data
+const systemStats = ref<any>(null);
+const studentAnalytics = ref<any>(null);
 
 const filteredLateStudents = computed(() =>
   lateStudents.value.filter(
@@ -51,11 +59,22 @@ const filteredLateStudents = computed(() =>
       s.class.toLowerCase().includes(lateSearchQuery.value.toLowerCase())
   )
 );
+const filteredOffsiteStudents = computed(() =>
+  offsiteStudents.value.filter(
+    (s) =>
+      s.name.toLowerCase().includes(offsiteSearchQuery.value.toLowerCase()) ||
+      s.class.toLowerCase().includes(offsiteSearchQuery.value.toLowerCase())
+  )
+);
 const visibleNotifications = computed(() =>
   notifications.value.filter((item) => !dismissedNotificationIds.value.includes(item.id))
 );
 
 const currentStats = computed(() => stats.value[selectedPeriod.value]);
+
+const setPeriod = (period: string) => {
+  selectedPeriod.value = period as Period;
+};
 
 const formatCount = (value: number) => new Intl.NumberFormat().format(Number(value || 0));
 const percent = (numerator: number, denominator: number) =>
@@ -94,23 +113,33 @@ const loadNotifications = async () => {
   }
 };
 
+const loadAdminAnalytics = async () => {
+  try {
+    const [sysStats, studAnalytics] = await Promise.all([
+      adminDashboardService.getSystemStats(),
+      adminDashboardService.getStudentAnalytics()
+    ]);
+    systemStats.value = sysStats;
+    studentAnalytics.value = studAnalytics;
+  } catch (error) {
+    console.error('Failed to load admin analytics', error);
+  }
+};
+
 const loadDashboard = async () => {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const [summaryResult, lateResult, sessionResult, trendsResult, riskResult] = await Promise.allSettled([
-      dashboardService.getSummary(),
-      dashboardService.getLateStudents(),
-      dashboardService.getActiveSession(),
-      dashboardService.getTrendData(),
-      dashboardService.getRiskStudents(),
-    ]);
-
-    const summaryRes = summaryResult.status === 'fulfilled' ? summaryResult.value : {};
-    const lateRes = lateResult.status === 'fulfilled' ? lateResult.value : [];
-    const sessionRes = sessionResult.status === 'fulfilled' ? sessionResult.value : null;
-    const trendsRes = trendsResult.status === 'fulfilled' ? trendsResult.value : [];
-    const riskRes = riskResult.status === 'fulfilled' ? riskResult.value : [];
+    const data = await dashboardService.getOverview();
+    
+    const summaryRes = data.summary || {};
+    const lateRes = data.late_students || [];
+    const offsiteRes = data.offsite_students || [];
+    const sessionRes = data.active_session || null;
+    
+    // Get trends and risk data from overview response (no extra API calls needed)
+    const trendsRes = data.trends || [];
+    const riskRes = data.risk_students || [];
 
     // Set active academic year from summary response
     if (summaryRes?.active_academic_year) {
@@ -121,7 +150,6 @@ const loadDashboard = async () => {
     const absent = Number(summaryRes?.total_absent_today || 0);
     const late = Number(summaryRes?.total_late_today || 0);
     const total = present + absent + late;
-    const absentTrend = Array.isArray(trendsRes) ? trendsRes : [];
 
     stats.value.Today = {
       present: formatCount(present),
@@ -149,41 +177,46 @@ const loadDashboard = async () => {
 
     lateStudents.value = Array.isArray(lateRes)
       ? lateRes.map((s: any) => ({
-          name: String(s?.student?.name || 'Unknown'),
-          class: String(s?.student?.class?.name || 'Unknown'),
-          time: String(s?.check_in_time || '--:--'),
+          name: String(s?.name || 'Unknown'),
+          class: String(s?.class || 'Unknown'),
+          time: String(s?.time || '--:--'),
           status: String(s?.status || 'Late'),
         }))
       : [];
 
+    offsiteStudents.value = Array.isArray(offsiteRes)
+      ? offsiteRes.map((s: any) => ({
+          name: String(s?.name || 'Unknown'),
+          class: String(s?.class || 'Unknown'),
+          time: String(s?.check_in_time || '--:--'),
+          status: String(s?.status || 'Present'),
+          distance_km: Number(s?.distance_km || 0),
+          location: String(s?.location || ''),
+        }))
+      : [];
+
     activeSession.value = sessionRes || null;
-    trendData.value = absentTrend;
+    trendData.value = trendsRes;
     riskStudents.value = Array.isArray(riskRes)
       ? riskRes.map((s: any) => ({
           name: String(s?.name || 'Unknown'),
-          class: String(s?.class?.name || 'Unknown'),
-          absence_count: Number(s?.absences_count || 0),
+          class: String(s?.class || 'Unknown'),
+          absence_count: Number(s?.absence_count || 0),
         }))
       : [];
-      
-    const failedCalls = [summaryResult, lateResult, sessionResult, trendsResult, riskResult]
-      .filter((result) => result.status === 'rejected')
-      .length;
-
-    if (failedCalls > 0) {
-      errorMessage.value = `${failedCalls} dashboard data source(s) failed to load.`;
-      notifications.value = [{
-        id: Date.now(),
-        title: 'Dashboard Partial Load',
-        subtitle: errorMessage.value,
-        type: 'error',
-      }, ...visibleNotifications.value];
-    }
   } catch (error: any) {
     errorMessage.value = error?.message || 'Failed to load dashboard data from backend.';
   } finally {
     loading.value = false;
   }
+};
+
+const autoRefreshInterval = ref<number | null>(null);
+
+const refreshDashboard = async () => {
+  loading.value = true;
+  await loadDashboard();
+  loading.value = false;
 };
 
 onMounted(async () => {
@@ -194,7 +227,16 @@ onMounted(async () => {
     dismissedNotificationIds.value = [];
   }
 
-  await Promise.all([loadDashboard(), loadNotifications()]);
+  await Promise.all([loadDashboard(), loadNotifications(), loadAdminAnalytics()]);
+  
+  // Auto-refresh every 30s for live data
+  autoRefreshInterval.value = window.setInterval(refreshDashboard, 30000);
+});
+
+onUnmounted(() => {
+  if (autoRefreshInterval.value) {
+    window.clearInterval(autoRefreshInterval.value);
+  }
 });
 </script>
 
@@ -212,17 +254,30 @@ onMounted(async () => {
         </p>
         <p v-else class="text-sm text-slate-500 font-medium">No active academic year</p>
       </div>
-      <div class="flex items-center gap-3 bg-white p-1.5 rounded-lg border border-slate-200 shadow-sm">
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-3 bg-white p-1.5 rounded-lg border border-slate-200 shadow-sm">
+          <button
+            v-for="period in ['Today', 'Weekly', 'Monthly']"
+            :key="period"
+            @click="setPeriod(period)"
+            :class="[
+              'px-4 py-1.5 rounded-md text-xs font-bold transition-all',
+              selectedPeriod === period ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
+            ]"
+          >
+            {{ period }}
+          </button>
+        </div>
         <button
-          v-for="period in ['Today', 'Weekly', 'Monthly']"
-          :key="period"
-          @click="selectedPeriod = period as 'Today' | 'Weekly' | 'Monthly'"
-          :class="[
-            'px-4 py-1.5 rounded-md text-xs font-bold transition-all',
-            selectedPeriod === period ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
-          ]"
+          @click="refreshDashboard"
+          :disabled="loading"
+          class="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg font-bold text-sm shadow-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          title="Refresh live data"
         >
-          {{ period }}
+          <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          Refresh
         </button>
       </div>
     </div>
@@ -264,8 +319,24 @@ onMounted(async () => {
         border-color="border-red-500"
         subtitle="Outside school perimeter"
         footer-text="Requires verification"
+      >
+        <template #action>
+          <button @click="isOffsiteModalOpen = true" class="text-[10px] text-primary font-bold hover:underline">View Details</button>
+        </template>
+      </StatCard>
+      
+      <!-- New Biometric Stat Card -->
+      <StatCard
+        v-if="studentAnalytics?.biometric_enrollment"
+        title="Biometric Enrollment"
+        :value="`${studentAnalytics.biometric_enrollment.percentage}%`"
+        :icon="Send"
+        icon-color="text-blue-500"
+        border-color="border-blue-500"
+        :subtitle="`${studentAnalytics.biometric_enrollment.enrolled} / ${studentAnalytics.biometric_enrollment.total} Students`"
       />
       <StatCard
+        v-else
         title="Telegram Alerts"
         value="Sent Status"
         :icon="Send"
@@ -290,8 +361,14 @@ onMounted(async () => {
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 pb-12">
+      <!-- System Health Card -->
       <div class="bg-slate-900 text-white rounded-xl p-8 flex items-center justify-between shadow-xl">
-        <div>
+        <div v-if="systemStats">
+          <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">System Health</h4>
+          <p class="text-4xl font-black">{{ systemStats.database?.size_mb }} MB</p>
+          <p class="text-[10px] text-slate-500 mt-2">Database Size • {{ systemStats.activity?.last_24h }} Activities (24h)</p>
+        </div>
+        <div v-else>
           <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Weekly System Uptime</h4>
           <p class="text-4xl font-black">99.98%</p>
           <p class="text-[10px] text-slate-500 mt-2">Biometric and RFID sensors online across all blocks</p>
@@ -371,6 +448,45 @@ onMounted(async () => {
             </tr>
             <tr v-if="filteredLateStudents.length === 0">
               <td :colspan="4" class="px-4 py-10 text-center text-slate-400 italic">No late students found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Modal>
+
+    <Modal :is-open="isOffsiteModalOpen" title="Off-site Today (Outside PNC Geofence)" size="lg" @close="isOffsiteModalOpen = false">
+      <div class="space-y-4">
+        <div class="relative">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
+          <input
+            v-model="offsiteSearchQuery"
+            type="text"
+            placeholder="Filter by name or class..."
+            class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+        <table class="w-full text-left text-sm">
+          <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+            <tr>
+              <th class="px-4 py-2">Student</th>
+              <th class="px-4 py-2">Class</th>
+              <th class="px-4 py-2">Time</th>
+              <th class="px-4 py-2">Distance</th>
+              <th class="px-4 py-2">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="(s, i) in filteredOffsiteStudents" :key="`offsite-${i}`">
+              <td class="px-4 py-3 font-bold">{{ s.name }}</td>
+              <td class="px-4 py-3">{{ s.class }}</td>
+              <td class="px-4 py-3 font-mono">{{ s.time }}</td>
+              <td class="px-4 py-3 font-mono">{{ s.distance_km.toFixed(3) }} km</td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-0.5 bg-rose-100 text-rose-600 text-[10px] font-bold rounded uppercase">{{ s.status }}</span>
+              </td>
+            </tr>
+            <tr v-if="filteredOffsiteStudents.length === 0">
+              <td :colspan="5" class="px-4 py-10 text-center text-slate-400 italic">No off-site students found for today.</td>
             </tr>
           </tbody>
         </table>

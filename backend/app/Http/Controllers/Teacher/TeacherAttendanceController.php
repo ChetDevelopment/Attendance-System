@@ -204,7 +204,7 @@ class TeacherAttendanceController extends Controller
                 AttendanceRecord::create([
                     'student_id' => $studentId,
                     'session_id' => $sessionId,
-                    'recorded_by' => auth()->id(),
+                    'submitted_by' => auth()->id(),
                     'attendance_date' => $date,
                     'status' => $status,
                     'recorded_at' => Carbon::now(),

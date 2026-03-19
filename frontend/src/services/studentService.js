@@ -15,10 +15,10 @@ const formatError = (error) => {
 }
 
 export const studentService = {
-  async getStudents(page = 1) {
+  async getStudents(page = 1, perPage = 50, filters = {}) {
     try {
       const response = await api.get('/admin/students', {
-        params: { page },
+        params: { page, per_page: perPage, ...filters },
       })
       return response.data
     } catch (error) {
@@ -29,6 +29,15 @@ export const studentService = {
   async createStudent(payload) {
     try {
       const response = await api.post('/admin/students', payload)
+      return response.data
+    } catch (error) {
+      throw formatError(error)
+    }
+  },
+
+  async bulkCreateStudents(payload) {
+    try {
+      const response = await api.post('/admin/students/bulk', payload)
       return response.data
     } catch (error) {
       throw formatError(error)

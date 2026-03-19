@@ -4,20 +4,19 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\SchoolClass;
+use App\Models\StudentClass;
 
 class AcademicYear extends Model
 {
     use HasFactory;
     protected $fillable = [
         'name',
-        'start_date',
-        'end_date',
-        'is_active',
+        'current_term',
+        'status',
     ];
 
      public function classes()
     {
-        return $this->hasMany(SchoolClass::class);
+        return $this->hasMany(StudentClass::class);
     }
 }

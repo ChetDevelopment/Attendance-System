@@ -17,9 +17,11 @@ const emit = defineEmits<{
 // Method to handle academic year change
 const onAcademicYearChange = (event: Event) => {
   const target = event.target as HTMLSelectElement;
-  // Handle "All Years" option (value is null or empty string)
+  // Handle "All Years" option across DOM string values and null-ish values.
   const value =
-    target.value && target.value !== "" ? Number(target.value) : null;
+    target.value && target.value !== "" && target.value !== "null"
+      ? Number(target.value)
+      : null;
   emit("update:academicYearId", value);
 };
 

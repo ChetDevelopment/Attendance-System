@@ -43,7 +43,7 @@ const fetchAndUpdateUserProfile = async () => {
 };
 
 // Initialize with stored user (will be refreshed on mount)
-let initialUser = getUser();
+const initialUser = getUser();
 
 // Get the proper fields from the backend user response
 // Backend returns: name, email, role, profile_image, calendar_id
@@ -51,10 +51,7 @@ let initialUser = getUser();
 const getUserPhoto = (user: any) => {
   // First check for profile_image (backend field)
   if (user?.profile_image) {
-    // Check if it's a valid path (starts with /teacherFaces/)
-    if (user.profile_image.startsWith("/teacherFaces/")) {
-      return user.profile_image;
-    }
+    return user.profile_image;
   }
   // Fallback to photo if exists
   if (user?.photo) {
@@ -63,7 +60,6 @@ const getUserPhoto = (user: any) => {
   // Try to get image from teacherFaces folder based on name
   if (user?.name) {
     const nameLower = user.name.toLowerCase();
-    // Return the path - the browser will handle 404 with @error handler
     return `/teacherFaces/${nameLower}.jpg`;
   }
   // Default image
@@ -84,9 +80,11 @@ const MOCK_USERS = ref<User[]>([
   {
     name: currentUserData.value?.name || "Teacher",
     role: "teacher",
-    department: currentUserData.value?.department || "Teacher",
-    photo:
-      currentUserData.value?.photo || currentUserData.value?.avatar_url || "",
+    department:
+      currentUserData.value?.department ||
+      currentUserData.value?.role?.name ||
+      "Teacher",
+    photo: getUserPhoto(currentUserData.value),
   },
 ]);
 
@@ -134,11 +132,8 @@ onMounted(async () => {
       {
         name: freshProfile.name || "Teacher",
         role: "teacher",
-        department: freshProfile.department || "Teacher",
-        photo:
-          freshProfile.photo ||
-          freshProfile.avatar_url ||
-          getUserPhoto(freshProfile),
+        department: freshProfile.department || freshProfile.role?.name || "Teacher",
+        photo: getUserPhoto(freshProfile),
       },
     ];
   }

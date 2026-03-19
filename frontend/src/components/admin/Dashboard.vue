@@ -46,7 +46,7 @@ const offsiteStudents = ref<Array<{ name: string; class: string; time: string; s
 const activeSession = ref<any>(null);
 const trendData = ref<Array<{ name: string; value: number }>>([]);
 const riskStudents = ref<Array<{ name: string; class: string; absence_count: number }>>([]);
-const activeAcademicYear = ref<{ id: number; name: string; current_term: number } | null>(null);
+const activeAcademicYear = ref<{ id: number; name: string; current_term: string | number } | null>(null);
 
 // Admin Analytics Data
 const systemStats = ref<any>(null);
@@ -145,7 +145,7 @@ const applyDashboardPayload = (data: any) => {
     activeAcademicYear.value = {
       id: Number(summaryRes.academic_year.id || 0),
       name: String(summaryRes.academic_year.name || ''),
-      current_term: Number(summaryRes.academic_year.term || 0),
+      current_term: summaryRes.academic_year.term || '',
     };
   } else {
     activeAcademicYear.value = null;

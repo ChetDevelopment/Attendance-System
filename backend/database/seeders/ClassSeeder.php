@@ -16,48 +16,56 @@ class ClassSeeder extends Seeder
      */
     public function run(): void
     {
-        // Get active academic year
-        $academicYear = AcademicYear::where('is_active', true)->first();
-        if (!$academicYear) {
+        // Get all academic years
+        $academicYears = AcademicYear::all();
+        if ($academicYears->isEmpty()) {
             return; // stop if no academic year exists
         }
 
-        // Get teacher users
-        $teacher1 = DB::table('users')->where('email', 'teacher@pnc.com')->first();
-        $teacher2 = DB::table('users')->where('email', 'radyy@pnc.com')->first();
+        // Get teacher users (using actual teacher emails from UserSeeder)
+        $teacher1 = DB::table('users')->where('email', 'davy@pnc.com')->first();
+        $teacher2 = DB::table('users')->where('email', 'him@pnc.com')->first();
+        $teacher3 = DB::table('users')->where('email', 'mengheang@pnc.com')->first();
 
-        $classes = [
-            [
-                'name' => 'WEP A',
-                'code' => 'WEP-A-2026' . $academicYear->id,
-                'academic_year_id' => $academicYear->id,
-                'description' => 'Web Programming Class A',
-                'teacher_id' => $teacher1->id ?? null,
-                'is_active' => true,
-            ],
-            [
-                'name' => 'WEP B',
-                'code' => 'WEP-B-2026' . $academicYear->id,
-                'academic_year_id' => $academicYear->id,
-                'description' => 'Web Programming Class B',
-                'teacher_id' => $teacher2->id ?? null,
-                'is_active' => true,
-            ],
-            [
-                'name' => 'WEP C',
-                'code' => 'WEP-C-2026' . $academicYear->id,
-                'academic_year_id' => $academicYear->id,
-                'description' => 'Web Programming Class C',
-                'teacher_id' => $teacher1->id ?? null,
-                'is_active' => true,
-            ],
-        ];
+        foreach ($academicYears as $academicYear) {
+            $yearPrefix = str_replace('-', '', $academicYear->name);
 
-        foreach ($classes as $class) {
-            SchoolClass::updateOrCreate(
-                ['code' => $class['code']],
-                $class
-            );
+            $classes = [
+                [
+                    'name' => 'WEP A',
+                    'code' => 'WEP-A-' . $yearPrefix,
+                    'academic_year_id' => $academicYear->id,
+                    'description' => 'Web Programming Class A',
+                    'teacher_id' => $teacher1->id ?? null,
+                    'is_active' => true,
+                ],
+                [
+                    'name' => 'WEP B',
+                    'code' => 'WEP-B-' . $yearPrefix,
+                    'academic_year_id' => $academicYear->id,
+                    'description' => 'Web Programming Class B',
+                    'teacher_id' => $teacher2->id ?? null,
+                    'is_active' => true,
+                ],
+                [
+                    'name' => 'WEP C',
+                    'code' => 'WEP-C-' . $yearPrefix,
+                    'academic_year_id' => $academicYear->id,
+                    'description' => 'Web Programming Class C',
+                    'teacher_id' => $teacher3->id ?? null,
+                    'is_active' => true,
+                ],
+            ];
+
+            foreach ($classes as $class) {
+                // Update existing class or create new one
+                $existingClass = SchoolClass::where('code', $class['code'])->first();
+                if ($existingClass) {
+                    $existingClass->update(['teacher_id' => $class['teacher_id']]);
+                } else {
+                    SchoolClass::create($class);
+                }
+            }
         }
     }
 }

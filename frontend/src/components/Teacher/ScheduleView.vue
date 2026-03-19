@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { ChevronDown, Loader2, Calendar, Clock, User } from 'lucide-vue-next'
+import { ChevronDown, Loader2, Calendar, Clock, User, ExternalLink } from 'lucide-vue-next'
 import { teacherService } from '../../services/teacherService'
 
 interface User {
@@ -133,11 +133,16 @@ const isAllDayEvent = (event: GoogleEvent) => {
   return event.start.date && event.end.date
 }
 
+// External timetable URL
+const externalTimetableUrl = 'https://timetables2.pnc.passerellesnumeriques.org/calendar/teachers/'
+
 onMounted(loadSchedule)
 </script>
 
 <template>
+  
   <div class="space-y-6">
+  <!--
     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
       <div class="flex justify-center">
         <div class="relative w-full max-w-2xl">
@@ -155,13 +160,16 @@ onMounted(loadSchedule)
     </div>
 
     <p v-if="errorMessage" class="p-3 rounded-lg bg-rose-50 text-rose-700 text-sm">{{ errorMessage }}</p>
+    -->
 
-    <!-- Debug Section - Shows current Google Calendar status -->
+    <!-- 
+    Debug Section - Shows current Google Calendar status 
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
       <h4 class="font-bold text-blue-900 mb-2">Google Calendar Status</h4>
       <p class="text-sm text-blue-700">Events loaded: {{ googleEvents.length }}</p>
       <p class="text-xs text-blue-600 mt-1">Check browser console for detailed API response and errors</p>
     </div>
+    -->
 
     <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden relative min-h-[420px]">
       <div v-if="loading" class="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center gap-3">
@@ -170,7 +178,9 @@ onMounted(loadSchedule)
       </div>
 
       <div class="p-6 space-y-6">
-        <!-- Traditional Sessions Section -->
+    
+    <!-- 
+        Traditional Sessions Section 
         <div>
           <h3 class="text-xl font-black text-slate-900 mb-4">Traditional Sessions</h3>
           <div v-if="sortedSessions.length === 0 && !loading" class="text-sm text-slate-500">No sessions found.</div>
@@ -187,8 +197,9 @@ onMounted(loadSchedule)
             </div>
           </div>
         </div>
+    -->
 
-        <!-- Google Calendar Events Section -->
+    <!-- Google Calendar Events Section 
         <div v-if="googleEvents.length > 0">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-xl font-black text-slate-900">Google Calendar Events</h3>
@@ -250,6 +261,33 @@ onMounted(loadSchedule)
           <div v-else class="text-center py-8">
             <Calendar class="size-12 text-slate-300 mx-auto mb-4" />
             <p class="text-sm text-slate-500">Click "Show Calendar" to view all {{ googleEvents.length }} events</p>
+          </div>
+        </div>
+    -->
+
+        <!-- External Timetable Section -->
+        <div class="mt-8">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-black text-slate-900">External Timetable</h3>
+            <a 
+              :href="externalTimetableUrl" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20 transition-colors"
+            >
+              <ExternalLink class="size-4" />
+              Open in New Tab
+            </a>
+          </div>
+          
+          <div class="border border-slate-200 rounded-xl overflow-hidden bg-white">
+            <iframe 
+              :src="externalTimetableUrl"
+              class="w-full h-[600px] border-0"
+              title="External Teacher Timetable"
+              allow="accelerometer, clipboard-write, encrypted-media, gyroscope, picture-in-picture"
+              allowfullscreen
+            />
           </div>
         </div>
       </div>

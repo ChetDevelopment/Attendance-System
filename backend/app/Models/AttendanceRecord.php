@@ -13,18 +13,16 @@ class AttendanceRecord extends Model
     protected $fillable = [
         'student_id',
         'session_id',
-        'submitted_by',
+        'attendance_id',
+        'recorded_by',
         'attendance_date',
         'status',
         'check_in_time',
-<<<<<<< HEAD
         'recorded_at',
         'justification_status',
         'comment',
-=======
         'is_locked',
         'location',
->>>>>>> admin-dashboard-backend
     ];
 
     protected $casts = [

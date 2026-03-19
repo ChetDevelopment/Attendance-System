@@ -175,4 +175,30 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin,teacher,educatio
 
     // View-Only Endpoints
     Route::get('roles', [RoleController::class, 'index']);
+    // Teacher: Get schedule/sessions
+    Route::get('/teacher/schedule', [TeacherAttendanceController::class, 'getSchedule']);
+
+    // Teacher: Get dashboard data
+    Route::get('/teacher/dashboard', [TeacherAttendanceController::class, 'getDashboard']);
+
+    // Teacher: Get today's schedule from external timetable API
+    Route::get('/teacher/today-schedule', [TeacherAttendanceController::class, 'getTodaySchedule']);
+
+    // Teacher: Get justifications/absence requests
+    Route::get('/teacher/justifications', [TeacherAttendanceController::class, 'getJustifications']);
+
+    // Teacher: Get attendance history
+    Route::get('/teacher/history', [TeacherAttendanceController::class, 'getHistory']);
+
+    // Teacher: Get notifications
+    Route::get('/teacher/notifications', [TeacherAttendanceController::class, 'getNotifications']);
+
+    // Teacher: Get academic years
+    Route::get('/teacher/academic-years', [TeacherAttendanceController::class, 'getAcademicYears']);
+
+    // Teacher: Submit attendance
+    Route::post(
+        '/teacher/attendance',
+        [TeacherAttendanceController::class, 'submitAttendance']
+    );
 });

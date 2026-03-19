@@ -10,6 +10,8 @@ use App\Models\AttendanceRecord;
 use App\Models\Session;
 use App\Models\SchoolClass;
 use App\Models\AbsenceComment;
+use App\Models\AcademicYear;
+use App\Services\TimetableService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -204,7 +206,8 @@ class TeacherAttendanceController extends Controller
                 AttendanceRecord::create([
                     'student_id' => $studentId,
                     'session_id' => $sessionId,
-                    'submitted_by' => auth()->id(),
+                    'attendance_id' => $attendance->id,
+                    'recorded_by' => auth()->id(),
                     'attendance_date' => $date,
                     'status' => $status,
                     'recorded_at' => Carbon::now(),
@@ -239,14 +242,21 @@ class TeacherAttendanceController extends Controller
     /**
      * Get all students (for teachers)
      */
-    public function getAllStudents()
+    public function getAllStudents(Request $request)
     {
         if (auth()->user()->role->slug !== 'teacher') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        $academicYearId = $request->input('academic_year_id');
+
         $students = Student::select('id', 'first_name', 'last_name', 'student_code', 'class_id', 'face_image', 'contact', 'parent_number')
-            ->with('class:id,name,code')
+            ->with('class:id,name,code,academic_year_id')
+            ->when($academicYearId, function ($query) use ($academicYearId) {
+                $query->whereHas('class', function ($classQuery) use ($academicYearId) {
+                    $classQuery->where('academic_year_id', $academicYearId);
+                });
+            })
             ->get()
             ->map(function ($student) {
                 // Build photo URL
@@ -277,23 +287,36 @@ class TeacherAttendanceController extends Controller
     /**
      * Get teacher schedule/sessions
      */
-    public function getSchedule()
+    public function getSchedule(Request $request)
     {
         if (auth()->user()->role->slug !== 'teacher') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $teacherId = auth()->id();
+        $academicYearId = $request->input('academic_year_id');
 
         // Get all active sessions
         $sessions = Session::where('is_active', true)
             ->orderBy('start_time')
             ->get();
 
-        // Get all active classes (for schools where one teacher can teach all classes)
-        $classes = SchoolClass::where('is_active', true)
-            ->select('id', 'name', 'code')
-            ->get();
+        // Get classes filtered by academic year
+        $classQuery = SchoolClass::where('is_active', true)
+            ->select('id', 'name', 'code', 'academic_year_id');
+
+        if ($academicYearId) {
+            $classQuery->where('academic_year_id', $academicYearId);
+        } else {
+            // When no academic year is selected, default to the current active academic year
+            // to avoid showing duplicate classes from different years
+            $currentAcademicYear = AcademicYear::where('is_active', true)->first();
+            if ($currentAcademicYear) {
+                $classQuery->where('academic_year_id', $currentAcademicYear->id);
+            }
+        }
+
+        $classes = $classQuery->orderBy('name')->get();
 
         // Get all teachers for the dropdown
         $teachers = \App\Models\User::whereHas('role', function ($query) {
@@ -329,37 +352,167 @@ class TeacherAttendanceController extends Controller
 
         $teacherId = auth()->id();
         $today = Carbon::today();
+        $now = Carbon::now();
 
-        // Get today's attendance count
-        $todayAttendance = Attendance::whereDate('date', $today)
-            ->where('submitted_by', $teacherId)
-            ->count();
-
-        // Get total classes handled by this teacher
-        $totalClasses = SchoolClass::where('is_active', true)->count();
-
-        // Get recent attendance records (last 7 days)
-        $recentAttendances = Attendance::where('submitted_by', $teacherId)
-            ->whereDate('date', '>=', $today->subDays(7))
-            ->with('class:id,name')
-            ->orderBy('date', 'desc')
-            ->limit(10)
+        // Get all active classes (any teacher can teach any class)
+        $teacherClasses = SchoolClass::where('is_active', true)
+            ->select('id', 'name', 'code')
             ->get();
 
-        // Get pending justifications (absent students with pending status)
-        $pendingJustifications = AttendanceRecord::whereHas('attendance', function ($query) use ($teacherId) {
-            $query->where('submitted_by', $teacherId);
-        })
-            ->where('status', AttendanceStatus::ABSENT)
-            ->whereNull('justification_status')
-            ->count();
+        // Format today's classes with session info
+        $todayClasses = $teacherClasses->map(function ($cls) {
+            return [
+                'id' => $cls->id,
+                'subject' => $cls->name,
+                'classCode' => $cls->code,
+                'start_time' => null, // Sessions are not directly linked to classes in current schema
+                'end_time' => null,
+            ];
+        });
+
+        // Get active session (currently happening based on current time)
+        $currentTime = $now->format('H:i:s');
+        $activeSession = Session::where('is_active', true)
+            ->where('start_time', '<=', $currentTime)
+            ->where('end_time', '>=', $currentTime)
+            ->orderBy('start_time')
+            ->first();
+
+        // If no session is currently happening, get the next upcoming session
+        if (!$activeSession) {
+            $activeSession = Session::where('is_active', true)
+                ->where('start_time', '>', $currentTime)
+                ->orderBy('start_time')
+                ->first();
+        }
+
+        // Get today's attendance counts - show ALL records for today (not filtered by teacher)
+        $allTodayRecords = AttendanceRecord::whereHas('attendance', function ($query) use ($today) {
+            $query->whereDate('date', $today);
+        })->get();
+
+        $checkedInCount = $allTodayRecords->where('status', 'PRESENT')->count();
+        $absentCount = $allTodayRecords->whereIn('status', ['ABSENT', 'LATE'])->count();
+
+        // Get next upcoming session (after current active session ends)
+        $nextToday = null;
+        if ($activeSession) {
+            $nextSession = Session::where('is_active', true)
+                ->where('start_time', '>', $activeSession->end_time)
+                ->orderBy('start_time')
+                ->first();
+
+            if ($nextSession) {
+                $nextToday = [
+                    'id' => $nextSession->id,
+                    'subject' => $nextSession->name,
+                    'start_time' => $nextSession->start_time,
+                    'end_time' => $nextSession->end_time,
+                ];
+            }
+        } else {
+            // No active session - show next upcoming session
+            $nextSession = Session::where('is_active', true)
+                ->where('start_time', '>', $currentTime)
+                ->orderBy('start_time')
+                ->first();
+
+            if ($nextSession) {
+                $nextToday = [
+                    'id' => $nextSession->id,
+                    'subject' => $nextSession->name,
+                    'start_time' => $nextSession->start_time,
+                    'end_time' => $nextSession->end_time,
+                ];
+            }
+        }
 
         return response()->json([
-            'today_attendance' => $todayAttendance,
-            'total_classes' => $totalClasses,
-            'pending_justifications' => $pendingJustifications,
-            'recent_attendances' => $recentAttendances,
+            'today_classes' => $todayClasses,
+            'active' => $activeSession ? [
+                'id' => $activeSession->id,
+                'subject' => $activeSession->name,
+                'start_time' => $activeSession->start_time,
+                'end_time' => $activeSession->end_time,
+            ] : null,
+            'next_today' => $nextToday,
+            'checked_in_count' => $checkedInCount,
+            'absent_count' => $absentCount,
+            'debug' => [
+                'today' => $today->toDateString(),
+                'teacher_id' => $teacherId,
+                'total_records_today' => $allTodayRecords->count(),
+            ]
         ]);
+    }
+
+    /**
+     * Get today's schedule from external timetable API
+     * This fetches the teacher's schedule from https://timetables2.pnc.passerellesnumeriques.org/
+     */
+    public function getTodaySchedule(Request $request)
+    {
+        if (auth()->user()->role->slug !== 'teacher') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $teacher = auth()->user();
+        $date = $request->input('date', Carbon::today()->toDateString());
+
+        // Get teacher's calendar ID from user profile first, then fall back to config/mapping
+        $calendarId = null;
+
+        // Check if teacher has a calendar_id in their profile
+        if (!empty($teacher->calendar_id)) {
+            $calendarId = $teacher->calendar_id;
+        }
+
+        // If no calendar_id in profile, try to get it from the TimetableService mapping by teacher name
+        if (empty($calendarId)) {
+            $timetableService = new TimetableService();
+            $calendarId = $timetableService->getCalendarIdByTeacherName($teacher->name);
+        }
+
+        // Fall back to default calendar ID from config
+        if (empty($calendarId)) {
+            $calendarId = config(
+                'app.teacher_calendar_id',
+                'c_1886h9lqonri4ig0noe2vrfvp8fb8@resource.calendar.google.com'
+            );
+        }
+
+        // Allow overriding calendar ID via request (for testing)
+        if ($request->has('calendar_id')) {
+            $calendarId = $request->input('calendar_id');
+        }
+
+        // DEBUG: Log the calendar ID being used
+        Log::info('getTodaySchedule: Using calendar_id: ' . $calendarId . ' for date: ' . $date);
+
+        try {
+            $timetableService = new TimetableService();
+            $scheduleData = $timetableService->getTeacherSchedule($calendarId, $date);
+
+            // DEBUG: Log the result
+            Log::info('getTodaySchedule: Result - total_sessions: ' . ($scheduleData['total_sessions'] ?? 0));
+
+            return response()->json([
+                'success' => true,
+                'date' => $scheduleData['date'],
+                'sessions' => $scheduleData['sessions'],
+                'total_sessions' => $scheduleData['total_sessions'],
+                'teacher_name' => $teacher->name,
+                'calendar_id' => $calendarId,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch teacher schedule: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch schedule from timetable API',
+                'sessions' => [],
+                'total_sessions' => 0,
+            ], 500);
+        }
     }
 
     /**
@@ -373,11 +526,11 @@ class TeacherAttendanceController extends Controller
 
         $teacherId = auth()->id();
 
-        // Get absent records that might need justification
+        // Get absent and late records that might need justification
         $absentRecords = AttendanceRecord::whereHas('attendance', function ($query) use ($teacherId) {
             $query->where('submitted_by', $teacherId);
         })
-            ->where('status', AttendanceStatus::ABSENT)
+            ->whereIn('status', ['absent', 'late'])
             ->with([
                 'student:id,first_name,last_name,student_code,class_id,face_image',
                 'session:id,name',
@@ -387,12 +540,22 @@ class TeacherAttendanceController extends Controller
             ->limit(50)
             ->get()
             ->map(function ($record) {
+                // Build photo URL
+                $photoUrl = null;
+                if ($record->student->face_image) {
+                    if (str_starts_with($record->student->face_image, 'http')) {
+                        $photoUrl = $record->student->face_image;
+                    } else {
+                        $photoUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $record->student->face_image;
+                    }
+                }
+
                 return [
                     'id' => $record->id,
                     'studentId' => $record->student->student_code,
                     'studentName' => $record->student->first_name . ' ' . $record->student->last_name,
                     'student_code' => $record->student->student_code,
-                    'studentPhoto' => $record->student->face_image ?? null,
+                    'studentPhoto' => $photoUrl,
                     'classCode' => $record->attendance->class->code ?? null,
                     'subject' => $record->attendance->class->name ?? null,
                     'sessionName' => $record->session->name ?? null,
@@ -472,7 +635,7 @@ class TeacherAttendanceController extends Controller
         $pendingJustifications = AttendanceRecord::whereHas('attendance', function ($query) use ($teacherId) {
             $query->where('submitted_by', $teacherId);
         })
-            ->where('status', AttendanceStatus::ABSENT)
+            ->where('status', 'absent')
             ->whereNull('justification_status')
             ->count();
 
@@ -502,5 +665,21 @@ class TeacherAttendanceController extends Controller
         }
 
         return response()->json($notifications);
+    }
+
+    /**
+     * Get all academic years
+     */
+    public function getAcademicYears()
+    {
+        if (auth()->user()->role->slug !== 'teacher') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $academicYears = AcademicYear::orderBy('start_date', 'desc')->get();
+
+        return response()->json([
+            'academic_years' => $academicYears,
+        ]);
     }
 }

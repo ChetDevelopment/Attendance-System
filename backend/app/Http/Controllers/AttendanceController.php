@@ -35,9 +35,8 @@ class AttendanceController extends Controller
             'session_id' => 'nullable|exists:sessions,id',
         ]);
 
-        // Verify teacher is assigned to this class
-        $class = SchoolClass::find($request->class_id);
-        if (!$class || $class->teacher_id !== auth()->id()) {
+        // Any teacher can mark attendance for any class
+        if (auth()->user()->role->slug !== 'teacher') {
             return response()->json(['message' => 'You are not authorized to mark attendance for this class'], 403);
         }
 
@@ -226,9 +225,8 @@ class AttendanceController extends Controller
 
         $request->validate($rules);
 
-        // Verify teacher is assigned to this class
-        $class = SchoolClass::find($request->class_id);
-        if (!$class || $class->teacher_id !== auth()->id()) {
+        // Any teacher can mark attendance for any class
+        if (auth()->user()->role->slug !== 'teacher') {
             return response()->json(['message' => 'You are not authorized to mark attendance for this class'], 403);
         }
 
@@ -300,6 +298,7 @@ class AttendanceController extends Controller
                 'status' => $status->value,
                 'recorded_by' => auth()->id(),
                 'recorded_at' => Carbon::now(),
+                'attendance_id' => $attendance->id,
             ];
 
             if ($checkIn) {

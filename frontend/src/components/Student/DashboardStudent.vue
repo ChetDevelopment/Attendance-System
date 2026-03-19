@@ -8,31 +8,37 @@ import {
   X, 
   Info, 
   ChevronRight,
-  TrendingDown,
   ArrowRight
 } from 'lucide-vue-next';
-import { fetchAttendanceHistory } from '../../services/api';
-import { AttendanceRecord } from '../types';
+import { buildStudentDashboardSummary } from '../../services/api';
+import { getStudentPortalData } from '../../services/studentPortalService';
 
-const attendanceHistory = ref<AttendanceRecord[]>([]);
+const attendanceHistory = ref([]);
+const stats = ref<any>(null);
+const loading = ref(true);
+const loadError = ref('');
 
 const recentRecords = computed(() => {
   return attendanceHistory.value.slice(0, 3);
 });
 
-const absenceReasons = [
-  { label: 'Medical Leave', val: 50, color: 'bg-blue-500' },
-  { label: 'Personal Emergency', val: 33, color: 'bg-amber-400' },
-  { label: 'Other / Unexcused', val: 17, color: 'bg-slate-300' }
-];
+const dashboard = computed(() => buildStudentDashboardSummary(stats.value, attendanceHistory.value));
 
-const trends = [92, 88, 75, 95, 80, 98, 85, 82];
+const trends = computed(() => {
+  const values = dashboard.value.recentTrendValues;
+  return values.length ? values : [0];
+});
 
 onMounted(async () => {
   try {
-    attendanceHistory.value = await fetchAttendanceHistory();
+    const { stats: dashboardStats, history } = await getStudentPortalData();
+    stats.value = dashboardStats;
+    attendanceHistory.value = history;
   } catch (err) {
     console.error(err);
+    loadError.value = 'Unable to load your dashboard right now.';
+  } finally {
+    loading.value = false;
   }
 });
 </script>
@@ -42,25 +48,37 @@ onMounted(async () => {
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold tracking-tight dark:text-white">Student Dashboard</h1>
-        <p class="text-slate-500 dark:text-slate-400 mt-1">Welcome back! Here's your attendance overview for this semester.</p>
+        <p class="text-slate-500 dark:text-slate-400 mt-1">
+          Welcome back{{ dashboard.studentName ? `, ${dashboard.studentName}` : '' }}. Here's your attendance overview.
+        </p>
       </div>
       <div class="flex items-center gap-3">
         <div class="bg-white dark:bg-slate-900 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-2">
           <Calendar class="text-primary" :size="18" />
-          <span class="text-sm font-medium dark:text-white">Semester 1, 2023</span>
+          <span class="text-sm font-medium dark:text-white">
+            {{ dashboard.currentSession?.course_name || 'No active session' }}
+          </span>
         </div>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div v-if="loadError" class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ loadError }}
+    </div>
+
+    <div v-if="loading" class="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      Loading student dashboard...
+    </div>
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
         <div class="flex items-center gap-4">
           <div class="w-14 h-14 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center text-primary">
             <TrendingUp :size="24" />
           </div>
           <div>
-            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Overall Rate</p>
-            <h3 class="text-2xl font-bold dark:text-white">92.4%</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Monthly Rate</p>
+            <h3 class="text-2xl font-bold dark:text-white">{{ dashboard.monthlyPercentage }}%</h3>
           </div>
         </div>
       </div>
@@ -71,8 +89,8 @@ onMounted(async () => {
             <CheckCircle2 :size="24" />
           </div>
           <div>
-            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Present Days</p>
-            <h3 class="text-2xl font-bold dark:text-white">142</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Present Count</p>
+            <h3 class="text-2xl font-bold dark:text-white">{{ dashboard.presentCount }}</h3>
           </div>
         </div>
       </div>
@@ -84,7 +102,7 @@ onMounted(async () => {
           </div>
           <div>
             <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Late Arrivals</p>
-            <h3 class="text-2xl font-bold dark:text-white">12</h3>
+            <h3 class="text-2xl font-bold dark:text-white">{{ dashboard.lateCount }}</h3>
           </div>
         </div>
       </div>
@@ -96,13 +114,13 @@ onMounted(async () => {
           </div>
           <div>
             <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Absences</p>
-            <h3 class="text-2xl font-bold dark:text-white">6</h3>
+            <h3 class="text-2xl font-bold dark:text-white">{{ dashboard.absencesCount }}</h3>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div v-if="!loading" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div class="lg:col-span-2 space-y-8">
         <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
           <div class="flex items-center justify-between mb-8">
@@ -112,7 +130,7 @@ onMounted(async () => {
                 <span class="w-2 h-2 rounded-full bg-primary"></span> Actual
               </div>
               <div class="flex items-center gap-1.5 text-xs text-slate-500">
-                <span class="w-2 h-2 rounded-full bg-slate-300"></span> Target (90%)
+                <span class="w-2 h-2 rounded-full bg-slate-300"></span> Target ({{ dashboard.targetPercentage }}%)
               </div>
             </div>
           </div>
@@ -138,12 +156,15 @@ onMounted(async () => {
         <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
           <div class="flex items-center justify-between mb-8">
             <h3 class="text-lg font-bold dark:text-white">Recent Records</h3>
-            <router-link to="/history" class="text-primary text-xs font-bold hover:underline flex items-center gap-1">
+            <router-link to="/student/history" class="text-primary text-xs font-bold hover:underline flex items-center gap-1">
               View All History <ArrowRight :size="14" />
             </router-link>
           </div>
           <div class="space-y-4">
-            <div v-for="record in recentRecords" :key="record.id" class="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+            <div v-if="recentRecords.length === 0" class="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              No attendance records found yet.
+            </div>
+            <div v-for="(record, index) in recentRecords" :key="index" class="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
               <div class="flex items-center gap-4">
                 <div :class="[
                   'w-10 h-10 rounded-xl flex items-center justify-center',
@@ -173,22 +194,29 @@ onMounted(async () => {
 
       <div class="space-y-8">
         <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col">
-          <h3 class="text-lg font-bold mb-6 dark:text-white">Absence Reasons</h3>
-          <div class="space-y-6 flex-1">
-            <div v-for="item in absenceReasons" :key="item.label">
-              <div class="flex justify-between text-sm mb-2">
-                <span class="text-slate-600 dark:text-slate-400">{{ item.label }}</span>
-                <span class="font-bold dark:text-white">{{ item.val }}%</span>
-              </div>
-              <div class="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div :class="[item.color, 'h-full rounded-full']" :style="{ width: `${item.val}%` }"></div>
-              </div>
+          <h3 class="text-lg font-bold mb-6 dark:text-white">Today’s Attendance</h3>
+          <div class="space-y-4 flex-1">
+            <div class="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50">
+              <p class="text-xs font-bold uppercase tracking-widest text-slate-400">Status</p>
+              <p class="mt-2 text-lg font-bold capitalize dark:text-white">
+                {{ stats?.todayAttendance?.status || 'not recorded' }}
+              </p>
+            </div>
+            <div class="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50">
+              <p class="text-xs font-bold uppercase tracking-widest text-slate-400">Session</p>
+              <p class="mt-2 text-sm font-semibold dark:text-white">
+                {{ dashboard.todayAttendanceLabel }}
+              </p>
+            </div>
+            <div class="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50">
+              <p class="text-xs font-bold uppercase tracking-widest text-slate-400">Tracked Sessions</p>
+              <p class="mt-2 text-lg font-bold dark:text-white">{{ dashboard.totalSessions }}</p>
             </div>
           </div>
           <div class="mt-8 pt-6 border-t border-slate-100 dark:border-slate-700">
             <div class="flex items-center gap-3 text-sm text-slate-500 italic">
               <Info class="text-primary" :size="16" />
-              Provide documentation for unexcused absences within 48 hours.
+              Keep your attendance above {{ dashboard.targetPercentage }}% to stay on track.
             </div>
           </div>
         </div>

@@ -146,8 +146,11 @@ export const getDeduplicated = async (url, options = {}) => {
  */
 export const clearCache = (url = null) => {
   if (url) {
-    const cacheKey = generateCacheKey(url);
-    responseCache.delete(cacheKey);
+    [...responseCache.keys()].forEach((cacheKey) => {
+      if (cacheKey.startsWith(`${url}:`)) {
+        responseCache.delete(cacheKey);
+      }
+    });
   } else {
     responseCache.clear();
   }

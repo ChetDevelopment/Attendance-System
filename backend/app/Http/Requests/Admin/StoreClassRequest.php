@@ -16,13 +16,14 @@ class StoreClassRequest extends FormRequest
     {
         return [
             'academic_year_id' => ['nullable', 'exists:academic_years,id'],
-            'class_name' => [
+            'name' => [
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('classes', 'class_name')->where(fn ($query) => $query->where('academic_year_id', $this->academic_year_id)),
+                Rule::unique('classes', 'name')->where(fn ($query) => $query->where('academic_year_id', $this->academic_year_id)),
             ],
-            'room_number' => ['nullable', 'string', 'max:255'],
+            'code' => ['required', 'string', 'max:255', 'unique:classes,code'],
+            'description' => ['nullable', 'string', 'max:255'],
         ];
     }
 

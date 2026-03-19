@@ -1,7 +1,11 @@
+import { computed, ref } from 'vue'
+
 const TOKEN_KEY = 'access_token'
 const STUDENT_SESSION_KEY = 'student_session'
 const USER_KEY = 'auth_user'
 const USER_ROLE_KEY = 'auth_user_role'
+const userState = ref(null)
+const roleState = ref('')
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY)
 
@@ -24,24 +28,30 @@ export const clearStudentSession = () => {
 }
 
 export const getUser = () => {
+  if (userState.value) return userState.value
+
   const raw = localStorage.getItem(USER_KEY)
 
   if (!raw) return null
 
   try {
-    return JSON.parse(raw)
+    userState.value = JSON.parse(raw)
+    return userState.value
   } catch {
     localStorage.removeItem(USER_KEY)
+    userState.value = null
     return null
   }
 }
 
 export const setUser = (user) => {
   if (!user) return
+  userState.value = user
   localStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 
 export const clearUser = () => {
+  userState.value = null
   localStorage.removeItem(USER_KEY)
 }
 
@@ -80,11 +90,17 @@ export const resolveUserRole = (user) => {
 }
 
 export const getUserRole = () => {
+  if (roleState.value) return roleState.value
+
   const storedRole = normalizeRole(localStorage.getItem(USER_ROLE_KEY))
-  if (storedRole) return storedRole
+  if (storedRole) {
+    roleState.value = storedRole
+    return storedRole
+  }
 
   const roleFromUser = resolveUserRole(getUser())
   if (roleFromUser) {
+    roleState.value = roleFromUser
     localStorage.setItem(USER_ROLE_KEY, roleFromUser)
   }
   return roleFromUser
@@ -94,17 +110,19 @@ export const setUserRole = (role) => {
   const normalizedRole = normalizeRole(role)
 
   if (!normalizedRole) {
+    roleState.value = ''
     localStorage.removeItem(USER_ROLE_KEY)
     return
   }
 
+  roleState.value = normalizedRole
   localStorage.setItem(USER_ROLE_KEY, normalizedRole)
 }
 
 export const clearUserRole = () => {
+  roleState.value = ''
   localStorage.removeItem(USER_ROLE_KEY)
 }
-
 import api from './api';
 
 export const clearAllAuthData = () => {
@@ -112,6 +130,32 @@ export const clearAllAuthData = () => {
   clearStudentSession()
   clearUser()
   clearUserRole()
+}
+
+export const studentProfile = computed(() => {
+  const user = getUser() || {}
+
+  return {
+    id: user.student_id || user.id || user.username || 'N/A',
+    name: user.fullname || user.name || user.username || 'Student',
+    avatar: user.avatar || user.avatar_url || user.profile_photo_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=student',
+    email: user.email || '',
+  }
+})
+
+export const updateProfile = (name, avatar) => {
+  const currentUser = getUser()
+  if (!currentUser) return null
+
+  const updatedUser = {
+    ...currentUser,
+    fullname: name,
+    name,
+    avatar,
+  }
+
+  setUser(updatedUser)
+  return updatedUser
 }
 
 export const logout = async () => {
@@ -124,4 +168,4 @@ export const logout = async () => {
   }
 }
 
-export const hasSession = () => Boolean(getToken() || getStudentSession())
+export const hasSession = () => Boolean(getToken())

@@ -17,27 +17,22 @@ class StudentClass extends Model
     protected $table = 'classes';
 
     protected $fillable = [
-        'class_name',
-        'room_number',
+        'name',
+        'code',
+        'description',
         'academic_year_id',
     ];
 
     // Accessor for class_name alias (frontend compatibility)
     public function getClassNameAttribute(): string
     {
-        return $this->attributes['class_name'] ?? '';
-    }
-
-    // Accessor for room_number
-    public function getRoomNumberAttribute(): ?string
-    {
-        return $this->attributes['room_number'] ?? null;
+        return $this->attributes['name'] ?? '';
     }
 
     // Accessor for name alias
     public function getNameAttribute(): string
     {
-        return $this->attributes['class_name'] ?? '';
+        return $this->attributes['name'] ?? '';
     }
 
     public function students()

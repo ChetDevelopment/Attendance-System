@@ -14,7 +14,7 @@ class SessionService
      * Cache key prefix
      */
     const CACHE_KEY = 'sessions.active.v2';
-    
+
     /**
      * Redis service instance
      */
@@ -46,7 +46,7 @@ class SessionService
     {
         $cacheEnabled = config('sessions.cache.enabled', true);
         $cacheTtl = config('sessions.cache.ttl', 300);
-        
+
         if ($cacheEnabled) {
             return Cache::remember(self::CACHE_KEY, $cacheTtl, function () {
                 return Session::active()
@@ -54,7 +54,7 @@ class SessionService
                     ->get();
             });
         }
-        
+
         return Session::active()
             ->ordered()
             ->get();
@@ -79,15 +79,15 @@ class SessionService
     public function getCurrentSession($time = null)
     {
         $checkTime = $time instanceof Carbon ? $time : Carbon::now(config('sessions.timezone', 'Asia/Bangkok'));
-        
+
         $sessions = $this->getActiveSessions();
-        
+
         foreach ($sessions as $session) {
             if ($session->isTimeWithinSession($checkTime)) {
                 return $session;
             }
         }
-        
+
         return null;
     }
 
@@ -97,17 +97,17 @@ class SessionService
     public function getNextSession($time = null)
     {
         $checkTime = $time instanceof Carbon ? $time : Carbon::now(config('sessions.timezone', 'Asia/Bangkok'));
-        
+
         $sessions = $this->getActiveSessions()
             ->filter(function ($session) use ($checkTime) {
                 $sessionStart = Carbon::parse($session->start_time, config('sessions.timezone', 'Asia/Bangkok'));
                 return $sessionStart->greaterThan($checkTime);
             });
-        
+
         if ($sessions->isEmpty()) {
             return null;
         }
-        
+
         return $sessions->sortBy(function ($session) {
             return $session->start_time;
         })->first();
@@ -126,13 +126,13 @@ class SessionService
                 return $cachedSession['is_active'] ?? false;
             }
         }
-        
+
         $session = Session::find($sessionId);
-        
+
         if (!$session) {
             return false;
         }
-        
+
         // Cache the session status
         if ($redisService) {
             $redisService->cacheSession($sessionId, [
@@ -145,7 +145,7 @@ class SessionService
                 'late_threshold' => $session->late_threshold,
             ]);
         }
-        
+
         return $session->isCurrentlyActive();
     }
 
@@ -165,7 +165,7 @@ class SessionService
                     'duplicate' => true,
                 ];
             }
-            
+
             // Try to record check-in atomically
             $recorded = $redisService->trackCheckIn($studentId, $sessionId);
             if (!$recorded) {
@@ -176,26 +176,26 @@ class SessionService
                 ];
             }
         }
-        
+
         $session = Session::find($sessionId);
-        
+
         if (!$session) {
             if ($redisService) $redisService->removeCheckIn($studentId, $sessionId);
             return ['allowed' => false, 'reason' => 'Session not found'];
         }
-        
+
         if (!$session->is_active) {
             if ($redisService) $redisService->removeCheckIn($studentId, $sessionId);
             return ['allowed' => false, 'reason' => 'Session is not active'];
         }
-        
+
         $now = Carbon::now(config('sessions.timezone', 'Asia/Bangkok'));
-        
+
         if (!$session->isTimeWithinSession($now)) {
             $earlyCheckinMinutes = config('sessions.validation.early_checkin_minutes', 30);
             $sessionStart = Carbon::createFromFormat('H:i:s', $session->start_time, config('sessions.timezone', 'Asia/Bangkok'));
             $earlyThreshold = $sessionStart->copy()->subMinutes($earlyCheckinMinutes);
-            
+
             if ($now->greaterThan($earlyThreshold) && $now->lessThan($sessionStart)) {
                 return [
                     'allowed' => true,
@@ -203,11 +203,11 @@ class SessionService
                     'is_early' => true,
                 ];
             }
-            
+
             if ($redisService) $redisService->removeCheckIn($studentId, $sessionId);
             return ['allowed' => false, 'reason' => 'Session is not currently active'];
         }
-        
+
         return ['allowed' => true, 'reason' => 'Check-in allowed'];
     }
 
@@ -217,7 +217,7 @@ class SessionService
     public function isLate($sessionId, $checkInTime = null): array
     {
         $session = Session::find($sessionId);
-        
+
         if (!$session) {
             return [
                 'is_late' => false,
@@ -225,19 +225,19 @@ class SessionService
                 'reason' => 'Session not found',
             ];
         }
-        
-        $time = $checkInTime instanceof Carbon 
-            ? $checkInTime 
+
+        $time = $checkInTime instanceof Carbon
+            ? $checkInTime
             : Carbon::now(config('sessions.timezone', 'Asia/Bangkok'));
-        
+
         $isLate = $session->isLate($time);
         $minutesLate = $session->getMinutesLate($time);
-        
+
         return [
             'is_late' => $isLate,
             'minutes_late' => $minutesLate,
             'late_threshold' => $session->late_threshold ?? $session->late_after_minutes ?? 15,
-            'reason' => $isLate 
+            'reason' => $isLate
                 ? "Check-in is {$minutesLate} minutes late"
                 : 'On time',
         ];
@@ -281,19 +281,19 @@ class SessionService
     public function updateSession($sessionId, array $data): ?Session
     {
         $session = Session::find($sessionId);
-        
+
         if (!$session) {
             return null;
         }
-        
+
         $session->update($data);
         $this->clearCache();
-        
+
         $redisService = $this->getRedisService();
         if ($redisService) {
             $redisService->clearSessionCheckIns($sessionId);
         }
-        
+
         return $session->fresh();
     }
 
@@ -303,19 +303,19 @@ class SessionService
     public function deleteSession($sessionId): bool
     {
         $session = Session::find($sessionId);
-        
+
         if (!$session) {
             return false;
         }
-        
+
         $session->delete();
         $this->clearCache();
-        
+
         $redisService = $this->getRedisService();
         if ($redisService) {
             $redisService->clearSessionCheckIns($sessionId);
         }
-        
+
         return true;
     }
 
@@ -325,19 +325,19 @@ class SessionService
     public function toggleSessionStatus($sessionId): ?Session
     {
         $session = Session::find($sessionId);
-        
+
         if (!$session) {
             return null;
         }
-        
+
         $session->update(['is_active' => !$session->is_active]);
         $this->clearCache();
-        
+
         $redisService = $this->getRedisService();
         if ($redisService) {
             $redisService->clearSessionCheckIns($sessionId);
         }
-        
+
         return $session->fresh();
     }
 
@@ -348,7 +348,7 @@ class SessionService
     {
         $defaultSessions = config('sessions.default_sessions', []);
         $created = 0;
-        
+
         foreach ($defaultSessions as $sessionData) {
             $exists = Session::where('order', $sessionData['order'])->exists();
             if (!$exists) {
@@ -356,7 +356,7 @@ class SessionService
                 $created++;
             }
         }
-        
+
         $this->clearCache();
         return $created;
     }
@@ -378,11 +378,11 @@ class SessionService
             ->where('session_id', $sessionId)
             ->where('attendance_date', now()->toDateString())
             ->first();
-        
+
         if (!$attendance) {
             return null;
         }
-        
+
         return [
             'checked_in' => true,
             'check_in_time' => $attendance->check_in_time,
@@ -416,27 +416,27 @@ class SessionService
     public function validateSessionTime($sessionId): array
     {
         $session = Session::find($sessionId);
-        
+
         if (!$session) {
             return ['valid' => false, 'reason' => 'Session not found'];
         }
-        
+
         $now = Carbon::now(config('sessions.timezone', 'Asia/Bangkok'));
-        
+
         if (!$session->is_active) {
             return ['valid' => false, 'reason' => 'Session is not active'];
         }
-        
+
         if (!$session->isTimeWithinSession($now)) {
             return [
-                'valid' => false, 
+                'valid' => false,
                 'reason' => 'Current time is outside session hours',
                 'session_start' => $session->start_time,
                 'session_end' => $session->end_time,
                 'current_time' => $now->format('H:i'),
             ];
         }
-        
+
         return ['valid' => true, 'reason' => 'Valid session time', 'session' => $session];
     }
 

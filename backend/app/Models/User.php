@@ -2,71 +2,71 @@
 
 namespace App\Models;
 
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use App\Models\Role;
-use App\Models\Attendance;
-use App\Models\AttendanceRecord;
-use App\Models\AbsenceComment;
-use App\Models\ActivityLog;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'name',
         'email',
-        'password',
-        'role_id',
-        'student_id',
         'avatar_url',
-        'is_active',
         'phone',
         'bio',
+        'theme',
+        'notification_email',
+        'notification_push',
+        'role_id',
+        'student_id',
+        'password',
     ];
 
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var array<int, string>
+     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
-        'is_active' => 'boolean',
+        'notification_email' => 'boolean',
+        'notification_push' => 'boolean',
     ];
-
-    public function role()
-    {
-        return $this->belongsTo(Role::class);
-    }
-
-    public function student()
-    {
-        return $this->belongsTo(Student::class);
-    }
 
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class);
     }
 
-    public function attendanceRecords()
+    public function role(): BelongsTo
     {
-        return $this->hasMany(AttendanceRecord::class, 'submitted_by');
+        return $this->belongsTo(Role::class);
     }
 
-    public function absenceComments()
+    public function student(): BelongsTo
     {
-        return $this->hasMany(AbsenceComment::class, 'commented_by');
-    }
-
-    public function activityLogs()
-    {
-        return $this->hasMany(ActivityLog::class);
+        return $this->belongsTo(Student::class);
     }
 }

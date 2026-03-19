@@ -16,7 +16,8 @@ const emit = defineEmits<{
 // Method to handle academic year change
 const onAcademicYearChange = (event: Event) => {
   const target = event.target as HTMLSelectElement;
-  const value = target.value ? Number(target.value) : null;
+  // Handle "All Years" option (value is empty string or "null")
+  const value = target.value && target.value !== 'null' ? Number(target.value) : null;
   emit('update:academicYearId', value);
 };
 
@@ -192,7 +193,7 @@ onMounted(loadData);
           @change="onAcademicYearChange"
           class="mt-1 w-full px-3 py-2 border rounded-lg bg-white"
         >
-          <option :value="undefined">All Years</option>
+          <option :value="null">All Years</option>
           <option
             v-for="year in academicYearOptions"
             :key="year.id"

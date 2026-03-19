@@ -24,17 +24,38 @@ import {
 
 const router = useRouter();
 
+// Initialize with stored user
+// The user data is set during login and stored in localStorage
 const loggedUser = getUser();
+
+// Get the proper fields from the backend user response
+// Backend returns: name, email, role, profile_image, calendar_id
+// We need to map profile_image to photo for the frontend interface
+const getUserPhoto = (user: any) => {
+  // First check for profile_image (backend field)
+  if (user?.profile_image) {
+    return user.profile_image;
+  }
+  // Fallback to photo if exists
+  if (user?.photo) {
+    return user.photo;
+  }
+  // Try to get image from teacherFaces folder based on name
+  if (user?.name) {
+    const nameLower = user.name.toLowerCase();
+    return `/teacherFaces/${nameLower}.png`;
+  }
+  // Default image
+  return "https://image2url.com/r2/default/images/1773553855939-e3b32a24-8b55-46a4-86fa-46b9710946fb.png";
+};
 
 // Only show the current logged-in user, not all teachers
 const MOCK_USERS = ref<User[]>([
   {
     name: loggedUser?.name || "Teacher",
     role: "teacher",
-    department: loggedUser?.department || "Teacher",
-    photo:
-      loggedUser?.photo ||
-      "https://image2url.com/r2/default/images/1773553855939-e3b32a24-8b55-46a4-86fa-46b9710946fb.png",
+    department: loggedUser?.department || loggedUser?.role?.name || "Teacher",
+    photo: getUserPhoto(loggedUser),
   },
 ]);
 

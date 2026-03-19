@@ -301,15 +301,22 @@ class TeacherAttendanceController extends Controller
             ->orderBy('start_time')
             ->get();
 
-        // Get classes filtered by academic year (if provided)
+        // Get classes filtered by academic year
         $classQuery = SchoolClass::where('is_active', true)
             ->select('id', 'name', 'code', 'academic_year_id');
 
         if ($academicYearId) {
             $classQuery->where('academic_year_id', $academicYearId);
+        } else {
+            // When no academic year is selected, default to the current active academic year
+            // to avoid showing duplicate classes from different years
+            $currentAcademicYear = AcademicYear::where('is_active', true)->first();
+            if ($currentAcademicYear) {
+                $classQuery->where('academic_year_id', $currentAcademicYear->id);
+            }
         }
 
-        $classes = $classQuery->get();
+        $classes = $classQuery->orderBy('name')->get();
 
         // Get all teachers for the dropdown
         $teachers = \App\Models\User::whereHas('role', function ($query) {

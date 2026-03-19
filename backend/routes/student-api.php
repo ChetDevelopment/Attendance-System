@@ -14,9 +14,7 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-Route::prefix('student')->middleware(['auth.jwt', 'role:student'])->group(function () {
-    Route::get('/dashboard/stats', [StudentDashboardController::class, 'getStats']);
-    Route::get('/attendance/history', [StudentDashboardController::class, 'getHistory']);
-    Route::post('/attendance/check-in', [StudentDashboardController::class, 'checkIn']);
-    Route::post('/attendance/request', [StudentDashboardController::class, 'requestManual']);
-});
+Route::get('/dashboard/stats', [StudentDashboardController::class, 'getStats']);
+Route::get('/attendance/history', [StudentDashboardController::class, 'getHistory']);
+Route::post('/attendance/check-in', [StudentDashboardController::class, 'checkIn']);
+Route::post('/attendance/request', [StudentDashboardController::class, 'requestManual']);

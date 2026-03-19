@@ -14,18 +14,25 @@ use Carbon\Carbon;
 
 class TeacherAttendanceController extends Controller
 {
+    private function isTeacher(): bool
+    {
+        $roleName = strtolower((string) optional(auth()->user()?->role)->name);
+
+        return $roleName === 'teacher';
+    }
+
     /**
      * Get students by class
      */
     public function getStudentsByClass($classId)
     {
         // Check teacher role
-        if (auth()->user()->role->slug !== 'teacher') {
+        if (!$this->isTeacher()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $students = Student::where('class_id', $classId)
-            ->select('id', 'first_name', 'last_name')
+            ->select('id', 'first_name', 'last_name', 'fullname', 'gender', 'class_id')
             ->get();
 
         return response()->json([
@@ -40,7 +47,7 @@ class TeacherAttendanceController extends Controller
     public function submitAttendance(Request $request)
     {
         // Validate teacher role
-        if (auth()->user()->role->slug !== 'teacher') {
+        if (!$this->isTeacher()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

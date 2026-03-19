@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Student;
 
+use App\Models\AttendanceFollowUp;
 use App\Models\AttendanceRecord;
 use App\Models\Session;
 use App\Models\Student;
@@ -10,10 +11,25 @@ use App\Http\Controllers\Controller;
 use App\Services\SessionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\Response;
 
 class StudentDashboardController extends Controller
 {
+    private function hasCheckInTimeColumn(): bool
+    {
+        return Schema::hasColumn('attendance_records', 'check_in_time');
+    }
+
+    private function resolveRecordTimestamp(AttendanceRecord $record): ?string
+    {
+        $timestamp = $this->hasCheckInTimeColumn()
+            ? ($record->check_in_time ?? $record->created_at)
+            : $record->created_at;
+
+        return optional($timestamp)->toIso8601String();
+    }
+
     /**
      * GET /student/dashboard/stats
      * 
@@ -39,21 +55,30 @@ class StudentDashboardController extends Controller
         $currentSession = $sessionService->getCurrentSession();
 
         // Get today's attendance for this student
-        $todayAttendance = AttendanceRecord::where('student_id', $student->id)
+        // Use attendance_date as the canonical day field instead of created_at so
+        // historical/backfilled records are picked up correctly for "today".
+        $todayAttendanceQuery = AttendanceRecord::where('student_id', $student->id)
             ->with('session')
-            ->whereDate('created_at', today())
-            ->orderBy('created_at', 'desc')
-            ->first();
+            ->whereDate('attendance_date', today())
+            ->latest('attendance_date');
+
+        if ($this->hasCheckInTimeColumn()) {
+            $todayAttendanceQuery->latest('check_in_time');
+        } else {
+            $todayAttendanceQuery->latest('created_at');
+        }
+
+        $todayAttendance = $todayAttendanceQuery->first();
 
         $startOfMonth = now()->startOfMonth();
-        // Aggregate monthly stats in one query to reduce DB round trips.
+        // Aggregate monthly stats on attendance_date so records remain accurate even if inserted later.
         $monthly = AttendanceRecord::where('student_id', $student->id)
-            ->where('created_at', '>=', $startOfMonth)
+            ->whereDate('attendance_date', '>=', $startOfMonth)
             ->selectRaw(
                 "COUNT(*) as total_sessions,
-                 SUM(CASE WHEN status IN ('present', 'Present') THEN 1 ELSE 0 END) as present_count,
-                 SUM(CASE WHEN status IN ('late', 'Late') THEN 1 ELSE 0 END) as late_count,
-                 SUM(CASE WHEN status IN ('absent', 'Absent') THEN 1 ELSE 0 END) as absences_count"
+                 SUM(CASE WHEN LOWER(status) = 'present' THEN 1 ELSE 0 END) as present_count,
+                 SUM(CASE WHEN LOWER(status) = 'late' THEN 1 ELSE 0 END) as late_count,
+                 SUM(CASE WHEN LOWER(status) = 'absent' THEN 1 ELSE 0 END) as absences_count"
             )
             ->first();
 
@@ -61,6 +86,13 @@ class StudentDashboardController extends Controller
         $presentCount = (int) ($monthly->present_count ?? 0);
         $lateCount = (int) ($monthly->late_count ?? 0);
         $absencesCount = (int) ($monthly->absences_count ?? 0);
+        $excusedCount = AttendanceFollowUp::query()
+            ->join('attendance_records', 'attendance_records.id', '=', 'attendance_follow_ups.attendance_record_id')
+            ->where('attendance_records.student_id', $student->id)
+            ->whereDate('attendance_records.attendance_date', '>=', $startOfMonth)
+            ->where('attendance_follow_ups.is_excused', true)
+            ->distinct('attendance_follow_ups.attendance_record_id')
+            ->count('attendance_follow_ups.attendance_record_id');
         $monthlyPercentage = $totalSessions > 0 ? round((($presentCount + $lateCount) / $totalSessions) * 100) : 0;
 
         return response()->json([
@@ -74,8 +106,8 @@ class StudentDashboardController extends Controller
             'todayAttendance' => $todayAttendance ? [
                 'id' => $todayAttendance->id,
                 'course_name' => $todayAttendance->session?->name ?? 'Session',
-                'status' => strtolower($todayAttendance->status),
-                'check_in_time' => $todayAttendance->created_at->toIso8601String(),
+                'status' => strtoupper($todayAttendance->status),
+                'check_in_time' => $this->resolveRecordTimestamp($todayAttendance),
                 'session_start' => $todayAttendance->session?->start_time,
                 'session_end' => $todayAttendance->session?->end_time,
             ] : null,
@@ -84,6 +116,7 @@ class StudentDashboardController extends Controller
             'presentCount' => $presentCount,
             'lateCount' => $lateCount,
             'absencesCount' => $absencesCount,
+            'excusedCount' => $excusedCount,
             'targetPercentage' => 75,
             'student' => $student ? [
                 'id' => $student->id,
@@ -110,18 +143,26 @@ class StudentDashboardController extends Controller
         }
 
         $limit = $request->input('limit', 50);
-        
-        $history = AttendanceRecord::with('session')
+
+        $historyQuery = AttendanceRecord::with('session')
             ->where('student_id', $student->id)
-            ->orderBy('created_at', 'desc')
+            ->orderByDesc('attendance_date');
+
+        if ($this->hasCheckInTimeColumn()) {
+            $historyQuery->orderByDesc('check_in_time');
+        } else {
+            $historyQuery->orderByDesc('created_at');
+        }
+
+        $history = $historyQuery
             ->limit($limit)
             ->get()
             ->map(function ($record) {
                 return [
                     'id' => $record->id,
                     'course_name' => $record->session?->name ?? 'Session',
-                    'status' => strtolower($record->status),
-                    'check_in_time' => $record->created_at->toIso8601String(),
+                    'status' => strtoupper($record->status),
+                    'check_in_time' => $this->resolveRecordTimestamp($record),
                     'session_start' => $record->session?->start_time,
                     'session_end' => $record->session?->end_time,
                 ];

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import AppLayout from '../layouts/AppLayout.vue';
 import { 
   CheckCircle2 as CheckCircle2Icon, 
@@ -11,45 +11,36 @@ import {
   AlertCircle as AlertCircleIcon,
   Check as CheckIcon
 } from 'lucide-vue-next';
+import { teacherService } from '../../services/teacherService';
+import api from '../../services/api';
 
 const user = JSON.parse(localStorage.getItem('user_data') || '{}');
-
-// --- Mock Data ---
-const classes = ['WEB-2024A', 'WEB-2024B', 'SNA-2024A', 'SNA-2024B'];
-const sessions = ['Morning Session (08:00 - 11:30)', 'Afternoon Session (13:30 - 17:00)'];
 
 interface Student {
   id: number;
   name: string;
-  gender: 'M' | 'F';
+  class_id?: number | string;
+  class_name?: string;
+  gender?: string;
   status: 'present' | 'absent' | 'late' | null;
 }
 
-const mockStudents: Student[] = [
-  { id: 1, name: 'Sokha Lim', gender: 'M', status: null },
-  { id: 2, name: 'Bopha Chen', gender: 'F', status: null },
-  { id: 3, name: 'Dara Vong', gender: 'M', status: null },
-  { id: 4, name: 'Chanthou Meas', gender: 'F', status: null },
-  { id: 5, name: 'Rithy Sam', gender: 'M', status: null },
-  { id: 6, name: 'Sreyneang Keo', gender: 'F', status: null },
-  { id: 7, name: 'Vannak Pen', gender: 'M', status: null },
-  { id: 8, name: 'Sophea Ros', gender: 'F', status: null },
-];
+const classes = ref<{ id: number | string; label: string }[]>([]);
+const sessions = ref<{ id: number; label: string }[]>([]);
 
-// --- State ---
-const selectedClass = ref(classes[0]);
-const selectedSession = ref(sessions[0]);
+const selectedClass = ref<string | number>('');
+const selectedSession = ref<number | null>(null);
 const searchQuery = ref('');
-const students = ref<Student[]>([...mockStudents]);
+const students = ref<Student[]>([]);
 const isSubmitted = ref(false);
 const showSuccess = ref(false);
+const loading = ref(true);
+const saving = ref(false);
+const fetchError = ref('');
 
-// --- Computed ---
 const filteredStudents = computed(() => {
   if (!searchQuery.value) return students.value;
-  return students.value.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-  );
+  return students.value.filter(s => s.name.toLowerCase().includes(searchQuery.value.toLowerCase()));
 });
 
 const attendanceStats = computed(() => {
@@ -58,11 +49,9 @@ const attendanceStats = computed(() => {
   const absent = students.value.filter(s => s.status === 'absent').length;
   const late = students.value.filter(s => s.status === 'late').length;
   const pending = students.value.filter(s => s.status === null).length;
-  
   return { total, present, absent, late, pending };
 });
 
-// --- Actions ---
 const setStatus = (studentId: number, status: 'present' | 'absent' | 'late') => {
   if (isSubmitted.value) return;
   const student = students.value.find(s => s.id === studentId);
@@ -71,56 +60,151 @@ const setStatus = (studentId: number, status: 'present' | 'absent' | 'late') => 
   }
 };
 
-const submitAttendance = () => {
+const resetAttendance = () => {
+  students.value = students.value.map(s => ({ ...s, status: null }));
+  isSubmitted.value = false;
+  showSuccess.value = false;
+};
+
+const submitAttendance = async () => {
+  if (!selectedSession.value) {
+    alert('Please select a session.');
+    return;
+  }
+  if (!selectedClass.value) {
+    alert('Please select a class.');
+    return;
+  }
   if (attendanceStats.value.pending > 0) {
     alert('Please mark attendance for all students before submitting.');
     return;
   }
-  
-  isSubmitted.value = true;
-  showSuccess.value = true;
-  
-  // Auto hide success message after 5 seconds
-  setTimeout(() => {
-    showSuccess.value = false;
-  }, 5000);
+
+  saving.value = true;
+  fetchError.value = '';
+  try {
+    const payload = {
+      class_id: selectedClass.value,
+      session_id: selectedSession.value,
+      attendance_date: new Date().toISOString().slice(0, 10),
+      records: students.value.map((s) => ({
+        student_id: s.id,
+        status: s.status,
+      })),
+    };
+    await api.post('/teacher/attendance', payload);
+    isSubmitted.value = true;
+    showSuccess.value = true;
+    setTimeout(() => (showSuccess.value = false), 2500);
+  } catch (error: any) {
+    console.error(error);
+    fetchError.value = error?.response?.data?.message || 'Failed to submit attendance.';
+  } finally {
+    saving.value = false;
+  }
 };
 
-const resetAttendance = () => {
-  students.value = mockStudents.map(s => ({ ...s, status: null }));
-  isSubmitted.value = false;
-  showSuccess.value = false;
+const loadStudentsForClass = async (classId: string | number) => {
+  try {
+    const { data } = await api.get(`/teacher/classes/${classId}/students`);
+    const rows = Array.isArray(data) ? data : data?.students || [];
+    students.value = rows.map((s: any) => ({
+      id: s.id,
+      name: s.fullname || s.name || s.student_name || [s.first_name, s.last_name].filter(Boolean).join(' '),
+      class_id: s.class_id,
+      class_name: s.class?.class_name || s.class_name,
+      gender: s.gender,
+      status: null,
+    }));
+  } catch (error: any) {
+    console.error(error);
+    fetchError.value = 'Failed to load students for this class.';
+    students.value = [];
+  }
 };
+
+const initData = async () => {
+  loading.value = true;
+  fetchError.value = '';
+  try {
+    const [schedule, roster] = await Promise.all([
+      teacherService.getSchedule(),
+      teacherService.getStudents(),
+    ]);
+
+    sessions.value = Array.isArray(schedule)
+      ? schedule.map((s: any) => ({
+          id: s.id,
+          label: `${s.name || s.course_name || 'Session'} (${s.start_time || ''} - ${s.end_time || ''})`,
+        }))
+      : [];
+    selectedSession.value = sessions.value[0]?.id || null;
+
+    const classMap = new Map<string | number, string>();
+    const normalizedStudents = Array.isArray(roster)
+      ? roster.map((s: any) => {
+          const classId = s.class_id ?? s.class?.id ?? s.classId ?? 'unknown';
+          const className = s.class?.class_name || s.class_name || `Class ${classId}`;
+          classMap.set(classId, className);
+          return {
+            id: s.id,
+            name: s.fullname || s.name || s.student_name,
+            class_id: classId,
+            class_name: className,
+            gender: s.gender,
+            status: null,
+          } as Student;
+        })
+      : [];
+
+    classes.value = Array.from(classMap.entries()).map(([id, label]) => ({ id, label }));
+    selectedClass.value = classes.value[0]?.id || '';
+    students.value = normalizedStudents.filter((s) => s.class_id === selectedClass.value) || normalizedStudents;
+
+    if (selectedClass.value) {
+      await loadStudentsForClass(selectedClass.value);
+    }
+  } catch (error: any) {
+    console.error(error);
+    fetchError.value = 'Failed to load classes or sessions.';
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(initData);
 </script>
 
 <template>
   <AppLayout title="Manual Attendance" :user="user">
     <div class="space-y-6">
-      <!-- Header Controls -->
+      <div v-if="fetchError" class="bg-red-50 text-red-700 border border-red-200 p-3 rounded-xl">
+        {{ fetchError }}
+      </div>
+
       <div class="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
         <div class="flex flex-wrap gap-4 w-full lg:w-auto">
-          <!-- Class Dropdown -->
           <div class="relative min-w-[180px]">
             <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest absolute -top-2 left-3 bg-slate-950 px-1 z-10">Class</label>
             <select 
               v-model="selectedClass"
-              :disabled="isSubmitted"
+              :disabled="isSubmitted || loading"
               class="w-full bg-slate-900 border border-slate-800 text-white rounded-xl px-4 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-pnc-blue/50 disabled:opacity-50 transition-all"
+              @change="loadStudentsForClass(selectedClass)"
             >
-              <option v-for="c in classes" :key="c" :value="c">{{ c }}</option>
+              <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.label }}</option>
             </select>
             <ChevronDownIcon class="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
           </div>
 
-          <!-- Session Dropdown -->
           <div class="relative min-w-[280px]">
             <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest absolute -top-2 left-3 bg-slate-950 px-1 z-10">Session</label>
             <select 
               v-model="selectedSession"
-              :disabled="isSubmitted"
+              :disabled="isSubmitted || loading"
               class="w-full bg-slate-900 border border-slate-800 text-white rounded-xl px-4 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-pnc-blue/50 disabled:opacity-50 transition-all"
             >
-              <option v-for="s in sessions" :key="s" :value="s">{{ s }}</option>
+              <option v-for="s in sessions" :key="s.id" :value="s.id">{{ s.label }}</option>
             </select>
             <ChevronDownIcon class="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 pointer-events-none" />
           </div>
@@ -139,7 +223,6 @@ const resetAttendance = () => {
         </div>
       </div>
 
-      <!-- Stats Bar -->
       <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div class="bg-slate-900/50 border border-slate-800 p-4 rounded-2xl">
           <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total</p>
@@ -163,7 +246,6 @@ const resetAttendance = () => {
         </div>
       </div>
 
-      <!-- Success Message -->
       <transition
         enter-active-class="transition duration-300 ease-out"
         enter-from-class="opacity-0 translate-y-4"
@@ -177,7 +259,7 @@ const resetAttendance = () => {
             <CheckIcon class="h-6 w-6" />
             <div>
               <p class="font-bold">Attendance Submitted Successfully!</p>
-              <p class="text-sm opacity-90">Records for {{ selectedClass }} have been saved for the {{ selectedSession.split(' ')[0] }}.</p>
+              <p class="text-sm opacity-90">Records for {{ selectedClass }} have been saved.</p>
             </div>
           </div>
           <button @click="showSuccess = false" class="hover:bg-white/20 p-1 rounded-lg transition-colors">
@@ -186,7 +268,6 @@ const resetAttendance = () => {
         </div>
       </transition>
 
-      <!-- Student Table -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         <table class="w-full text-left border-collapse">
           <thead>
@@ -207,7 +288,7 @@ const resetAttendance = () => {
                 </div>
               </td>
               <td class="px-6 py-4 text-center">
-                <span class="text-slate-400 text-sm">{{ student.gender }}</span>
+                <span class="text-slate-400 text-sm">{{ student.gender || '—' }}</span>
               </td>
               <td class="px-6 py-4">
                 <div class="flex justify-end gap-2">
@@ -265,7 +346,6 @@ const resetAttendance = () => {
         </table>
       </div>
 
-      <!-- Footer Actions -->
       <div class="flex justify-between items-center bg-slate-900 border border-slate-800 p-6 rounded-2xl">
         <div class="flex items-center gap-4">
           <div v-if="isSubmitted" class="flex items-center gap-2 text-slate-500 text-sm italic">
@@ -286,11 +366,11 @@ const resetAttendance = () => {
           </button>
           <button 
             @click="submitAttendance"
-            :disabled="isSubmitted || attendanceStats.pending > 0"
+            :disabled="isSubmitted || attendanceStats.pending > 0 || saving"
             class="flex items-center gap-2 px-8 py-3 bg-pnc-blue hover:bg-blue-600 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold rounded-xl shadow-lg shadow-pnc-blue/20 transition-all active:scale-[0.98]"
           >
             <SaveIcon class="h-5 w-5" />
-            Submit Attendance
+            {{ saving ? 'Saving...' : 'Submit Attendance' }}
           </button>
         </div>
       </div>

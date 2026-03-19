@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { 
   Search, 
   Download, 
@@ -14,6 +15,7 @@ import {
 import { getStudentHistory } from '../../services/studentPortalService';
 import { AttendanceRecord } from '../types';
 
+const route = useRoute();
 const attendanceHistory = ref<AttendanceRecord[]>([]);
 const searchQuery = ref('');
 const statusFilter = ref<'ALL' | 'PRESENT' | 'LATE' | 'ABSENT'>('ALL');
@@ -21,6 +23,7 @@ const dateRange = ref({ start: '', end: '' });
 const sortBy = ref<keyof AttendanceRecord>('date');
 const sortOrder = ref<'asc' | 'desc'>('desc');
 const notification = ref<{ message: string; type: 'success' | 'error' } | null>(null);
+const isExporting = ref(false);
 
 const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
   notification.value = { message, type };
@@ -80,13 +83,65 @@ const toggleSort = (field: keyof AttendanceRecord) => {
   }
 };
 
+const exportCsv = () => {
+  if (!attendanceHistory.value.length) {
+    showNotification('No data to export.', 'error');
+    return;
+  }
+
+  isExporting.value = true;
+  try {
+    const header = ['Date', 'Course', 'Status', 'Instructor', 'Time Slot'];
+    const rows = attendanceHistory.value.map((r) => [
+      r.date,
+      r.courseName,
+      r.status,
+      r.instructor || '',
+      r.timeSlot || '',
+    ]);
+
+    const csv = [header, ...rows]
+      .map((row) =>
+        row
+          .map((cell) => {
+            const value = String(cell ?? '');
+            return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+          })
+          .join(',')
+      )
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `attendance-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showNotification('CSV exported successfully.');
+  } catch (err) {
+    console.error(err);
+    showNotification('Failed to export CSV.', 'error');
+  } finally {
+    isExporting.value = false;
+  }
+};
+
 onMounted(async () => {
+  searchQuery.value = typeof route.query.q === 'string' ? route.query.q : '';
   try {
     attendanceHistory.value = await getStudentHistory();
   } catch (err) {
     showNotification("Unable to load attendance history.", "error");
   }
 });
+
+watch(
+  () => route.query.q,
+  (value) => {
+    searchQuery.value = typeof value === 'string' ? value : '';
+  }
+);
 </script>
 
 <template>
@@ -108,9 +163,13 @@ onMounted(async () => {
         <h1 class="text-3xl font-bold dark:text-white">Attendance History</h1>
         <p class="text-slate-500 mt-2">View and filter your past attendance records.</p>
       </div>
-      <button class="bg-white dark:bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-2 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
+      <button
+        @click="exportCsv"
+        :disabled="isExporting"
+        class="bg-white dark:bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-2 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
         <Download :size="18" class="text-primary" />
-        Export CSV
+        {{ isExporting ? 'Exporting...' : 'Export CSV' }}
       </button>
     </div>
 

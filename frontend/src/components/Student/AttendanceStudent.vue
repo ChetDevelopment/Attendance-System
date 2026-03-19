@@ -5,6 +5,7 @@ import {
   QrCode, 
   ArrowRight, 
   Calendar, 
+  Clock,
   Loader2, 
   FlipHorizontal, 
   RefreshCw,

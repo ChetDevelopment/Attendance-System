@@ -31,12 +31,15 @@ const routes = [
   },
   {
     path: '/dashboard',
+    name: 'dashboard',
     component: AppLayout,
     meta: { requiresAuth: true },
   },
   {
     path: '/admin/dashboard',
-    redirect: '/dashboard',
+    name: 'admin-dashboard',
+    meta: { requiresAuth: true },
+    redirect: { name: 'dashboard' },
   },
   {
     path: '/teacher/dashboard',
@@ -131,7 +134,7 @@ router.beforeEach((to) => {
   }
 
   if (to.name === 'dashboard' && role === 'admin') {
-    return { name: 'dashboard' }
+    return true
   }
 
   if (to.name === 'teacher-dashboard' && role && role !== 'teacher') {

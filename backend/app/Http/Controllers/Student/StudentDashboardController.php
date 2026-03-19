@@ -192,7 +192,13 @@ class StudentDashboardController extends Controller
         }
 
         // Check if already checked in
-        if (AttendanceRecord::alreadySubmitted($student->id, $sessionId)) {
+        $alreadySubmitted = AttendanceRecord::query()
+            ->where('student_id', $student->id)
+            ->where('session_id', $sessionId)
+            ->whereDate('attendance_date', now()->toDateString())
+            ->exists();
+
+        if ($alreadySubmitted) {
             return response()->json([
                 'success' => false,
                 'message' => 'Attendance already recorded for this session',
@@ -271,9 +277,22 @@ class StudentDashboardController extends Controller
         $reason = $request->input('reason');
 
         // Check if request already exists for this session
-        $existingRequest = \App\Models\AttendanceFollowUp::where('student_id', $student->id)
-            ->where('session_id', $sessionId)
-            ->where('status', 'pending')
+        $attendanceRecord = AttendanceRecord::firstOrCreate(
+            [
+                'student_id' => $student->id,
+                'session_id' => $sessionId,
+                'attendance_date' => now()->toDateString(),
+            ],
+            [
+                'status' => 'Pending',
+                'submitted_by' => $this->resolveUserFromRequest($request)?->id
+                    ?? User::where('student_id', $student->id)->value('id')
+                    ?? ($student->email ? User::where('email', $student->email)->value('id') : null),
+            ]
+        );
+
+        $existingRequest = \App\Models\AttendanceFollowUp::where('attendance_record_id', $attendanceRecord->id)
+            ->where('resolved', false)
             ->first();
 
         if ($existingRequest) {
@@ -285,11 +304,14 @@ class StudentDashboardController extends Controller
 
         // Create follow-up request
         $followUp = \App\Models\AttendanceFollowUp::create([
-            'student_id' => $student->id,
-            'session_id' => $sessionId,
-            'reason' => $reason,
+            'attendance_record_id' => $attendanceRecord->id,
+            'updated_by' => $this->resolveUserFromRequest($request)?->id,
+            'reason' => 'student_manual_request',
+            'comment' => $reason,
+            'note' => $reason,
             'status' => 'pending',
-            'follow_up_date' => now()->toDateString(),
+            'resolved' => false,
+            'is_excused' => false,
         ]);
 
         return response()->json([

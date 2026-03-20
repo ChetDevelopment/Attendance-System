@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
-import { attendanceService } from '../../services/attendanceService';
-import { biometricService } from '../../services/biometricService';
-import { teacherService } from '../../services/teacherService';
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { attendanceService } from "../../services/attendanceService";
+import { teacherService } from "../../services/teacherService";
 
 // Props
 const props = defineProps<{
@@ -10,13 +9,12 @@ const props = defineProps<{
   academicYearOptions?: { id: number; name: string }[];
 }>();
 
-const loading = ref(false)
-const saving = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
-const searchQuery = ref('')
-const cardScanValue = ref('')
-const cardScanLoading = ref(false)
+const loading = ref(false);
+const saving = ref(false);
+const errorMessage = ref("");
+const successMessage = ref("");
+const searchQuery = ref("");
+
 const emit = defineEmits<{
   (e: "update:academicYearId", value: number | null): void;
 }>();

@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { 
-  History, 
   Search, 
-  Filter, 
   Download, 
   ChevronLeft, 
   ChevronRight,
   CheckCircle2,
   Clock,
   X,
-  AlertCircle
+  AlertCircle,
+  Info
 } from 'lucide-vue-next';
-import { fetchAttendanceHistory } from '../../services/api';
+import { getStudentHistory } from '../../services/studentPortalService';
 import { AttendanceRecord } from '../types';
 
 const attendanceHistory = ref<AttendanceRecord[]>([]);
+const searchQuery = ref('');
 const statusFilter = ref<'ALL' | 'PRESENT' | 'LATE' | 'ABSENT'>('ALL');
 const dateRange = ref({ start: '', end: '' });
 const sortBy = ref<keyof AttendanceRecord>('date');
@@ -31,6 +31,15 @@ const showNotification = (message: string, type: 'success' | 'error' = 'success'
 
 const filteredHistory = computed(() => {
   let records = [...attendanceHistory.value];
+
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.trim().toLowerCase();
+    records = records.filter((record) =>
+      [record.courseName, record.instructor, record.status]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    );
+  }
 
   if (statusFilter.value !== 'ALL') {
     records = records.filter(r => r.status === statusFilter.value);
@@ -73,7 +82,7 @@ const toggleSort = (field: keyof AttendanceRecord) => {
 
 onMounted(async () => {
   try {
-    attendanceHistory.value = await fetchAttendanceHistory();
+    attendanceHistory.value = await getStudentHistory();
   } catch (err) {
     showNotification("Unable to load attendance history.", "error");
   }
@@ -110,6 +119,7 @@ onMounted(async () => {
         <div class="flex-1 relative">
           <Search class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" :size="18" />
           <input 
+            v-model="searchQuery"
             type="text" 
             placeholder="Search by course or instructor..." 
             class="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-primary outline-none dark:text-white"

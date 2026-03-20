@@ -1,9 +1,6 @@
 <template>
-  <div class="flex h-screen overflow-hidden bg-background-light">
-    <Sidebar
-      :current-module="currentModule"
-      @module-change="setCurrentModule"
-    />
+  <div class="flex h-screen overflow-hidden bg-slate-50">
+    <Sidebar :current-module="currentModule" @module-change="setCurrentModule" />
 
     <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
       <Navbar @navigate="setCurrentModule" />
@@ -23,35 +20,35 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import Sidebar from "./Sidebar.vue";
-import Navbar from "./Navbar.vue";
-import Dashboard from "../components/Admin/Dashboard.vue";
-import UserManagement from "../components/Admin/UserManagement.vue";
-import AcademicStructure from "../components/Admin/AcademicStructure.vue";
-import StudentManagement from "../components/Admin/StudentManagement.vue";
-import Profile from "../components/Admin/Profile.vue";
-import AbsenceManagement from "../components/Admin/AbsenceManagement.vue";
-import AttendanceControl from "../components/Admin/AttendanceControl.vue";
-import SystemSettings from "../components/Admin/SystemSettings.vue";
-import { getUserRole } from "../services/auth";
+import { computed, ref, watchEffect } from 'vue';
+import Sidebar from './Sidebar.vue';
+import Navbar from './Navbar.vue';
+import Dashboard from '../components/Admin/Dashboard.vue';
+import UserManagement from '../components/Admin/UserManagement.vue';
+import AcademicStructure from '../components/Admin/AcademicStructure.vue';
+import StudentManagement from '../components/Admin/StudentManagement.vue';
+import Profile from '../components/Admin/Profile.vue';
+import AbsenceManagement from '../components/Admin/AbsenceManagement.vue';
+import AttendanceControl from '../components/Admin/AttendanceControl.vue';
+import SystemSettings from '../components/Admin/SystemSettings.vue';
+import { getUserRole } from '../services/auth';
 
-const currentModule = ref("dashboard");
+const currentModule = ref('');
+const classesRefreshKey = ref(0);
 const userRole = computed(() => getUserRole());
 
 const moduleMap = computed(() => {
-  if (userRole.value === "student") {
+  if (userRole.value === 'student') {
     return {
-      dashboard: Dashboard,
-      absences: AbsenceManagement,
+      profile: Profile,
     } as const;
-  } else if (userRole.value === "teacher") {
+  } else if (userRole.value === 'teacher') {
     return {
       dashboard: Dashboard,
       attendance: AttendanceControl,
       absences: AbsenceManagement,
     } as const;
-  } else if (userRole.value === "education") {
+  } else if (userRole.value === 'education') {
     return {
       dashboard: Dashboard,
       users: UserManagement,
@@ -63,7 +60,6 @@ const moduleMap = computed(() => {
       profile: Profile,
     } as const;
   } else {
-    // Admin role
     return {
       dashboard: Dashboard,
       users: UserManagement,
@@ -77,11 +73,20 @@ const moduleMap = computed(() => {
   }
 });
 
+const defaultModule = computed(() => {
+  if (userRole.value === 'student') return 'profile';
+  return 'dashboard';
+});
+
 const activeModule = computed(
-  () =>
-    moduleMap.value[currentModule.value as keyof typeof moduleMap.value] ??
-    Dashboard,
+  () => moduleMap.value[currentModule.value as keyof typeof moduleMap.value] ?? Dashboard,
 );
+
+watchEffect(() => {
+  if (!(currentModule.value in moduleMap.value)) {
+    currentModule.value = defaultModule.value;
+  }
+});
 
 const setCurrentModule = (module: string) => {
   if (module in moduleMap.value) {

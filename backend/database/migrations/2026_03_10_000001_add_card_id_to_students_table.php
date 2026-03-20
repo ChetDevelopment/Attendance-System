@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('students', function (Blueprint $table) {
-            $table->string('card_id')->nullable()->unique()->after('qr_code');
+            if (!Schema::hasColumn('students', 'card_id')) {
+                $table->string('card_id')->nullable()->unique();
+            }
         });
     }
 
@@ -27,4 +29,3 @@ return new class extends Migration
         });
     }
 };
-

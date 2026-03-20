@@ -5,14 +5,18 @@
  */
 
 import { getOptimized, clearCache } from './apiOptimized'
+import { getUserRole } from './auth'
 
 const BASE_URL = '/admin/dashboard'
+const hasAdminAccess = () => getUserRole() === 'admin'
 
 /**
  * Get complete dashboard data in one request
  * Uses backend caching (30s) for fast response
  */
 export const getDashboardData = async (options = {}) => {
+  if (!hasAdminAccess()) return {}
+
   const { 
     bypassCache = false, 
     cacheTTL = 30000 // 30 seconds - matches backend cache
@@ -28,6 +32,8 @@ export const getDashboardData = async (options = {}) => {
  * Get quick stats for widget updates
  */
 export const getQuickStats = async (options = {}) => {
+  if (!hasAdminAccess()) return {}
+
   const { bypassCache = false, cacheTTL = 60000 } = options
   
   return getOptimized(`${BASE_URL}/quick-stats`, {
@@ -40,6 +46,8 @@ export const getQuickStats = async (options = {}) => {
  * Get student analytics data
  */
 export const getStudentAnalytics = async (options = {}) => {
+  if (!hasAdminAccess()) return null
+
   const { bypassCache = false, cacheTTL = 120000 } = options
   
   return getOptimized(`${BASE_URL}/student-analytics`, {
@@ -52,6 +60,8 @@ export const getStudentAnalytics = async (options = {}) => {
  * Get class analytics data
  */
 export const getClassAnalytics = async (options = {}) => {
+  if (!hasAdminAccess()) return null
+
   const { bypassCache = false, cacheTTL = 120000 } = options
   
   return getOptimized(`${BASE_URL}/class-analytics`, {
@@ -64,6 +74,8 @@ export const getClassAnalytics = async (options = {}) => {
  * Get system statistics
  */
 export const getSystemStats = async (options = {}) => {
+  if (!hasAdminAccess()) return null
+
   const { bypassCache = false, cacheTTL = 300000 } = options
   
   return getOptimized(`${BASE_URL}/system-stats`, {
@@ -76,6 +88,7 @@ export const getSystemStats = async (options = {}) => {
  * Refresh dashboard data (bypass cache)
  */
 export const refreshDashboard = async () => {
+  if (!hasAdminAccess()) return {}
   return getDashboardData({ bypassCache: true })
 }
 

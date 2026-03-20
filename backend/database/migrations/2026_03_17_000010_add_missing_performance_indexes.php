@@ -15,34 +15,34 @@ return new class extends Migration
         // 1. Optimize attendance_records for reporting and analytics
         Schema::table('attendance_records', function (Blueprint $table) {
             // Index for date-based lookups (very common)
-            if (!$this->hasIndex('attendance_records', 'idx_attendance_date')) {
+            if (Schema::hasColumn('attendance_records', 'attendance_date') && !$this->hasIndex('attendance_records', 'idx_attendance_date')) {
                 $table->index('attendance_date', 'idx_attendance_date');
             }
             
             // Index for student performance lookups
-            if (!$this->hasIndex('attendance_records', 'idx_student_date')) {
+            if (Schema::hasColumn('attendance_records', 'student_id') && Schema::hasColumn('attendance_records', 'attendance_date') && !$this->hasIndex('attendance_records', 'idx_student_date')) {
                 $table->index(['student_id', 'attendance_date'], 'idx_student_date');
             }
 
             // Index for session monitoring
-            if (!$this->hasIndex('attendance_records', 'idx_session_date')) {
+            if (Schema::hasColumn('attendance_records', 'session_id') && Schema::hasColumn('attendance_records', 'attendance_date') && !$this->hasIndex('attendance_records', 'idx_session_date')) {
                 $table->index(['session_id', 'attendance_date'], 'idx_session_date');
             }
         });
 
         // 2. Optimize students for searching and filtering
         Schema::table('students', function (Blueprint $table) {
-            if (!$this->hasIndex('students', 'idx_students_class_id')) {
+            if (Schema::hasColumn('students', 'class_id') && !$this->hasIndex('students', 'idx_students_class_id')) {
                 $table->index('class_id', 'idx_students_class_id');
             }
-            if (!$this->hasIndex('students', 'idx_students_generation')) {
+            if (Schema::hasColumn('students', 'generation') && !$this->hasIndex('students', 'idx_students_generation')) {
                 $table->index('generation', 'idx_students_generation');
             }
         });
 
         // 3. Optimize sessions
         Schema::table('sessions', function (Blueprint $table) {
-            if (!$this->hasIndex('sessions', 'idx_sessions_is_active')) {
+            if (Schema::hasColumn('sessions', 'is_active') && !$this->hasIndex('sessions', 'idx_sessions_is_active')) {
                 $table->index('is_active', 'idx_sessions_is_active');
             }
         });

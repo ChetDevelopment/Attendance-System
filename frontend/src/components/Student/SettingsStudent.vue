@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { 
   Camera, 
   X, 
@@ -7,14 +7,18 @@ import {
   BadgeCheck, 
   Lock, 
   Bell, 
+  Loader2,
   CheckCircle2, 
   AlertCircle 
 } from 'lucide-vue-next';
-import { studentProfile, updateProfile } from '../../services/auth';
+import { getUser, setUser, studentProfile } from '../../services/auth';
+import { profileService } from '../../services/profileService';
 
 const editName = ref(studentProfile.value.name);
 const editAvatar = ref(studentProfile.value.avatar);
 const isProcessing = ref(false);
+const notificationEmail = ref(true);
+const notificationPush = ref(true);
 const isSettingsCameraOpen = ref(false);
 const isMirrored = ref(true);
 const showFlash = ref(false);
@@ -122,12 +126,64 @@ const saveSettings = () => {
     return;
   }
   isProcessing.value = true;
-  setTimeout(() => {
-    updateProfile(editName.value, editAvatar.value);
-    isProcessing.value = false;
-    showNotification("Profile updated successfully!");
-  }, 800);
+
+  Promise.all([
+    profileService.updateProfile({
+      name: editName.value.trim(),
+      avatar_url: editAvatar.value,
+    }),
+    profileService.updateSettings({
+      notification_email: notificationEmail.value,
+      notification_push: notificationPush.value,
+    }),
+  ])
+    .then(([profileResponse, settingsResponse]) => {
+      const currentUser = getUser() || {};
+      const updatedUser = {
+        ...currentUser,
+        name: profileResponse?.name || editName.value.trim(),
+        fullname: profileResponse?.name || editName.value.trim(),
+        email: profileResponse?.email || currentUser.email,
+        avatar_url: profileResponse?.avatar_url || editAvatar.value,
+        avatar: profileResponse?.avatar_url || editAvatar.value,
+        notification_email: settingsResponse?.user?.notification_email ?? notificationEmail.value,
+        notification_push: settingsResponse?.user?.notification_push ?? notificationPush.value,
+      };
+
+      setUser(updatedUser);
+      showNotification("Profile updated successfully!");
+    })
+    .catch((error: any) => {
+      showNotification(error?.message || "Failed to save settings.", "error");
+    })
+    .finally(() => {
+      isProcessing.value = false;
+    });
 };
+
+onMounted(async () => {
+  try {
+    const profile = await profileService.getProfile();
+    editName.value = profile?.name || editName.value;
+    editAvatar.value = profile?.avatar_url || editAvatar.value;
+    notificationEmail.value = profile?.notification_email ?? true;
+    notificationPush.value = profile?.notification_push ?? true;
+
+    const currentUser = getUser() || {};
+    setUser({
+      ...currentUser,
+      name: profile?.name || currentUser.name,
+      fullname: profile?.name || currentUser.fullname,
+      email: profile?.email || currentUser.email,
+      avatar_url: profile?.avatar_url || currentUser.avatar_url,
+      avatar: profile?.avatar_url || currentUser.avatar,
+      notification_email: profile?.notification_email ?? currentUser.notification_email,
+      notification_push: profile?.notification_push ?? currentUser.notification_push,
+    });
+  } catch (error: any) {
+    showNotification(error?.message || "Unable to load profile settings.", "error");
+  }
+});
 
 onUnmounted(() => {
   stopWebcam();
@@ -312,11 +368,11 @@ onUnmounted(() => {
           </h3>
           <div class="space-y-4">
             <label class="flex items-center gap-3 cursor-pointer group">
-              <input type="checkbox" checked class="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary" />
+              <input v-model="notificationEmail" type="checkbox" class="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary" />
               <span class="text-sm text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200">Email me when attendance is marked</span>
             </label>
             <label class="flex items-center gap-3 cursor-pointer group">
-              <input type="checkbox" checked class="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary" />
+              <input v-model="notificationPush" type="checkbox" class="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary" />
               <span class="text-sm text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200">Notify me about upcoming session deadlines</span>
             </label>
           </div>

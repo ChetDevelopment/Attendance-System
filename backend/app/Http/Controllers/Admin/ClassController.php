@@ -14,7 +14,7 @@ class ClassController extends Controller
         return StudentClass::query()
             ->with('academicYear:id,name')
             ->withCount('students')
-            ->orderBy('class_name')
+            ->orderBy('name')
             ->get();
     }
 

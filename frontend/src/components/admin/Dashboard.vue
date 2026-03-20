@@ -16,6 +16,7 @@ import {
 } from 'lucide-vue-next';
 import { dashboardService } from '../../services/dashboardService';
 import adminDashboardService from '../../services/adminDashboardService';
+import { getUserRole } from '../../services/auth';
 
 type Period = 'Today' | 'Weekly' | 'Monthly';
 type DashboardStats = { present: string; absent: string; late: string; rate: string; offsite: string };
@@ -47,6 +48,8 @@ const activeSession = ref<any>(null);
 const trendData = ref<Array<{ name: string; value: number }>>([]);
 const riskStudents = ref<Array<{ name: string; class: string; absence_count: number }>>([]);
 const activeAcademicYear = ref<{ id: number; name: string; current_term: number } | null>(null);
+const userRole = computed(() => getUserRole());
+const isAdmin = computed(() => userRole.value === 'admin');
 
 // Admin Analytics Data
 const systemStats = ref<any>(null);
@@ -114,6 +117,12 @@ const loadNotifications = async () => {
 };
 
 const loadAdminAnalytics = async () => {
+  if (!isAdmin.value) {
+    systemStats.value = null;
+    studentAnalytics.value = null;
+    return;
+  }
+
   try {
     const [sysStats, studAnalytics] = await Promise.all([
       adminDashboardService.getSystemStats(),

@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\PredictionController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\TeacherPortalController;
+use App\Http\Controllers\Student\StudentDashboardController;
 use App\Http\Controllers\Teacher\TeacherAttendanceController;
 use App\Http\Controllers\Student\StudentAttendanceController;
 use Illuminate\Support\Facades\Route;
@@ -49,7 +50,19 @@ Route::middleware('auth:sanctum')->group(function () {
     // Student specific
     Route::prefix('student/attendance')->group(function () {
         Route::get('/history', [StudentAttendanceController::class, 'history']);
+        Route::post('/check-in', [StudentAttendanceController::class, 'submitAttendance']);
+        Route::post('/request', [StudentAttendanceController::class, 'requestManual']);
         Route::post('/card-scan', [StudentAttendanceController::class, 'cardScan']);
+        Route::post('/fingerprint-scan', [StudentAttendanceController::class, 'fingerprintScan']);
+        Route::post('/validate-biometric', [StudentAttendanceController::class, 'validateBiometric']);
+        Route::get('/biometric-history', [StudentAttendanceController::class, 'biometricHistory']);
+        Route::get('/biometric-status', [StudentAttendanceController::class, 'biometricStatus']);
+        Route::post('/student-info', [StudentAttendanceController::class, 'studentInfo']);
+    });
+
+    Route::prefix('student')->middleware('role:student')->group(function () {
+        Route::get('/dashboard/stats', [StudentDashboardController::class, 'getStats']);
+        Route::get('/attendance/history-detailed', [StudentDashboardController::class, 'getHistory']);
     });
     
     // Alias for external devices

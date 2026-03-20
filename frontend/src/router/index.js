@@ -5,6 +5,10 @@ import LoginPage from '../pages/LoginPage.vue'
 import TeacherDashboardPage from '../pages/TeacherDashboardPage.vue'
 import EducationDashboardPage from '../pages/EducationDashboardPage.vue'
 import StudentDashboardPage from '../pages/StudentDashboardPage.vue'
+import StudentAttendancePage from '../pages/StudentAttendancePage.vue'
+import StudentBiometricScanPage from '../pages/StudentBiometricScanPage.vue'
+import StudentHistoryPage from '../pages/StudentHistoryPage.vue'
+import StudentSettingsPage from '../pages/StudentSettingsPage.vue'
 import ReportsPage from '../pages/ReportsPage.vue'
 
 const routes = [
@@ -15,8 +19,8 @@ const routes = [
       if (role === 'teacher') return '/teacher/dashboard'
       if (role === 'education') return '/education/dashboard'
       if (role === 'student') return '/student/dashboard'
-      if (role === 'admin') return '/dashboard'
-      return '/dashboard'
+      if (role === 'admin') return '/admin/dashboard'
+      return '/login'
     },
   },
   {
@@ -27,9 +31,12 @@ const routes = [
   },
   {
     path: '/dashboard',
-    name: 'dashboard',
     component: AppLayout,
     meta: { requiresAuth: true },
+  },
+  {
+    path: '/admin/dashboard',
+    redirect: '/dashboard',
   },
   {
     path: '/teacher/dashboard',
@@ -47,7 +54,31 @@ const routes = [
     path: '/student/dashboard',
     name: 'student-dashboard',
     component: StudentDashboardPage,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, layout: 'StudentLayout' },
+  },
+  {
+    path: '/student/attendance',
+    name: 'student-attendance',
+    component: StudentAttendancePage,
+    meta: { requiresAuth: true, layout: 'StudentLayout' },
+  },
+  {
+    path: '/student/biometric-scan',
+    name: 'student-biometric-scan',
+    component: StudentBiometricScanPage,
+    meta: { requiresAuth: true, layout: 'StudentLayout' },
+  },
+  {
+    path: '/student/history',
+    name: 'student-history',
+    component: StudentHistoryPage,
+    meta: { requiresAuth: true, layout: 'StudentLayout' },
+  },
+  {
+    path: '/student/settings',
+    name: 'student-settings',
+    component: StudentSettingsPage,
+    meta: { requiresAuth: true, layout: 'StudentLayout' },
   },
   {
     path: '/reports',
@@ -66,6 +97,15 @@ router.beforeEach((to) => {
   const loggedIn = hasSession()
   const role = getUserRole()
 
+  // If accessing login page and already logged in, redirect to role-based dashboard
+  if (to.name === 'login' && loggedIn) {
+    if (role === 'teacher') return { name: 'teacher-dashboard' }
+    if (role === 'education') return { name: 'education-dashboard' }
+    if (role === 'student') return { name: 'student-dashboard' }
+    if (role === 'admin') return { name: 'dashboard' }
+  }
+
+  // If accessing protected route without auth, go to login
   if (to.meta.requiresAuth && !loggedIn) {
     return { name: 'login' }
   }
@@ -74,7 +114,8 @@ router.beforeEach((to) => {
     if (role === 'teacher') return { name: 'teacher-dashboard' }
     if (role === 'education') return { name: 'education-dashboard' }
     if (role === 'student') return { name: 'student-dashboard' }
-    return { name: 'dashboard' }
+    if (role === 'admin') return { name: 'dashboard' }
+    return { name: 'login' }
   }
 
   if (to.name === 'dashboard' && role === 'teacher') {
@@ -89,16 +130,28 @@ router.beforeEach((to) => {
     return { name: 'student-dashboard' }
   }
 
-  if (to.name === 'teacher-dashboard' && role && role !== 'teacher') {
+  if (to.name === 'dashboard' && role === 'admin') {
     return { name: 'dashboard' }
+  }
+
+  if (to.name === 'teacher-dashboard' && role && role !== 'teacher') {
+    return { name: 'login' }
   }
 
   if (to.name === 'education-dashboard' && role && role !== 'education') {
-    return { name: 'dashboard' }
+    return { name: 'login' }
   }
 
-  if (to.name === 'student-dashboard' && role && role !== 'student') {
-    return { name: 'dashboard' }
+  if (
+    ['student-dashboard', 'student-attendance', 'student-biometric-scan', 'student-history', 'student-settings'].includes(to.name)
+    && role
+    && role !== 'student'
+  ) {
+    return { name: 'login' }
+  }
+
+  if (to.name === 'admin-dashboard' && role && role !== 'admin') {
+    return { name: 'login' }
   }
 
   return true

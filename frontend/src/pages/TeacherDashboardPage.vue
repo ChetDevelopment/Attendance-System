@@ -46,7 +46,7 @@ const getUserPhoto = (user: any) => {
     return `/teacherFaces/${nameLower}.png`;
   }
   // Default image
-  return "https://image2url.com/r2/default/images/1773553855939-e3b32a24-8b55-46a4-86fa-46b9710946fb.png";
+  return "https://www.shutterstock.com/image-vector/user-profile-icon-vector-avatar-600nw-2558760599.jpg";
 };
 
 // Only show the current logged-in user, not all teachers

@@ -18,15 +18,16 @@ const searchQuery = ref('')
 const cardScanValue = ref('')
 const cardScanLoading = ref(false)
 const emit = defineEmits<{
-  (e: 'update:academicYearId', value: number | null): void;
+  (e: "update:academicYearId", value: number | null): void;
 }>();
 
 // Method to handle academic year change
 const onAcademicYearChange = (event: Event) => {
   const target = event.target as HTMLSelectElement;
-  // Handle "All Years" option (value is empty string or "null")
-  const value = target.value && target.value !== 'null' ? Number(target.value) : null;
-  emit('update:academicYearId', value);
+  // Handle "All Years" option (value is null or empty string)
+  const value =
+    target.value && target.value !== "" ? Number(target.value) : null;
+  emit("update:academicYearId", value);
 };
 
 type StatusType = "Present" | "Absent" | "Late" | "Excused";
@@ -187,7 +188,7 @@ onMounted(loadData);
     </p>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="md:col-span-1">
+      <div class="md:col-span-1">
         <label class="text-xs font-bold text-slate-500 uppercase"
           >Academic Year</label
         >

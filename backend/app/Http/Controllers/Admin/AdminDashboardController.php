@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\DB;
 
 class AdminDashboardController extends Controller
 {
+    private const PNC_LAT = 11.5518;
+    private const PNC_LNG = 104.9163;
+    private const PNC_RADIUS_KM = 0.5;
+
     // Cache TTL constants (in seconds)
     const CACHE_TTL_SHORT = 60;      // 1 minute for frequently changing data
     const CACHE_TTL_MEDIUM = 300;     // 5 minutes for moderately static data
@@ -62,6 +66,7 @@ class AdminDashboardController extends Controller
             $dailyStats = $this->formatStats($allStats->today_present, $allStats->today_absent, $allStats->today_late);
             $weeklyStats = $this->formatStats($allStats->week_present, $allStats->week_absent, $allStats->week_late);
             $monthlyStats = $this->formatStats($allStats->month_present, $allStats->month_absent, $allStats->month_late);
+            $offsite = $this->countOffsiteBuckets($todayStart, $weekStart, $monthStart);
 
             // Get counts using single optimized queries with caching
             $counts = Cache::remember('admin_counts_v1', self::CACHE_TTL_MEDIUM, function () {
@@ -103,6 +108,9 @@ class AdminDashboardController extends Controller
             // Get today's late students
             $lateStudents = $this->getLateStudents($todayStart, $now->copy()->endOfDay());
 
+            // Get today's off-site students
+            $offsiteStudents = $this->getOffsiteStudentsData($todayStart, $now->copy()->endOfDay());
+
             // Get active session
             $activeSession = $this->getActiveSession($now);
 
@@ -129,10 +137,23 @@ class AdminDashboardController extends Controller
                         'week' => $weeklyStats,
                         'month' => $monthlyStats,
                     ],
+                    'total_present_today' => $dailyStats['present'],
+                    'total_absent_today' => $dailyStats['absent'],
+                    'total_late_today' => $dailyStats['late'],
+                    'total_present_weekly' => $weeklyStats['present'],
+                    'total_absent_weekly' => $weeklyStats['absent'],
+                    'total_late_weekly' => $weeklyStats['late'],
+                    'total_present_monthly' => $monthlyStats['present'],
+                    'total_absent_monthly' => $monthlyStats['absent'],
+                    'total_late_monthly' => $monthlyStats['late'],
+                    'total_offsite_today' => $offsite['today'],
+                    'total_offsite_weekly' => $offsite['weekly'],
+                    'total_offsite_monthly' => $offsite['monthly'],
                 ],
                 'active_session' => $activeSession,
                 'recent_activities' => $recentActivities,
                 'late_students_today' => $lateStudents,
+                'offsite_students' => $offsiteStudents,
                 'trends' => $trends,
                 'risk_students' => $riskStudents,
             ]);
@@ -282,14 +303,17 @@ class AdminDashboardController extends Controller
                 ->orderBy('date')
                 ->get();
 
-            return $records->map(function ($row) {
+            $recordMap = $records->keyBy('date');
+
+            return collect(range(0, $days - 1))->map(function ($offset) use ($startDate, $recordMap) {
+                $date = $startDate->copy()->addDays($offset);
+                $row = $recordMap->get($date->toDateString());
+
                 return [
-                    'date' => $row->date,
-                    'present' => (int) $row->present,
-                    'absent' => (int) $row->absent,
-                    'late' => (int) $row->late,
+                    'name' => $date->format('M d'),
+                    'value' => (int) ($row->absent ?? 0),
                 ];
-            });
+            })->values();
         });
     }
 
@@ -321,6 +345,95 @@ class AdminDashboardController extends Controller
                 return collect([]);
             }
         });
+    }
+
+    private function getOffsiteStudentsData(Carbon $start, Carbon $end)
+    {
+        try {
+            $pncLat = self::PNC_LAT;
+            $pncLng = self::PNC_LNG;
+            $radiusKm = self::PNC_RADIUS_KM;
+
+            $rows = DB::table('v_admin_attendance_enriched as va')
+                ->whereBetween('va.created_at', [$start, $end])
+                ->whereIn('va.status', ['present', 'late', 'excused'])
+                ->whereNotNull('va.location')
+                ->whereRaw("
+                    (6371 * acos(
+                        cos(radians({$pncLat})) *
+                        cos(radians(JSON_UNQUOTE(JSON_EXTRACT(va.location, '$.lat')))) *
+                        cos(radians(JSON_UNQUOTE(JSON_EXTRACT(va.location, '$.lng'))) - radians({$pncLng})) +
+                        sin(radians({$pncLat})) *
+                        sin(radians(JSON_UNQUOTE(JSON_EXTRACT(va.location, '$.lat'))))
+                    )) > {$radiusKm}
+                ")
+                ->select([
+                    'va.attendance_id as id',
+                    'va.location',
+                    'va.created_at',
+                    'va.student_name as name',
+                    'va.class_name as class_name',
+                    'va.status',
+                    DB::raw("(6371 * acos(
+                        cos(radians({$pncLat})) *
+                        cos(radians(JSON_UNQUOTE(JSON_EXTRACT(va.location, '$.lat')))) *
+                        cos(radians(JSON_UNQUOTE(JSON_EXTRACT(va.location, '$.lng'))) - radians({$pncLng})) +
+                        sin(radians({$pncLat})) *
+                        sin(radians(JSON_UNQUOTE(JSON_EXTRACT(va.location, '$.lat'))))
+                    )) as distance_km"),
+                ])
+                ->orderByDesc('va.created_at')
+                ->limit(20)
+                ->get();
+        } catch (\Exception $e) {
+            return collect([]);
+        }
+
+        return $rows->map(function ($row) {
+            return [
+                'id' => (int) $row->id,
+                'name' => (string) $row->name,
+                'class' => (string) $row->class_name,
+                'status' => (string) $row->status,
+                'location' => (string) $row->location,
+                'distance_km' => round($row->distance_km ?? 0, 3),
+                'check_in_time' => Carbon::parse($row->created_at)->format('H:i:s'),
+            ];
+        });
+    }
+
+    private function countOffsiteBuckets(Carbon $todayStart, Carbon $weekStart, Carbon $monthStart): array
+    {
+        $pncLat = self::PNC_LAT;
+        $pncLng = self::PNC_LNG;
+        $radiusKm = self::PNC_RADIUS_KM;
+
+        $haversineFormula = "
+            (6371 * acos(
+                cos(radians({$pncLat})) *
+                cos(radians(JSON_UNQUOTE(JSON_EXTRACT(location, '$.lat')))) *
+                cos(radians(JSON_UNQUOTE(JSON_EXTRACT(location, '$.lng'))) - radians({$pncLng})) +
+                sin(radians({$pncLat})) *
+                sin(radians(JSON_UNQUOTE(JSON_EXTRACT(location, '$.lat'))))
+            ))
+        ";
+
+        $result = DB::table('attendance_records')
+            ->where('created_at', '>=', $monthStart)
+            ->whereIn('status', ['present', 'late', 'excused'])
+            ->whereNotNull('location')
+            ->selectRaw("
+                SUM(CASE WHEN created_at >= ? AND {$haversineFormula} > ? THEN 1 ELSE 0 END) as today_offsite,
+                SUM(CASE WHEN created_at >= ? AND {$haversineFormula} > ? THEN 1 ELSE 0 END) as week_offsite,
+                SUM(CASE WHEN {$haversineFormula} > ? THEN 1 ELSE 0 END) as month_offsite
+            ", [$todayStart, $radiusKm, $weekStart, $radiusKm, $radiusKm])
+            ->first();
+
+        return [
+            'today' => (int) ($result->today_offsite ?? 0),
+            'weekly' => (int) ($result->week_offsite ?? 0),
+            'monthly' => (int) ($result->month_offsite ?? 0),
+        ];
     }
 
     /**
@@ -459,5 +572,4 @@ class AdminDashboardController extends Controller
         });
     }
 }
-
 

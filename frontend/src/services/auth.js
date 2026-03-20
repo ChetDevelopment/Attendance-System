@@ -52,21 +52,53 @@ export const normalizeRole = (role) => {
 export const resolveUserRole = (user) => {
   if (!user) return ''
 
+  // First, check for role object with name or slug
+  if (typeof user.role === 'object' && user.role) {
+    const roleName = user.role.name ? normalizeRole(user.role.name) : ''
+    const roleSlug = user.role.slug ? normalizeRole(user.role.slug) : ''
+
+    // Try name first
+    if (roleName) {
+      if (roleName === 'admin') return 'admin'
+      if (roleName === 'teacher') return 'teacher'
+      if (roleName === 'education team') return 'education'
+      if (roleName === 'training team') return 'training'
+      if (roleName === 'student') return 'student'
+    }
+
+    // Try slug
+    if (roleSlug) {
+      if (roleSlug === 'admin') return 'admin'
+      if (roleSlug === 'teacher') return 'teacher'
+      if (roleSlug === 'education_team') return 'education'
+      if (roleSlug === 'training_team') return 'training'
+      if (roleSlug === 'student') return 'student'
+    }
+  }
+
+  // Fallback: check for role as string
   const roleValue =
     typeof user.role === 'string'
       ? user.role
-      : typeof user.role === 'object' && user.role
-        ? user.role.name
-        : ''
+      : ''
 
   const directRole = normalizeRole(roleValue)
-  if (directRole) return directRole
+  if (directRole) {
+    if (directRole === 'admin') return 'admin'
+    if (directRole === 'teacher') return 'teacher'
+    if (directRole === 'education_team') return 'education'
+    if (directRole === 'training_team') return 'training'
+    if (directRole === 'student') return 'student'
+    return directRole
+  }
 
+  // Check for roles array (legacy)
   if (Array.isArray(user.roles) && user.roles.length) {
     const firstRole = user.roles[0]
     return normalizeRole(typeof firstRole === 'string' ? firstRole : firstRole?.name)
   }
 
+  // Check for permissions (fallback)
   if (Array.isArray(user.permissions)) {
     const hasTeacherPermission = user.permissions.some((permission) => {
       const name = typeof permission === 'string' ? permission : permission?.name
@@ -80,9 +112,11 @@ export const resolveUserRole = (user) => {
 }
 
 export const getUserRole = () => {
+  // Check for cached role first
   const storedRole = normalizeRole(localStorage.getItem(USER_ROLE_KEY))
   if (storedRole) return storedRole
 
+  // Resolve role from user data and cache it
   const roleFromUser = resolveUserRole(getUser())
   if (roleFromUser) {
     localStorage.setItem(USER_ROLE_KEY, roleFromUser)

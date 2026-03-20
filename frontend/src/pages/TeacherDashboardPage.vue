@@ -23,6 +23,7 @@ import {
 } from "../services/auth";
 
 const router = useRouter();
+const DEFAULT_TEACHER_PHOTO = "/default-teacher.svg";
 
 // Initialize with stored user
 // The user data is set during login and stored in localStorage
@@ -34,7 +35,10 @@ const loggedUser = getUser();
 const getUserPhoto = (user: any) => {
   // First check for profile_image (backend field)
   if (user?.profile_image) {
-    return user.profile_image;
+    // Check if it's a valid path (starts with /teacherFaces/)
+    if (user.profile_image.startsWith('/teacherFaces/')) {
+      return user.profile_image;
+    }
   }
   // Fallback to photo if exists
   if (user?.photo) {
@@ -43,10 +47,11 @@ const getUserPhoto = (user: any) => {
   // Try to get image from teacherFaces folder based on name
   if (user?.name) {
     const nameLower = user.name.toLowerCase();
-    return `/teacherFaces/${nameLower}.png`;
+    // Return the path - the browser will handle 404 with @error handler
+    return `/teacherFaces/${nameLower}.jpg`;
   }
   // Default image
-  return "https://www.shutterstock.com/image-vector/user-profile-icon-vector-avatar-600nw-2558760599.jpg";
+  return DEFAULT_TEACHER_PHOTO;
 };
 
 // Only show the current logged-in user, not all teachers

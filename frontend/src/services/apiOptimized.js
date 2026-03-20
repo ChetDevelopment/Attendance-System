@@ -97,24 +97,35 @@ export const batch = async (requests) => {
  * Prefetch data in background
  */
 export const prefetch = (url, options = {}) => {
-  const { cacheTTL = 300000 } = options;
-  const cacheKey = generateCacheKey(url);
+  const { cacheTTL = 300000, params = {} } = options;
+  const cacheKey = generateCacheKey(url, params);
   
   // Don't prefetch if already cached
   if (getCachedData(cacheKey)) {
     return Promise.resolve(getCachedData(cacheKey));
   }
+
+  if (pendingRequests.has(cacheKey)) {
+    return pendingRequests.get(cacheKey);
+  }
   
   // Prefetch in background
-  api.get(url)
+  const request = api.get(url, { params })
     .then(response => {
       setCachedData(cacheKey, response.data, cacheTTL);
+      return response.data;
     })
     .catch(error => {
       console.error(`Prefetch Error [${url}]:`, error);
+      return null;
+    })
+    .finally(() => {
+      pendingRequests.delete(cacheKey);
     });
+
+  pendingRequests.set(cacheKey, request);
     
-  return Promise.resolve(null);
+  return request;
 };
 
 /**
@@ -146,8 +157,11 @@ export const getDeduplicated = async (url, options = {}) => {
  */
 export const clearCache = (url = null) => {
   if (url) {
-    const cacheKey = generateCacheKey(url);
-    responseCache.delete(cacheKey);
+    [...responseCache.keys()].forEach((cacheKey) => {
+      if (cacheKey.startsWith(`${url}:`)) {
+        responseCache.delete(cacheKey);
+      }
+    });
   } else {
     responseCache.clear();
   }

@@ -19,15 +19,21 @@ class UpdateClassRequest extends FormRequest
 
         return [
             'academic_year_id' => ['nullable', 'exists:academic_years,id'],
-            'class_name' => [
+            'name' => [
                 'sometimes',
                 'string',
                 'max:255',
-                Rule::unique('classes', 'class_name')
+                Rule::unique('classes', 'name')
                     ->ignore($classId)
                     ->where(fn ($query) => $query->where('academic_year_id', $this->academic_year_id)),
             ],
-            'room_number' => ['nullable', 'string', 'max:255'],
+            'code' => [
+                'sometimes',
+                'string',
+                'max:255',
+                Rule::unique('classes', 'code')->ignore($classId),
+            ],
+            'description' => ['nullable', 'string', 'max:255'],
         ];
     }
 

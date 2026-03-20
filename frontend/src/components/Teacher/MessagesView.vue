@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import { Search, Bell, ShieldCheck, MessageSquare } from "lucide-vue-next";
 import { cn } from "../lib/utils";
 import { teacherService } from "../../services/teacherService";
+import { setImageFallback } from "../../utils/imageFallback";
 
 interface User {
   name: string;
@@ -112,6 +113,7 @@ onMounted(loadJustifications);
               alt=""
               class="size-12 rounded-2xl object-cover border border-slate-200 shrink-0"
               referrerPolicy="no-referrer"
+              @error="(event) => setImageFallback(event, '/default-student.svg')"
             />
             <div
               v-else
@@ -182,6 +184,7 @@ onMounted(loadJustifications);
               alt=""
               class="size-16 rounded-[2rem] object-cover border-4 border-slate-50 shadow-sm"
               referrerPolicy="no-referrer"
+              @error="(event) => setImageFallback(event, '/default-student.svg')"
             />
             <div
               v-else

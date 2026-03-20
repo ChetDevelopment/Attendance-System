@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -14,9 +15,9 @@ return new class extends Migration
     {
         // 1. Standardize attendance_records table
         Schema::table('attendance_records', function (Blueprint $table) {
-            // Fix column name for consistency with model
+            // Add the canonical column first; data is copied below for MariaDB compatibility.
             if (Schema::hasColumn('attendance_records', 'date') && !Schema::hasColumn('attendance_records', 'attendance_date')) {
-                $table->renameColumn('date', 'attendance_date');
+                $table->date('attendance_date')->nullable()->after('date');
             }
             
             // Handle recorded_by vs submitted_by vs created_by
@@ -26,6 +27,14 @@ return new class extends Migration
                 $table->renameColumn('created_by', 'submitted_by');
             }
         });
+
+        if (Schema::hasColumn('attendance_records', 'date') && Schema::hasColumn('attendance_records', 'attendance_date')) {
+            DB::table('attendance_records')
+                ->whereNull('attendance_date')
+                ->update([
+                    'attendance_date' => DB::raw('`date`'),
+                ]);
+        }
 
         // 2. Standardize students table
         Schema::table('students', function (Blueprint $table) {

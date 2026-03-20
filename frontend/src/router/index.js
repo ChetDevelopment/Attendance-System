@@ -1,11 +1,16 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { getUserRole, hasSession } from '../services/auth'
-import AppLayout from '../layouts/AppLayout.vue'
-import LoginPage from '../pages/LoginPage.vue'
-import TeacherDashboardPage from '../pages/TeacherDashboardPage.vue'
-import EducationDashboardPage from '../pages/EducationDashboardPage.vue'
-import StudentDashboardPage from '../pages/StudentDashboardPage.vue'
-import ReportsPage from '../pages/ReportsPage.vue'
+
+const AppLayout = () => import('../layouts/AppLayout.vue')
+const LoginPage = () => import('../pages/LoginPage.vue')
+const TeacherDashboardPage = () => import('../pages/TeacherDashboardPage.vue')
+const EducationDashboardPage = () => import('../pages/EducationDashboardPage.vue')
+const StudentDashboardPage = () => import('../pages/StudentDashboardPage.vue')
+const StudentAttendancePage = () => import('../pages/StudentAttendancePage.vue')
+const StudentBiometricScanPage = () => import('../pages/StudentBiometricScanPage.vue')
+const StudentHistoryPage = () => import('../pages/StudentHistoryPage.vue')
+const StudentSettingsPage = () => import('../pages/StudentSettingsPage.vue')
+const ReportsPage = () => import('../pages/ReportsPage.vue')
 
 const routes = [
   {
@@ -15,8 +20,8 @@ const routes = [
       if (role === 'teacher') return '/teacher/dashboard'
       if (role === 'education') return '/education/dashboard'
       if (role === 'student') return '/student/dashboard'
-      if (role === 'admin') return '/dashboard'
-      return '/dashboard'
+      if (role === 'admin') return '/admin/dashboard'
+      return '/login'
     },
   },
   {
@@ -30,6 +35,12 @@ const routes = [
     name: 'dashboard',
     component: AppLayout,
     meta: { requiresAuth: true },
+  },
+  {
+    path: '/admin/dashboard',
+    name: 'admin-dashboard',
+    meta: { requiresAuth: true },
+    redirect: { name: 'dashboard' },
   },
   {
     path: '/teacher/dashboard',
@@ -47,7 +58,31 @@ const routes = [
     path: '/student/dashboard',
     name: 'student-dashboard',
     component: StudentDashboardPage,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, layout: 'StudentLayout', keepAlive: true },
+  },
+  {
+    path: '/student/attendance',
+    name: 'student-attendance',
+    component: StudentAttendancePage,
+    meta: { requiresAuth: true, layout: 'StudentLayout', keepAlive: true },
+  },
+  {
+    path: '/student/biometric-scan',
+    name: 'student-biometric-scan',
+    component: StudentBiometricScanPage,
+    meta: { requiresAuth: true, layout: 'StudentLayout', keepAlive: true },
+  },
+  {
+    path: '/student/history',
+    name: 'student-history',
+    component: StudentHistoryPage,
+    meta: { requiresAuth: true, layout: 'StudentLayout', keepAlive: true },
+  },
+  {
+    path: '/student/settings',
+    name: 'student-settings',
+    component: StudentSettingsPage,
+    meta: { requiresAuth: true, layout: 'StudentLayout', keepAlive: true },
   },
   {
     path: '/reports',
@@ -66,6 +101,15 @@ router.beforeEach((to) => {
   const loggedIn = hasSession()
   const role = getUserRole()
 
+  // If accessing login page and already logged in, redirect to role-based dashboard
+  if (to.name === 'login' && loggedIn) {
+    if (role === 'teacher') return { name: 'teacher-dashboard' }
+    if (role === 'education') return { name: 'education-dashboard' }
+    if (role === 'student') return { name: 'student-dashboard' }
+    if (role === 'admin') return { name: 'dashboard' }
+  }
+
+  // If accessing protected route without auth, go to login
   if (to.meta.requiresAuth && !loggedIn) {
     return { name: 'login' }
   }
@@ -74,7 +118,8 @@ router.beforeEach((to) => {
     if (role === 'teacher') return { name: 'teacher-dashboard' }
     if (role === 'education') return { name: 'education-dashboard' }
     if (role === 'student') return { name: 'student-dashboard' }
-    return { name: 'dashboard' }
+    if (role === 'admin') return { name: 'dashboard' }
+    return { name: 'login' }
   }
 
   if (to.name === 'dashboard' && role === 'teacher') {
@@ -89,16 +134,28 @@ router.beforeEach((to) => {
     return { name: 'student-dashboard' }
   }
 
+  if (to.name === 'dashboard' && role === 'admin') {
+    return true
+  }
+
   if (to.name === 'teacher-dashboard' && role && role !== 'teacher') {
-    return { name: 'dashboard' }
+    return { name: 'login' }
   }
 
   if (to.name === 'education-dashboard' && role && role !== 'education') {
-    return { name: 'dashboard' }
+    return { name: 'login' }
   }
 
-  if (to.name === 'student-dashboard' && role && role !== 'student') {
-    return { name: 'dashboard' }
+  if (
+    ['student-dashboard', 'student-attendance', 'student-biometric-scan', 'student-history', 'student-settings'].includes(to.name)
+    && role
+    && role !== 'student'
+  ) {
+    return { name: 'login' }
+  }
+
+  if (to.name === 'admin-dashboard' && role && role !== 'admin') {
+    return { name: 'login' }
   }
 
   return true

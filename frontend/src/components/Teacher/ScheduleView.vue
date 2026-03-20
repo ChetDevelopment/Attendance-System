@@ -257,7 +257,6 @@ onMounted(loadSchedule)
               </div>
             </div>
           </div>
-          
           <div v-else class="text-center py-8">
             <Calendar class="size-12 text-slate-300 mx-auto mb-4" />
             <p class="text-sm text-slate-500">Click "Show Calendar" to view all {{ googleEvents.length }} events</p>

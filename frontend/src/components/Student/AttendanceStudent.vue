@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import { 
   Camera, 
   QrCode, 
   ArrowRight, 
   Calendar, 
+  Clock,
   Loader2, 
   FlipHorizontal, 
   RefreshCw,
@@ -12,9 +13,7 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-vue-next';
-import jsQR from 'jsqr';
-import { studentProfile } from '../../services/auth';
-import { checkIn, submitManualAttendanceRequest } from '../../services/api';
+import { getStudentDashboardStats, submitStudentCheckIn, submitStudentManualRequest } from '../../services/studentPortalService';
 
 const attendanceMode = ref<'webcam' | 'qr' | 'manual'>('webcam');
 const videoRef = ref<HTMLVideoElement | null>(null);
@@ -29,6 +28,29 @@ const notification = ref<{ message: string; type: 'success' | 'error' } | null>(
 
 const manualCourse = ref('Web Development II');
 const manualReason = ref('');
+const currentSession = ref<any>(null);
+const currentDateLabel = computed(() => new Date().toLocaleDateString('en-US', {
+  weekday: 'long',
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+}));
+const currentCourseLabel = computed(() => currentSession.value?.course_name || currentSession.value?.name || manualCourse.value);
+
+const decodeQrCodeFromCanvas = async (imageData: ImageData) => {
+  if (typeof window === 'undefined' || !('BarcodeDetector' in window)) {
+    return null;
+  }
+
+  try {
+    const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+    const barcodes = await detector.detect(imageData);
+    return barcodes[0]?.rawValue || null;
+  } catch (err) {
+    console.error('QR detection failed:', err);
+    return null;
+  }
+};
 
 const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
   notification.value = { message, type };
@@ -106,6 +128,11 @@ const capturePhoto = () => {
 };
 
 const handleCheckIn = async () => {
+  if (!currentSession.value?.id) {
+    showNotification("No active session is available right now.", "error");
+    return;
+  }
+
   isProcessing.value = true;
   showFlash.value = true;
   setTimeout(() => { showFlash.value = false; }, 150);
@@ -117,29 +144,21 @@ const handleCheckIn = async () => {
     return;
   }
 
-  const record = {
-    id: Date.now().toString(),
-    studentId: studentProfile.value.id,
-    courseName: "Web Development II",
-    instructor: "Sarah Williams",
-    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-    timeSlot: "09:00 - 10:30",
-    status: "PRESENT",
-    photoProof: photo,
-    type: "WEBCAM"
-  };
-
   try {
-    await checkIn(record);
-    showNotification("Attendance marked successfully!");
+    const result = await submitStudentCheckIn({
+      sessionId: currentSession.value.id,
+      method: 'photo',
+      photo,
+    });
+    showNotification(result?.message || "Attendance marked successfully!");
   } catch (err: any) {
-    showNotification(err.message, "error");
+    showNotification(err?.message || err?.response?.data?.message || "Attendance check-in failed.", "error");
   } finally {
     isProcessing.value = false;
   }
 };
 
-const scanQRCode = () => {
+const scanQRCode = async () => {
   if (!videoRef.value || !canvasRef.value || attendanceMode.value !== 'qr') return;
   
   const video = videoRef.value;
@@ -151,12 +170,10 @@ const scanQRCode = () => {
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: "dontInvert",
-    });
+    const code = await decodeQrCodeFromCanvas(imageData);
 
     if (code) {
-      handleQRCheckIn(code.data);
+      handleQRCheckIn(code);
       return;
     }
   }
@@ -167,52 +184,50 @@ const scanQRCode = () => {
 };
 
 const handleQRCheckIn = async (qrData: string) => {
+  if (!currentSession.value?.id) {
+    showNotification("No active session is available right now.", "error");
+    return;
+  }
+
   isProcessing.value = true;
-  const record = {
-    id: Date.now().toString(),
-    studentId: studentProfile.value.id,
-    courseName: "Web Development II",
-    instructor: "Sarah Williams",
-    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-    timeSlot: "09:00 - 10:30",
-    status: "PRESENT",
-    type: "QR"
-  };
 
   try {
-    await checkIn(record);
-    showNotification("QR Attendance marked successfully!");
+    const result = await submitStudentCheckIn({
+      sessionId: currentSession.value.id,
+      method: 'qrcode',
+      qrCode: qrData,
+    });
+    showNotification(result?.message || "QR attendance marked successfully!");
     attendanceMode.value = 'webcam';
   } catch (err: any) {
-    showNotification(err.message, "error");
+    showNotification(err?.message || err?.response?.data?.message || "QR attendance failed.", "error");
   } finally {
     isProcessing.value = false;
   }
 };
 
 const submitManualRequest = async () => {
+  if (!currentSession.value?.id) {
+    showNotification("No active session is available right now.", "error");
+    return;
+  }
+
   if (!manualReason.value) {
     showNotification("Please provide a reason for the manual request.", "error");
     return;
   }
 
   isProcessing.value = true;
-  const request = {
-    id: Date.now().toString(),
-    studentId: studentProfile.value.id,
-    studentName: studentProfile.value.name,
-    courseName: manualCourse.value,
-    reason: manualReason.value,
-    status: "PENDING"
-  };
-
   try {
-    await submitManualAttendanceRequest(request);
-    showNotification("Manual request submitted for approval");
+    const result = await submitStudentManualRequest({
+      sessionId: currentSession.value.id,
+      reason: manualReason.value,
+    });
+    showNotification(result?.message || "Manual request submitted for approval");
     manualReason.value = '';
     attendanceMode.value = 'webcam';
   } catch (err: any) {
-    showNotification(err.message, "error");
+    showNotification(err?.message || err?.response?.data?.message || "Manual request failed.", "error");
   } finally {
     isProcessing.value = false;
   }
@@ -236,6 +251,14 @@ watch(selectedDeviceId, () => {
 });
 
 onMounted(() => {
+  getStudentDashboardStats()
+    .then((stats) => {
+      currentSession.value = stats?.currentSession || null;
+      manualCourse.value = stats?.currentSession?.course_name || stats?.currentSession?.name || 'No active session';
+    })
+    .catch((error) => {
+      console.error('Failed to load active session:', error);
+    });
   getDevices().then(() => startWebcam());
 });
 
@@ -261,11 +284,11 @@ onUnmounted(() => {
     <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold mb-1 dark:text-white">Self Attendance Check-In</h1>
-        <p class="text-slate-500 dark:text-slate-400">Complete your attendance for <span class="font-semibold text-slate-700 dark:text-slate-200">Computer Science 302</span></p>
+        <p class="text-slate-500 dark:text-slate-400">Complete your attendance for <span class="font-semibold text-slate-700 dark:text-slate-200">{{ currentCourseLabel }}</span></p>
       </div>
       <div class="flex items-center space-x-2 bg-white dark:bg-slate-900 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <Calendar class="text-primary" :size="18" />
-        <span class="text-sm font-medium dark:text-white">Monday, Oct 24, 2023</span>
+        <span class="text-sm font-medium dark:text-white">{{ currentDateLabel }}</span>
       </div>
     </div>
 
@@ -430,12 +453,10 @@ onUnmounted(() => {
           <div class="space-y-6">
             <div>
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">Course Session</label>
-              <select v-model="manualCourse" class="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-primary outline-none dark:text-white">
-                <option>Web Development II</option>
-                <option>Data Structures</option>
-                <option>Artificial Intelligence</option>
-              </select>
-            </div>
+	              <select v-model="manualCourse" class="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-primary outline-none dark:text-white">
+	                <option :value="manualCourse">{{ manualCourse }}</option>
+	              </select>
+	            </div>
 
             <div>
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">Reason for Manual Request</label>
@@ -492,7 +513,7 @@ onUnmounted(() => {
             <h4 class="font-bold text-amber-900 dark:text-amber-400 text-sm">Session Deadline</h4>
           </div>
           <p class="text-xs text-amber-700 dark:text-amber-500/80 leading-relaxed">
-            Attendance check-in for <span class="font-bold">Web Development II</span> closes in <span class="font-bold">12 minutes</span>.
+            Attendance check-in for <span class="font-bold">{{ currentCourseLabel }}</span> is only available during the active session window.
           </p>
         </div>
       </div>

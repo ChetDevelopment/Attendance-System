@@ -17,6 +17,8 @@ import { dashboardService } from '../../services/dashboardService';
 import { profileService } from '../../services/profileService';
 import { adminAttendanceService } from '../../services/adminAttendanceService';
 import { sessionAdminService } from '../../services/sessionAdminService';
+import { activityLogService } from '../../services/activityLogService';
+import { backupAdminService } from '../../services/backupAdminService';
 import api from '../../services/api';
 
 type LogStatus = 'Success' | 'Failed';
@@ -35,6 +37,7 @@ const serverTime = ref(new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/
 const serverDate = ref(new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Phnom_Penh', day: '2-digit', month: '2-digit', year: 'numeric' }));
 const loadingLogs = ref(false);
 const loadingConfig = ref(false);
+const loadingBackups = ref(false);
 const saving = ref(false);
 const testingTelegram = ref(false);
 const errorMessage = ref('');
@@ -43,6 +46,7 @@ let timer: number | undefined;
 
 const logs = ref<ActivityLog[]>([]);
 const sessions = ref<Array<{ id: number; name: string; start_time: string; end_time: string }>>([]);
+const backups = ref<Array<{ name: string; size: number; last_modified: string }>>([]);
 
 const profileSettings = ref({
   theme: 'light',
@@ -78,20 +82,25 @@ const statusTextClass = (status: string) => [
 
 const loadLogs = async () => {
   loadingLogs.value = true;
-      try {
-    const notificationData = await dashboardService.getNotifications();
-    logs.value = Array.isArray(notificationData)
-      ? notificationData.map((item: any) => ({
-        time: String(item?.created_at || '-'),
-        user: String(item?.type || 'System'),
-        action: String(item?.title || 'Activity update'),
-        status: String(item?.type || '').toLowerCase().includes('failed') ? 'Failed' : 'Success',
-      }))
-      : [];
+  try {
+    const logData = await activityLogService.list({ per_page: 50, search: logSearchQuery.value || undefined });
+    logs.value = Array.isArray(logData?.data) ? logData.data : [];
   } catch (error: any) {
     errorMessage.value = error?.message || 'Failed to load activity logs.';
   } finally {
     loadingLogs.value = false;
+  }
+};
+
+const loadBackups = async () => {
+  loadingBackups.value = true;
+  try {
+    const backupData = await backupAdminService.list();
+    backups.value = Array.isArray(backupData) ? backupData : [];
+  } catch (error: any) {
+    errorMessage.value = error?.message || 'Failed to load backups.';
+  } finally {
+    loadingBackups.value = false;
   }
 };
 
@@ -220,6 +229,30 @@ const downloadConfigBackup = async () => {
   }
 };
 
+const createDatabaseBackup = async () => {
+  errorMessage.value = '';
+  successMessage.value = '';
+  try {
+    const response = await backupAdminService.create();
+    successMessage.value = response?.message || 'Database backup created.';
+    await loadBackups();
+  } catch (error: any) {
+    errorMessage.value = error?.message || 'Failed to create backup.';
+  }
+};
+
+const restoreBackup = async (name: string) => {
+  errorMessage.value = '';
+  successMessage.value = '';
+  try {
+    const response = await backupAdminService.restore(name);
+    successMessage.value = response?.message || 'Backup restored successfully.';
+    await loadBackups();
+  } catch (error: any) {
+    errorMessage.value = error?.message || 'Failed to restore backup.';
+  }
+};
+
 const testTelegramConnection = async () => {
   if (testingTelegram.value) return;
   testingTelegram.value = true;
@@ -261,7 +294,7 @@ onMounted(() => {
     serverTime.value = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Phnom_Penh' });
     serverDate.value = new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Phnom_Penh', day: '2-digit', month: '2-digit', year: 'numeric' });
   }, 1000);
-  loadLogs().then(loadConfig);
+  Promise.all([loadLogs(), loadConfig(), loadBackups()]);
 });
 
 onUnmounted(() => {
@@ -380,10 +413,29 @@ onUnmounted(() => {
               <Download class="size-4" />
               Export Config
             </button>
-            <button disabled class="flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-400 cursor-not-allowed">
+            <button @click="createDatabaseBackup" class="flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-100 transition-all">
               <HistoryIcon class="size-4" />
-              Restore Point
+              Create Backup
             </button>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold uppercase tracking-widest text-slate-500">Available Backups</h4>
+              <span v-if="loadingBackups" class="text-[10px] font-bold text-slate-400 uppercase">Loading...</span>
+            </div>
+            <div v-if="backups.length === 0" class="rounded-xl border border-dashed border-slate-200 px-4 py-4 text-xs text-slate-400">
+              No database backups created yet.
+            </div>
+            <div v-for="backup in backups" :key="backup.name" class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div>
+                <p class="text-xs font-bold text-slate-900">{{ backup.name }}</p>
+                <p class="text-[10px] text-slate-400">{{ backup.last_modified }}</p>
+              </div>
+              <button @click="restoreBackup(backup.name)" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold text-slate-700 hover:bg-slate-100">
+                Restore
+              </button>
+            </div>
           </div>
 
           <button @click="clearSystemCache" class="w-full py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold text-xs hover:bg-red-100 transition-all">

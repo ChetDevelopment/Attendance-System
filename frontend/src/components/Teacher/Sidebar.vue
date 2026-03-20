@@ -12,6 +12,7 @@ import {
   LogOut
 } from 'lucide-vue-next';
 import { t } from '../composables/useSettings';
+import { setImageFallback } from '../../utils/imageFallback';
 
 export type ViewType = 'dashboard' | 'schedule' | 'attendance' | 'history' | 'students' | 'messages' | 'management' | 'settings' | 'notifications';
 
@@ -77,6 +78,7 @@ const navItems = computed(() => [
             :src="user.photo" 
             :alt="user.name"
             referrerPolicy="no-referrer"
+            @error="(event) => setImageFallback(event, '/default-teacher.svg')"
           />
           <div class="flex flex-col text-left flex-1 min-w-0">
             <p class="text-sm font-bold truncate">{{ user.name }}</p>
@@ -96,7 +98,13 @@ const navItems = computed(() => [
               user.name === u.name ? 'bg-primary/5 text-primary' : 'hover:bg-slate-50'
             }`"
           >
-            <img :src="u.photo" class="size-8 rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
+            <img
+              :src="u.photo"
+              class="size-8 rounded-full object-cover"
+              alt=""
+              referrerPolicy="no-referrer"
+              @error="(event) => setImageFallback(event, '/default-teacher.svg')"
+            />
             <span class="text-xs font-bold">{{ u.name }}</span>
           </button>
           <div class="border-t border-slate-200 my-2"></div>

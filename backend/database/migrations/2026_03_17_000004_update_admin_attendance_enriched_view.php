@@ -20,11 +20,11 @@ return new class extends Migration
             SELECT 
                 ar.id as attendance_id,
                 ar.student_id,
-                s.fullname as student_name,
-                c.class_name as class_name,
+                TRIM(CONCAT(COALESCE(s.first_name, ''), ' ', COALESCE(s.last_name, ''))) as student_name,
+                c.name as class_name,
                 ar.created_at as created_time,
                 ar.status,
-                ar.attendance_date,
+                ar.date as attendance_date,
                 ar.created_at,
                 ar.session_id,
                 ar.location

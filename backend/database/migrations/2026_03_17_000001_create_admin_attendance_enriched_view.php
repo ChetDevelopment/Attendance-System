@@ -20,27 +20,18 @@ return new class extends Migration
             SELECT 
                 ar.id as attendance_id,
                 ar.student_id,
-                s.fullname as student_name,
+                TRIM(CONCAT(COALESCE(s.first_name, ''), ' ', COALESCE(s.last_name, ''))) as student_name,
                 c.name as class_name,
-                ar.check_in_time as created_time,
+                ar.created_at as created_time,
                 ar.status,
-                ar.attendance_date,
+                ar.date as attendance_date,
                 ar.created_at,
                 ar.session_id,
-                COALESCE(
-                    JSON_UNQUOTE(JSON_EXTRACT(ar.check_in_time, '$.location')),
-                    NULL
-                ) as location
+                NULL as location
             FROM attendance_records ar
             INNER JOIN students s ON ar.student_id = s.id
             LEFT JOIN sessions sess ON ar.session_id = sess.id
-            LEFT JOIN classes c ON c.id = (
-                SELECT sc.class_id 
-                FROM student_classes sc 
-                INNER JOIN student_class_students scs ON scs.student_class_id = sc.id 
-                WHERE scs.student_id = s.id 
-                LIMIT 1
-            )
+            LEFT JOIN classes c ON s.class_id = c.id
         ";
 
         DB::statement($sql);

@@ -16,4 +16,5 @@ export interface AttendanceRecord {
   date?: string
   timeSlot?: string
   courseName?: string
+  instructor?: string
 }

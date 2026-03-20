@@ -16,6 +16,7 @@ import {
 } from 'lucide-vue-next';
 import { dashboardService } from '../../services/dashboardService';
 import adminDashboardService from '../../services/adminDashboardService';
+import { getUserRole } from '../../services/auth';
 
 type Period = 'Today' | 'Weekly' | 'Monthly';
 type DashboardStats = { present: string; absent: string; late: string; rate: string; offsite: string };
@@ -46,7 +47,9 @@ const offsiteStudents = ref<Array<{ name: string; class: string; time: string; s
 const activeSession = ref<any>(null);
 const trendData = ref<Array<{ name: string; value: number }>>([]);
 const riskStudents = ref<Array<{ name: string; class: string; absence_count: number }>>([]);
-const activeAcademicYear = ref<{ id: number; name: string; current_term: number } | null>(null);
+const activeAcademicYear = ref<{ id: number; name: string; current_term: string | number } | null>(null);
+const userRole = computed(() => getUserRole());
+const isAdmin = computed(() => userRole.value === 'admin');
 
 // Admin Analytics Data
 const systemStats = ref<any>(null);
@@ -99,7 +102,29 @@ const normalizeNotifications = (payload: any) =>
       }))
     : [];
 
-const loadNotifications = async () => {
+const loadAdminAnalytics = async () => {
+  if (!isAdmin.value) {
+    systemStats.value = null;
+    studentAnalytics.value = null;
+    return;
+  }
+
+  try {
+    studentAnalytics.value = await adminDashboardService.getStudentAnalytics();
+  } catch (error) {
+    console.error('Failed to load admin analytics', error);
+  }
+};
+
+const loadSystemStats = async () => {
+  try {
+    systemStats.value = await adminDashboardService.getSystemStats();
+  } catch (error) {
+    console.error('Failed to load system stats', error);
+  }
+};
+
+const refreshNotifications = async () => {
   notificationLoading.value = true;
   notificationError.value = '';
   try {
@@ -113,99 +138,116 @@ const loadNotifications = async () => {
   }
 };
 
-const loadAdminAnalytics = async () => {
-  try {
-    const [sysStats, studAnalytics] = await Promise.all([
-      adminDashboardService.getSystemStats(),
-      adminDashboardService.getStudentAnalytics()
-    ]);
-    systemStats.value = sysStats;
-    studentAnalytics.value = studAnalytics;
-  } catch (error) {
-    console.error('Failed to load admin analytics', error);
+const applyDashboardPayload = (data: any) => {
+  const summaryRes = data.summary || {};
+  const lateRes = data.late_students || data.late_students_today || [];
+  const offsiteRes = data.offsite_students || [];
+  const sessionRes = data.active_session || null;
+  const trendsRes = data.trends || [];
+  const riskRes = data.risk_students || [];
+  const recentActivity = data.recent_activities || [];
+
+  if (summaryRes?.active_academic_year) {
+    activeAcademicYear.value = summaryRes.active_academic_year;
+  } else if (summaryRes?.academic_year) {
+    activeAcademicYear.value = {
+      id: Number(summaryRes.academic_year.id || 0),
+      name: String(summaryRes.academic_year.name || ''),
+      current_term: summaryRes.academic_year.term || '',
+    };
+  } else {
+    activeAcademicYear.value = null;
   }
+
+  const present = Number(summaryRes?.total_present_today ?? summaryRes?.attendance?.today?.present ?? 0);
+  const absent = Number(summaryRes?.total_absent_today ?? summaryRes?.attendance?.today?.absent ?? 0);
+  const late = Number(summaryRes?.total_late_today ?? summaryRes?.attendance?.today?.late ?? 0);
+  const total = present + absent + late;
+
+  stats.value.Today = {
+    present: formatCount(present),
+    absent: formatCount(absent),
+    late: formatCount(late),
+    rate: percent(present, total),
+    offsite: formatCount(Number(summaryRes?.total_offsite_today || 0)),
+  };
+
+  const weeklyPresent = Number(summaryRes?.total_present_weekly ?? summaryRes?.attendance?.week?.present ?? 0);
+  const weeklyAbsent = Number(summaryRes?.total_absent_weekly ?? summaryRes?.attendance?.week?.absent ?? 0);
+  const weeklyLate = Number(summaryRes?.total_late_weekly ?? summaryRes?.attendance?.week?.late ?? 0);
+  stats.value.Weekly = {
+    present: formatCount(weeklyPresent),
+    absent: formatCount(weeklyAbsent),
+    late: formatCount(weeklyLate),
+    rate: percent(weeklyPresent, weeklyPresent + weeklyAbsent + weeklyLate),
+    offsite: formatCount(Number(summaryRes?.total_offsite_weekly || 0)),
+  };
+
+  const monthlyPresent = Number(summaryRes?.total_present_monthly ?? summaryRes?.attendance?.month?.present ?? 0);
+  const monthlyAbsent = Number(summaryRes?.total_absent_monthly ?? summaryRes?.attendance?.month?.absent ?? 0);
+  const monthlyLate = Number(summaryRes?.total_late_monthly ?? summaryRes?.attendance?.month?.late ?? 0);
+  stats.value.Monthly = {
+    present: formatCount(monthlyPresent),
+    absent: formatCount(monthlyAbsent),
+    late: formatCount(monthlyLate),
+    rate: percent(monthlyPresent, monthlyPresent + monthlyAbsent + monthlyLate),
+    offsite: formatCount(Number(summaryRes?.total_offsite_monthly || 0)),
+  };
+
+  lateStudents.value = Array.isArray(lateRes)
+    ? lateRes.map((s: any) => ({
+        name: String(s?.name || 'Unknown'),
+        class: String(s?.class || 'Unknown'),
+        time: String(s?.time || '--:--'),
+        status: String(s?.status || 'Late'),
+      }))
+    : [];
+
+  offsiteStudents.value = Array.isArray(offsiteRes)
+    ? offsiteRes.map((s: any) => ({
+        name: String(s?.name || 'Unknown'),
+        class: String(s?.class || 'Unknown'),
+        time: String(s?.check_in_time || '--:--'),
+        status: String(s?.status || 'Present'),
+        distance_km: Number(s?.distance_km || 0),
+        location: String(s?.location || ''),
+      }))
+    : [];
+
+  activeSession.value = sessionRes || null;
+  trendData.value = trendsRes;
+  riskStudents.value = Array.isArray(riskRes)
+    ? riskRes.map((s: any) => ({
+        name: String(s?.name || 'Unknown'),
+        class: String(s?.class || 'Unknown'),
+        absence_count: Number(s?.absence_count || 0),
+      }))
+    : [];
+
+  notifications.value = normalizeNotifications(
+    recentActivity.map((item: any) => ({
+      id: Number(item?.id || 0),
+      title: String(item?.action || 'System notification'),
+      subtitle: item?.student_name ? `Student: ${item.student_name}` : 'Attendance activity update',
+      type: 'activity',
+    }))
+  );
+  notificationError.value = '';
 };
 
 const loadDashboard = async () => {
   loading.value = true;
   errorMessage.value = '';
   try {
-    const data = await dashboardService.getOverview();
-    
-    const summaryRes = data.summary || {};
-    const lateRes = data.late_students || [];
-    const offsiteRes = data.offsite_students || [];
-    const sessionRes = data.active_session || null;
-    
-    // Get trends and risk data from overview response (no extra API calls needed)
-    const trendsRes = data.trends || [];
-    const riskRes = data.risk_students || [];
-
-    // Set active academic year from summary response
-    if (summaryRes?.active_academic_year) {
-      activeAcademicYear.value = summaryRes.active_academic_year;
-    }
-
-    const present = Number(summaryRes?.total_present_today || 0);
-    const absent = Number(summaryRes?.total_absent_today || 0);
-    const late = Number(summaryRes?.total_late_today || 0);
-    const total = present + absent + late;
-
-    stats.value.Today = {
-      present: formatCount(present),
-      absent: formatCount(absent),
-      late: formatCount(late),
-      rate: percent(present, total),
-      offsite: formatCount(Number(summaryRes?.total_offsite_today || 0)),
-    };
-
-    stats.value.Weekly = {
-        present: formatCount(Number(summaryRes?.total_present_weekly || 0)),
-        absent: formatCount(Number(summaryRes?.total_absent_weekly || 0)),
-        late: formatCount(Number(summaryRes?.total_late_weekly || 0)),
-        rate: percent(Number(summaryRes?.total_present_weekly || 0), Number(summaryRes?.total_present_weekly || 0) + Number(summaryRes?.total_absent_weekly || 0)),
-        offsite: formatCount(Number(summaryRes?.total_offsite_weekly || 0)),
-    };
-
-    stats.value.Monthly = {
-        present: formatCount(Number(summaryRes?.total_present_monthly || 0)),
-        absent: formatCount(Number(summaryRes?.total_absent_monthly || 0)),
-        late: formatCount(Number(summaryRes?.total_late_monthly || 0)),
-        rate: percent(Number(summaryRes?.total_present_monthly || 0), Number(summaryRes?.total_present_monthly || 0) + Number(summaryRes?.total_absent_monthly || 0)),
-        offsite: formatCount(Number(summaryRes?.total_offsite_monthly || 0)),
-    };
-
-    lateStudents.value = Array.isArray(lateRes)
-      ? lateRes.map((s: any) => ({
-          name: String(s?.name || 'Unknown'),
-          class: String(s?.class || 'Unknown'),
-          time: String(s?.time || '--:--'),
-          status: String(s?.status || 'Late'),
-        }))
-      : [];
-
-    offsiteStudents.value = Array.isArray(offsiteRes)
-      ? offsiteRes.map((s: any) => ({
-          name: String(s?.name || 'Unknown'),
-          class: String(s?.class || 'Unknown'),
-          time: String(s?.check_in_time || '--:--'),
-          status: String(s?.status || 'Present'),
-          distance_km: Number(s?.distance_km || 0),
-          location: String(s?.location || ''),
-        }))
-      : [];
-
-    activeSession.value = sessionRes || null;
-    trendData.value = trendsRes;
-    riskStudents.value = Array.isArray(riskRes)
-      ? riskRes.map((s: any) => ({
-          name: String(s?.name || 'Unknown'),
-          class: String(s?.class || 'Unknown'),
-          absence_count: Number(s?.absence_count || 0),
-        }))
-      : [];
+    const data = await adminDashboardService.getDashboardData();
+    applyDashboardPayload(data);
   } catch (error: any) {
-    errorMessage.value = error?.message || 'Failed to load dashboard data from backend.';
+    try {
+      const fallbackData = await dashboardService.getOverview();
+      applyDashboardPayload(fallbackData);
+    } catch (fallbackError: any) {
+      errorMessage.value = fallbackError?.message || error?.message || 'Failed to load dashboard data from backend.';
+    }
   } finally {
     loading.value = false;
   }
@@ -227,8 +269,14 @@ onMounted(async () => {
     dismissedNotificationIds.value = [];
   }
 
-  await Promise.all([loadDashboard(), loadNotifications(), loadAdminAnalytics()]);
-  
+  notificationLoading.value = true;
+  await loadDashboard();
+  notificationLoading.value = false;
+  void loadAdminAnalytics();
+  window.setTimeout(() => {
+    void loadSystemStats();
+  }, 0);
+
   // Auto-refresh every 30s for live data
   autoRefreshInterval.value = window.setInterval(refreshDashboard, 30000);
 });
@@ -400,7 +448,7 @@ onUnmounted(() => {
           <p class="text-[10px] text-slate-400 mt-1 italic">{{ visibleNotifications[0].subtitle }}</p>
         </div>
         <div class="flex flex-col gap-2">
-          <button @click="loadNotifications" class="px-4 py-2 bg-primary text-white text-[10px] font-bold rounded-lg shadow-lg shadow-primary/20">Refresh</button>
+          <button @click="refreshNotifications" class="px-4 py-2 bg-primary text-white text-[10px] font-bold rounded-lg shadow-lg shadow-primary/20">Refresh</button>
           <button
             @click="dismissNotification(visibleNotifications[0].id)"
             class="px-4 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-200 transition-colors"

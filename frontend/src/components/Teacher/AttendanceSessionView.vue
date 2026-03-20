@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { attendanceService } from "../../services/attendanceService";
 import { teacherService } from "../../services/teacherService";
+import { setImageFallback } from "../../utils/imageFallback";
 
 // Props
 const props = defineProps<{
@@ -281,6 +282,7 @@ onMounted(loadData);
                 :src="student.photo"
                 alt="Photo"
                 class="w-10 h-10 rounded-full object-cover border border-slate-200"
+                @error="(event) => setImageFallback(event, '/default-student.svg')"
               />
               <div
                 v-else

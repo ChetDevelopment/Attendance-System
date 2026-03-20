@@ -13,6 +13,7 @@ import {
 } from "lucide-vue-next";
 import { ViewType } from "./Sidebar.vue";
 import { teacherService } from "../../services/teacherService";
+import { setImageFallback } from "../../utils/imageFallback";
 
 interface User {
   name: string;
@@ -469,6 +470,7 @@ onMounted(async () => {
                   class="size-10 rounded-xl object-cover"
                   alt=""
                   referrerPolicy="no-referrer"
+                  @error="(event) => setImageFallback(event, '/default-student.svg')"
                 />
                 <div v-else class="size-10 rounded-xl bg-slate-100" />
                 <div class="flex-1">

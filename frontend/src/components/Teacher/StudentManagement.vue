@@ -4,6 +4,7 @@ import Modal from "./Modal.vue";
 import { Search, QrCode, Printer, LayoutGrid, List } from "lucide-vue-next";
 import { cn } from "../lib/utils";
 import { teacherService } from "../../services/teacherService";
+import { setImageFallback } from "../../utils/imageFallback";
 
 // Props
 const props = defineProps<{
@@ -254,6 +255,7 @@ onMounted(loadStudents);
                       :src="s.avatar"
                       alt=""
                       class="w-full h-full object-cover"
+                      @error="(event) => setImageFallback(event, '/default-student.svg')"
                     />
                   </div>
                   <div>
@@ -303,6 +305,7 @@ onMounted(loadStudents);
                 :src="s.avatar"
                 alt=""
                 class="w-full h-full object-cover rounded-full"
+                @error="(event) => setImageFallback(event, '/default-student.svg')"
               />
             </div>
             <div>
@@ -402,6 +405,7 @@ onMounted(loadStudents);
                   :src="selectedStudent.avatar"
                   alt=""
                   class="w-full h-full object-cover"
+                  @error="(event) => setImageFallback(event, '/default-student.svg')"
                 />
               </div>
             </div>

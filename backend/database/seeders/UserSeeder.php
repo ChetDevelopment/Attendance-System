@@ -92,7 +92,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('rady123'),
                 'role_id' => 2, // Teacher role
                 'is_active' => true,
-                'profile_image' => '/teacherFaces/rady.png',
+                'profile_image' => '/teacherFaces/rady.jpg',
                 'calendar_id' => 'passerellesnumeriques.org_2d3132393337373934393735@resource.calendar.google.com',
             ],
             [
@@ -101,7 +101,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('savoeurn123'),
                 'role_id' => 2, // Teacher role
                 'is_active' => true,
-                'profile_image' => '/teacherFaces/savouern.jpg',
+                'profile_image' => '/teacherFaces/savoeurn.jpg',
                 'calendar_id' => 'passerellesnumeriques.org_3539373731343733353932@resource.calendar.google.com',
             ],
             [
@@ -146,7 +146,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('vandy123'),
                 'role_id' => 2, // Teacher role
                 'is_active' => true,
-                'profile_image' => '/teacherFaces/sokhom.jpg',
+                'profile_image' => '/teacherFaces/vandy.jpg',
                 'calendar_id' => 'passerellesnumeriques.org_3331363536313232373638@resource.calendar.google.com',
             ],
             [
@@ -155,6 +155,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('yon123'),
                 'role_id' => 2, // Teacher role
                 'is_active' => true,
+                'profile_image' => '/teacherFaces/yon.png',
                 'calendar_id' => 'c_1882ckecmfgb0h7fmha0u9t3rbd5g@resource.calendar.google.com',
             ],
             [

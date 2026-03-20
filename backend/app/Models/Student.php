@@ -5,14 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Models\SchoolClass;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Hash;
-use App\Models\StudentClass;
-use App\Models\AcademicYear;
-use App\Models\AttendanceRecord;
-use App\Models\User;
 
 class Student extends Model
 {
@@ -52,7 +47,7 @@ class Student extends Model
         'last_biometric_scan' => 'datetime',
     ];
 
-    public static function boot()
+    protected static function boot()
     {
         parent::boot();
 
@@ -62,8 +57,7 @@ class Student extends Model
                 $student->first_name = $student->first_name ?: ($parts[0] ?? '');
                 $student->last_name = $student->last_name ?: ($parts[1] ?? '');
             }
-            
-            // Generate a student_code if missing
+
             if (!$student->student_code) {
                 $student->student_code = $student->username ?: 'STU-' . uniqid();
             }
@@ -73,6 +67,11 @@ class Student extends Model
     public function class(): BelongsTo
     {
         return $this->belongsTo(StudentClass::class, 'class_id');
+    }
+
+    public function schoolClass(): BelongsTo
+    {
+        return $this->belongsTo(SchoolClass::class, 'class_id');
     }
 
     public function academicYear(): BelongsTo
@@ -90,9 +89,6 @@ class Student extends Model
         return $this->hasOne(User::class, 'student_id', 'id');
     }
 
-    /**
-     * Hash password when setting it.
-     */
     public function setPasswordAttribute($value)
     {
         if ($value) {

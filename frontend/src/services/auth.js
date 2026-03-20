@@ -1,7 +1,13 @@
+import { computed, ref } from 'vue'
+import api from './api';
+
 const TOKEN_KEY = 'access_token'
 const STUDENT_SESSION_KEY = 'student_session'
 const USER_KEY = 'auth_user'
 const USER_ROLE_KEY = 'auth_user_role'
+
+const userState = ref(null)
+const roleState = ref('')
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY)
 
@@ -24,24 +30,29 @@ export const clearStudentSession = () => {
 }
 
 export const getUser = () => {
-  const raw = localStorage.getItem(USER_KEY)
+  if (userState.value) return userState.value
 
+  const raw = localStorage.getItem(USER_KEY)
   if (!raw) return null
 
   try {
-    return JSON.parse(raw)
+    userState.value = JSON.parse(raw)
+    return userState.value
   } catch {
     localStorage.removeItem(USER_KEY)
+    userState.value = null
     return null
   }
 }
 
 export const setUser = (user) => {
   if (!user) return
+  userState.value = user
   localStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 
 export const clearUser = () => {
+  userState.value = null
   localStorage.removeItem(USER_KEY)
 }
 
@@ -52,12 +63,10 @@ export const normalizeRole = (role) => {
 export const resolveUserRole = (user) => {
   if (!user) return ''
 
-  // First, check for role object with name or slug
   if (typeof user.role === 'object' && user.role) {
     const roleName = user.role.name ? normalizeRole(user.role.name) : ''
     const roleSlug = user.role.slug ? normalizeRole(user.role.slug) : ''
 
-    // Try name first
     if (roleName) {
       if (roleName === 'admin') return 'admin'
       if (roleName === 'teacher') return 'teacher'
@@ -66,7 +75,6 @@ export const resolveUserRole = (user) => {
       if (roleName === 'student') return 'student'
     }
 
-    // Try slug
     if (roleSlug) {
       if (roleSlug === 'admin') return 'admin'
       if (roleSlug === 'teacher') return 'teacher'
@@ -76,7 +84,6 @@ export const resolveUserRole = (user) => {
     }
   }
 
-  // Fallback: check for role as string
   const roleValue =
     typeof user.role === 'string'
       ? user.role
@@ -92,13 +99,11 @@ export const resolveUserRole = (user) => {
     return directRole
   }
 
-  // Check for roles array (legacy)
   if (Array.isArray(user.roles) && user.roles.length) {
     const firstRole = user.roles[0]
     return normalizeRole(typeof firstRole === 'string' ? firstRole : firstRole?.name)
   }
 
-  // Check for permissions (fallback)
   if (Array.isArray(user.permissions)) {
     const hasTeacherPermission = user.permissions.some((permission) => {
       const name = typeof permission === 'string' ? permission : permission?.name
@@ -112,13 +117,17 @@ export const resolveUserRole = (user) => {
 }
 
 export const getUserRole = () => {
-  // Check for cached role first
-  const storedRole = normalizeRole(localStorage.getItem(USER_ROLE_KEY))
-  if (storedRole) return storedRole
+  if (roleState.value) return roleState.value
 
-  // Resolve role from user data and cache it
+  const storedRole = normalizeRole(localStorage.getItem(USER_ROLE_KEY))
+  if (storedRole) {
+    roleState.value = storedRole
+    return storedRole
+  }
+
   const roleFromUser = resolveUserRole(getUser())
   if (roleFromUser) {
+    roleState.value = roleFromUser
     localStorage.setItem(USER_ROLE_KEY, roleFromUser)
   }
   return roleFromUser
@@ -128,24 +137,55 @@ export const setUserRole = (role) => {
   const normalizedRole = normalizeRole(role)
 
   if (!normalizedRole) {
+    roleState.value = ''
     localStorage.removeItem(USER_ROLE_KEY)
     return
   }
 
+  roleState.value = normalizedRole
   localStorage.setItem(USER_ROLE_KEY, normalizedRole)
 }
 
 export const clearUserRole = () => {
+  roleState.value = ''
   localStorage.removeItem(USER_ROLE_KEY)
 }
-
-import api from './api';
 
 export const clearAllAuthData = () => {
   clearToken()
   clearStudentSession()
   clearUser()
   clearUserRole()
+}
+
+export const studentProfile = computed(() => {
+  const user = getUser() || {}
+  const linkedStudent = user.student || {}
+
+  return {
+    id: linkedStudent.student_code || user.student_id || linkedStudent.id || user.id || user.username || 'N/A',
+    name: linkedStudent.fullname || user.fullname || user.name || linkedStudent.username || user.username || 'Student',
+    // Prefer the current user avatar first so navbar/profile updates reflect
+    // the latest uploaded image immediately, even if student.profile is stale.
+    avatar: user.avatar || user.avatar_url || linkedStudent.profile || user.profile_photo_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=student',
+    email: linkedStudent.email || user.email || '',
+    className: linkedStudent.class_name || '',
+  }
+})
+
+export const updateProfile = (name, avatar) => {
+  const currentUser = getUser()
+  if (!currentUser) return null
+
+  const updatedUser = {
+    ...currentUser,
+    fullname: name,
+    name,
+    avatar,
+  }
+
+  setUser(updatedUser)
+  return updatedUser
 }
 
 export const logout = async () => {

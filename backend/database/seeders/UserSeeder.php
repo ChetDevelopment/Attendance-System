@@ -20,6 +20,15 @@ class UserSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'PNC Admin',
+                'email' => 'pnc@admin.passerellesnumeriques.org',
+                'password' => Hash::make('PnD0ma!n$ty'),
+                'role_id' => 1, // Admin role
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
                 'name' => 'Teacher User',
                 'email' => 'teacher@pnc.com',
                 'password' => Hash::make('teacher123'),

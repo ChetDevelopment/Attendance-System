@@ -1,0 +1,57 @@
+name: CI/CD Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Backend Image
+        run: |
+          docker build -t vichet12/attendance-backend ./backend
+
+      - name: Build Frontend Image
+        run: |
+          docker build -t vichet12/attendance-frontend ./frontend
+
+      - name: Push Backend Image
+        run: docker push vichet12/attendance-backend
+
+      - name: Push Frontend Image
+        run: docker push vichet12/attendance-frontend
+
+      - name: Deploy to AWS Server
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            sudo docker pull vichet12/attendance-backend
+            sudo docker pull vichet12/attendance-frontend
+
+            sudo docker stop laravel_app || true
+            sudo docker stop vue_app || true
+
+            sudo docker rm laravel_app || true
+            sudo docker rm vue_app || true
+
+            # Backend running on 9000
+            sudo docker run -d -p 9000:9000 --name laravel_app vichet12/attendance-backend
+
+            # Frontend mapping public port 80 to internal 5173
+            sudo docker run -d -p 80:5173 --name vue_app vichet12/attendance-frontend

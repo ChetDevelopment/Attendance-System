@@ -9,9 +9,14 @@
       <Navbar @navigate="setCurrentModule" />
 
       <div class="flex-1 overflow-y-auto p-8 scroll-smooth">
-        <Transition name="module-fade" mode="out-in">
-          <component :is="activeModule" :key="currentModule" />
-        </Transition>
+        <KeepAlive>
+          <component
+            :is="activeModule"
+            :key="currentModule"
+            :classes-refresh-key="classesRefreshKey"
+            @classes-updated="handleClassesUpdated"
+          />
+        </KeepAlive>
       </div>
     </main>
   </div>
@@ -79,10 +84,13 @@ const activeModule = computed(
 );
 
 const setCurrentModule = (module: string) => {
-  // Check if user has access to this module
   if (module in moduleMap.value) {
     currentModule.value = module;
   }
+};
+
+const handleClassesUpdated = () => {
+  classesRefreshKey.value += 1;
 };
 </script>
 

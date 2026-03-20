@@ -10,6 +10,15 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    private function transformUser(User $user): array
+    {
+        $user->loadMissing('role');
+        $payload = $user->toArray();
+        $payload['role'] = strtolower((string) optional($user->role)->name);
+
+        return $payload;
+    }
+
     public function register(Request $request)
     {
         if (! $request->isMethod('post')) {
@@ -39,7 +48,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'User registered successfully.',
             'token' => $token,
-            'user' => $user,
+            'user' => $this->transformUser($user),
         ], 201);
     }
 
@@ -72,7 +81,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Login successful.',
             'token' => $token,
-            'user' => $user,
+            'user' => $this->transformUser($user),
         ]);
     }
 
@@ -87,11 +96,8 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        $user = $request->user();
-        $user->load('role');
-
         return response()->json([
-            'user' => $user,
+            'user' => $this->transformUser($request->user()),
         ]);
     }
 }

@@ -45,24 +45,27 @@ const chartOptions = {
 </script>
 
 <template>
-  <div class="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
-    <div class="flex items-center justify-between mb-10">
+  <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-lg hover:shadow-xl transition-shadow duration-300">
+    <div class="flex items-center justify-between mb-6">
       <div>
-        <h3 class="text-lg font-bold text-slate-900">Absence Trends</h3>
-        <p class="text-sm text-slate-500">Data from backend reports endpoint</p>
+        <h3 class="text-base font-semibold text-slate-900 tracking-tight">Absence Trends</h3>
+        <p class="text-xs text-slate-400 font-medium mt-0.5">Data from backend reports endpoint</p>
       </div>
       <div class="flex items-center gap-2">
-        <div class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg text-[10px] font-bold">
-          <span class="size-2 bg-primary rounded-full"></span> Absences
+        <div class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-full">
+          <span class="size-2.5 bg-[#135bec] rounded-full ring-4 ring-[#135bec]/10"></span>
+          <span class="text-xs font-medium text-slate-600">Absences</span>
         </div>
-        <button class="p-2 text-slate-400 hover:text-slate-600">
-          <MoreVertical class="size-5" />
+        <button class="p-1.5 text-slate-300 hover:text-slate-500 hover:bg-slate-50 rounded-lg transition-colors">
+          <MoreVertical class="size-4" />
         </button>
       </div>
     </div>
 
-    <div class="h-64 w-full">
-      <Bar :data="chartData" :options="chartOptions" />
+    <div class="h-64 w-full relative">
+      <div class="absolute inset-0">
+        <Bar :data="chartData" :options="chartOptions" />
+      </div>
     </div>
   </div>
 </template>

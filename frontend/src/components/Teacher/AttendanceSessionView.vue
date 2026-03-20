@@ -9,12 +9,6 @@ const props = defineProps<{
   academicYearOptions?: { id: number; name: string }[];
 }>();
 
-const loading = ref(false);
-const saving = ref(false);
-const errorMessage = ref("");
-const successMessage = ref("");
-const searchQuery = ref("");
-
 const emit = defineEmits<{
   (e: "update:academicYearId", value: number | null): void;
 }>();
@@ -30,6 +24,11 @@ const onAcademicYearChange = (event: Event) => {
 
 type StatusType = "Present" | "Absent" | "Late" | "Excused";
 
+const loading = ref(false);
+const saving = ref(false);
+const errorMessage = ref("");
+const successMessage = ref("");
+const searchQuery = ref("");
 
 const sessions = ref<any[]>([]);
 const classes = ref<any[]>([]);

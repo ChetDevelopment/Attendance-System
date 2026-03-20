@@ -60,11 +60,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/student-info', [StudentAttendanceController::class, 'studentInfo']);
     });
 
-    Route::prefix('student')->middleware('role:student')->group(function () {
+Route::prefix('student')->middleware('role:student')->group(function () {
         Route::get('/dashboard/stats', [StudentDashboardController::class, 'getStats']);
+        Route::get('/attendance/history', [StudentDashboardController::class, 'getHistory']);
         Route::get('/attendance/history-detailed', [StudentDashboardController::class, 'getHistory']);
     });
-    
+
     // Alias for external devices
     Route::post('/receive-card-id', [StudentAttendanceController::class, 'cardScan']);
 

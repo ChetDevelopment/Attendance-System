@@ -160,12 +160,16 @@ export const clearAllAuthData = () => {
 
 export const studentProfile = computed(() => {
   const user = getUser() || {}
+  const linkedStudent = user.student || {}
 
   return {
-    id: user.student_id || user.id || user.username || 'N/A',
-    name: user.fullname || user.name || user.username || 'Student',
-    avatar: user.avatar || user.avatar_url || user.profile_photo_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=student',
-    email: user.email || '',
+    id: linkedStudent.student_code || user.student_id || linkedStudent.id || user.id || user.username || 'N/A',
+    name: linkedStudent.fullname || user.fullname || user.name || linkedStudent.username || user.username || 'Student',
+    // Prefer the current user avatar first so navbar/profile updates reflect
+    // the latest uploaded image immediately, even if student.profile is stale.
+    avatar: user.avatar || user.avatar_url || linkedStudent.profile || user.profile_photo_url || 'https://api.dicebear.com/7.x/avataaars/svg?seed=student',
+    email: linkedStudent.email || user.email || '',
+    className: linkedStudent.class_name || '',
   }
 })
 

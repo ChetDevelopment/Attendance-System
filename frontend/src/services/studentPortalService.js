@@ -27,19 +27,14 @@ const normalizeHistoryRecord = (record) => {
   }
 }
 
-export const getStudentDashboardStats = () =>
-  getDeduplicated(STUDENT_STATS_URL, {
-    cache: true,
-    cacheTTL: 30000,
-  })
+export const getStudentDashboardStats = async () => {
+  const response = await api.get(STUDENT_STATS_URL)
+  return response.data
+}
 
 export const getStudentHistory = async (limit = 50) => {
-  const data = await getDeduplicated(STUDENT_HISTORY_URL, {
-    cache: true,
-    cacheTTL: 60000,
-    params: { limit },
-  })
-
+  const response = await api.get(STUDENT_HISTORY_URL, { params: { limit } })
+  const data = response.data
   return Array.isArray(data) ? data.map(normalizeHistoryRecord) : []
 }
 

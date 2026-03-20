@@ -130,18 +130,40 @@ export const submitManualAttendanceRequest = async (payload) => {
 
 export const buildStudentDashboardSummary = (stats, history = []) => {
   const recentRecords = Array.isArray(history) ? history.slice(0, 3) : []
+  const monthlyPercentage = Number(stats?.monthlyPercentage || 0)
+  const targetPercentage = Number(stats?.targetPercentage || 75)
+  const progressPercentage = Math.min(100, Math.max(0, monthlyPercentage))
+  const progressToTarget = targetPercentage > 0
+    ? Math.min(100, Math.round((monthlyPercentage / targetPercentage) * 100))
+    : 0
 
   return {
     studentName: stats?.student?.fullname || stats?.student?.username || 'Student',
-    monthlyPercentage: Number(stats?.monthlyPercentage || 0),
+    monthlyPercentage,
     presentCount: Number(stats?.presentCount || 0),
     lateCount: Number(stats?.lateCount || 0),
     absencesCount: Number(stats?.absencesCount || 0),
+    excusedCount: Number(stats?.excusedCount || 0),
     totalSessions: Number(stats?.totalSessions || 0),
-    targetPercentage: Number(stats?.targetPercentage || 75),
+    targetPercentage,
+    progressPercentage,
+    progressToTarget,
     currentSession: stats?.currentSession || null,
     todayAttendance: stats?.todayAttendance || null,
     recentRecords,
+    recentActivities: recentRecords.map((record) => ({
+      ...record,
+      title: record.courseName || 'Attendance Session',
+      subtitle: [record.date, record.timeSlot].filter(Boolean).join(' • '),
+      description:
+        record.status === 'PRESENT'
+          ? 'Attendance marked successfully.'
+          : record.status === 'LATE'
+            ? 'Marked present after the session started.'
+            : record.status === 'ABSENT'
+              ? 'No attendance was recorded for this session.'
+              : 'Attendance is waiting for review.',
+    })),
     recentTrendValues: recentRecords
       .slice()
       .reverse()

@@ -8,7 +8,8 @@ import {
   X, 
   Info, 
   ChevronRight,
-  ArrowRight
+  ArrowRight,
+  Activity
 } from 'lucide-vue-next';
 import { buildStudentDashboardSummary } from '../../services/api';
 import { getStudentPortalData } from '../../services/studentPortalService';
@@ -23,6 +24,8 @@ const recentRecords = computed(() => {
 });
 
 const dashboard = computed(() => buildStudentDashboardSummary(stats.value, attendanceHistory.value));
+const attendanceRateWidth = computed(() => `${dashboard.value.progressPercentage}%`);
+const progressToTargetWidth = computed(() => `${dashboard.value.progressToTarget}%`);
 
 const trends = computed(() => {
   const values = dashboard.value.recentTrendValues;
@@ -72,13 +75,45 @@ onMounted(async () => {
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-4 mb-4">
           <div class="w-14 h-14 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center text-primary">
             <TrendingUp :size="24" />
           </div>
           <div>
-            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Monthly Rate</p>
+            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Attendance Rate</p>
             <h3 class="text-2xl font-bold dark:text-white">{{ dashboard.monthlyPercentage }}%</h3>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <div class="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+            <div class="h-full rounded-full bg-blue-500 transition-all duration-500" :style="{ width: attendanceRateWidth }"></div>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ dashboard.totalSessions }} tracked sessions this month
+          </p>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center text-green-500">
+            <Clock :size="24" />
+          </div>
+          <div>
+            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Late Sessions</p>
+            <h3 class="text-2xl font-bold dark:text-white">{{ dashboard.lateCount }}</h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center text-amber-500">
+            <Info :size="24" />
+          </div>
+          <div>
+            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Excused Absences</p>
+            <h3 class="text-2xl font-bold dark:text-white">{{ dashboard.excusedCount }}</h3>
           </div>
         </div>
       </div>
@@ -89,32 +124,8 @@ onMounted(async () => {
             <CheckCircle2 :size="24" />
           </div>
           <div>
-            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Present Count</p>
+            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Present Sessions</p>
             <h3 class="text-2xl font-bold dark:text-white">{{ dashboard.presentCount }}</h3>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-        <div class="flex items-center gap-4">
-          <div class="w-14 h-14 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center text-amber-500">
-            <Clock :size="24" />
-          </div>
-          <div>
-            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Late Arrivals</p>
-            <h3 class="text-2xl font-bold dark:text-white">{{ dashboard.lateCount }}</h3>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-        <div class="flex items-center gap-4">
-          <div class="w-14 h-14 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center text-red-500">
-            <X :size="24" />
-          </div>
-          <div>
-            <p class="text-sm text-slate-500 dark:text-slate-400 font-medium">Absences</p>
-            <h3 class="text-2xl font-bold dark:text-white">{{ dashboard.absencesCount }}</h3>
           </div>
         </div>
       </div>
@@ -122,6 +133,40 @@ onMounted(async () => {
 
     <div v-if="!loading" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div class="lg:col-span-2 space-y-8">
+        <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+          <div class="flex items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 class="text-lg font-bold dark:text-white">Progress</h3>
+              <p class="text-sm text-slate-500 dark:text-slate-400">
+                You are {{ dashboard.monthlyPercentage }}% attended this month. Target is {{ dashboard.targetPercentage }}%.
+              </p>
+            </div>
+            <span class="text-sm font-semibold text-primary">
+              {{ dashboard.progressToTarget }}% of target
+            </span>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <div class="mb-2 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span>Attendance rate</span>
+                <span>{{ dashboard.monthlyPercentage }}%</span>
+              </div>
+              <div class="h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                <div class="h-full rounded-full bg-blue-500 transition-all duration-500" :style="{ width: attendanceRateWidth }"></div>
+              </div>
+            </div>
+            <div>
+              <div class="mb-2 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
+                <span>Progress to target</span>
+                <span>{{ dashboard.targetPercentage }}% goal</span>
+              </div>
+              <div class="h-3 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                <div class="h-full rounded-full bg-emerald-500 transition-all duration-500" :style="{ width: progressToTargetWidth }"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
           <div class="flex items-center justify-between mb-8">
             <h3 class="text-lg font-bold dark:text-white">Attendance Trends</h3>
@@ -155,7 +200,7 @@ onMounted(async () => {
 
         <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
           <div class="flex items-center justify-between mb-8">
-            <h3 class="text-lg font-bold dark:text-white">Recent Records</h3>
+            <h3 class="text-lg font-bold dark:text-white">Recent Activity</h3>
             <router-link to="/student/history" class="text-primary text-xs font-bold hover:underline flex items-center gap-1">
               View All History <ArrowRight :size="14" />
             </router-link>
@@ -164,28 +209,31 @@ onMounted(async () => {
             <div v-if="recentRecords.length === 0" class="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
               No attendance records found yet.
             </div>
-            <div v-for="(record, index) in recentRecords" :key="index" class="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+            <div v-for="(activity, index) in dashboard.recentActivities" :key="index" class="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
               <div class="flex items-center gap-4">
                 <div :class="[
                   'w-10 h-10 rounded-xl flex items-center justify-center',
-                  record.status === 'PRESENT' ? 'bg-green-100 text-green-600' : 
-                  record.status === 'LATE' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
+                  activity.status === 'PRESENT' ? 'bg-green-100 text-green-600' : 
+                  activity.status === 'LATE' ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'
                 ]">
-                  <CheckCircle2 v-if="record.status === 'PRESENT'" :size="20" />
-                  <Clock v-else-if="record.status === 'LATE'" :size="20" />
+                  <CheckCircle2 v-if="activity.status === 'PRESENT'" :size="20" />
+                  <Clock v-else-if="activity.status === 'LATE'" :size="20" />
+                  <Activity v-else-if="activity.status === 'PENDING'" :size="20" />
                   <X v-else :size="20" />
                 </div>
                 <div>
-                  <p class="text-sm font-bold dark:text-white">{{ record.courseName }}</p>
-                  <p class="text-[10px] text-slate-500">{{ record.date }} • {{ record.timeSlot }}</p>
+                  <p class="text-sm font-bold dark:text-white">{{ activity.title }}</p>
+                  <p class="text-[10px] text-slate-500">{{ activity.subtitle }}</p>
+                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ activity.description }}</p>
                 </div>
               </div>
               <span :class="[
                 'px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider',
-                record.status === 'PRESENT' ? 'bg-green-500/10 text-green-600' : 
-                record.status === 'LATE' ? 'bg-amber-500/10 text-amber-600' : 'bg-red-500/10 text-red-600'
+                activity.status === 'PRESENT' ? 'bg-green-500/10 text-green-600' : 
+                activity.status === 'LATE' ? 'bg-amber-500/10 text-amber-600' : 
+                activity.status === 'PENDING' ? 'bg-blue-500/10 text-blue-600' : 'bg-red-500/10 text-red-600'
               ]">
-                {{ record.status }}
+                {{ activity.status }}
               </span>
             </div>
           </div>

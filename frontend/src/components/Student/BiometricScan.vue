@@ -12,7 +12,9 @@ import {
   User,
   Badge,
   Eye,
-  EyeOff
+  EyeOff,
+  Wrench,
+  X
 } from 'lucide-vue-next'
 import { getBiometricHistory, getBiometricStatus, getStudentInfoAfterScan, scanCard, scanFingerprint } from '../../services/studentPortalService'
 
@@ -38,6 +40,7 @@ const fingerprintData = ref('')
 const showFingerprintPreview = ref(false)
 const systemStatus = ref<any>(null)
 const recentScans = ref<any[]>([])
+const showComingSoonModal = ref(true)
 
 // Configuration
 const debounceTime = 2000 // 2 seconds between scans
@@ -48,6 +51,8 @@ const canScan = computed(() => {
   const now = Date.now()
   return now - lastScanTimestamp.value > debounceTime
 })
+
+const biometricFeatureReady = computed(() => false)
 
 const statusColor = computed(() => {
   switch (scanStatus.value) {
@@ -86,6 +91,11 @@ const getInstructions = computed(() => {
 
 // Scan handlers
 const handleCardScan = async () => {
+  if (!biometricFeatureReady.value) {
+    showComingSoonModal.value = true
+    return
+  }
+
   if (!canScan.value) {
     errorMessage.value = 'Please wait before scanning again'
     return
@@ -100,6 +110,11 @@ const handleCardScan = async () => {
 }
 
 const handleFingerprintScan = async () => {
+  if (!biometricFeatureReady.value) {
+    showComingSoonModal.value = true
+    return
+  }
+
   if (!canScan.value) {
     errorMessage.value = 'Please wait before scanning again'
     return
@@ -195,6 +210,11 @@ const getCurrentSessionId = () => {
 }
 
 const simulateFingerprintScan = () => {
+  if (!biometricFeatureReady.value) {
+    showComingSoonModal.value = true
+    return
+  }
+
   if (scanType.value === 'fingerprint') {
     fingerprintData.value = `fingerprint_${Math.random().toString(36).substr(2, 9)}`
     handleFingerprintScan()
@@ -202,6 +222,11 @@ const simulateFingerprintScan = () => {
 }
 
 const simulateCardScan = () => {
+  if (!biometricFeatureReady.value) {
+    showComingSoonModal.value = true
+    return
+  }
+
   if (scanType.value === 'card') {
     cardData.value = `card_${Math.random().toString(36).substr(2, 9)}`
     handleCardScan()
@@ -210,6 +235,16 @@ const simulateCardScan = () => {
 
 // Keyboard shortcuts
 const handleKeyDown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    if (showComingSoonModal.value) {
+      showComingSoonModal.value = false
+      return
+    }
+
+    resetScan()
+    return
+  }
+
   if (event.key === 'Enter' && canScan.value) {
     if (scanType.value === 'card') {
       handleCardScan()
@@ -220,8 +255,6 @@ const handleKeyDown = (event: KeyboardEvent) => {
     scanType.value = 'card'
   } else if (event.key === 'f') {
     scanType.value = 'fingerprint'
-  } else if (event.key === 'Escape') {
-    resetScan()
   }
 }
 
@@ -241,14 +274,74 @@ onUnmounted(() => {
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
     <div class="max-w-4xl mx-auto">
+      <transition name="modal-fade">
+        <div
+          v-if="showComingSoonModal"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm"
+        >
+          <div class="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl dark:bg-slate-900">
+            <div class="mb-6 flex items-start justify-between gap-4">
+              <div class="flex items-center gap-3">
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
+                  <Wrench :size="28" />
+                </div>
+                <div>
+                  <h2 class="text-2xl font-bold text-slate-900 dark:text-white">Biometric Scan Coming Soon</h2>
+                  <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                    This feature is still being prepared for real device integration.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                @click="showComingSoonModal = false"
+                class="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              >
+                <X :size="18" />
+              </button>
+            </div>
+
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-slate-200">
+              For now, students can keep using Self Attendance. Biometric card and fingerprint scanning will be enabled after the hardware and backend device flow are fully ready.
+            </div>
+
+            <div class="mt-6 flex justify-end">
+              <button
+                @click="showComingSoonModal = false"
+                class="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition-colors hover:bg-blue-700"
+              >
+                Understood
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+
       <!-- Header -->
       <div class="text-center mb-8">
         <h1 class="text-4xl font-bold text-slate-800 dark:text-white mb-2">
           Biometric Attendance System
         </h1>
         <p class="text-slate-600 dark:text-slate-300">
-          Scan your card or fingerprint to mark attendance
+          Biometric device support is being prepared for this student portal
         </p>
+      </div>
+
+      <div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="font-semibold">Coming Soon</p>
+            <p class="mt-1">
+              Live biometric card and fingerprint scans are not enabled yet. This page is currently a preview while hardware integration is being completed.
+            </p>
+          </div>
+          <button
+            @click="showComingSoonModal = true"
+            class="shrink-0 rounded-lg border border-amber-300 px-3 py-2 font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-400/20 dark:text-amber-100 dark:hover:bg-amber-400/10"
+          >
+            View notice
+          </button>
+        </div>
       </div>
 
       <!-- Main Card -->
@@ -351,24 +444,17 @@ onUnmounted(() => {
                 <div class="mt-6 flex gap-3">
                   <button
                     @click="scanType === 'card' ? handleCardScan() : handleFingerprintScan()"
-                    :disabled="isScanning || !canScan"
+                    :disabled="true"
                     class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 text-white font-semibold py-3 px-6 rounded-xl transition-all disabled:cursor-not-allowed"
                   >
-                    <span v-if="isScanning">
-                      <Loader2 class="animate-spin inline mr-2" :size="18" />
-                      Scanning...
-                    </span>
-                    <span v-else-if="!canScan">
+                    <span>
                       <Clock class="inline mr-2" :size="18" />
-                      Please wait...
-                    </span>
-                    <span v-else>
-                      {{ scanType === 'card' ? 'Scan Card' : 'Scan Fingerprint' }}
+                      Coming Soon
                     </span>
                   </button>
                   
                   <button
-                    @click="resetScan"
+                    @click="showComingSoonModal = true"
                     class="px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                   >
                     <RefreshCw :size="18" />
@@ -384,6 +470,7 @@ onUnmounted(() => {
                     v-model="cardData"
                     type="text"
                     placeholder="Enter card ID or use card reader..."
+                    disabled
                     class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                   />
                 </div>
@@ -410,9 +497,10 @@ onUnmounted(() => {
                   
                   <button
                     @click="simulateFingerprintScan"
+                    disabled
                     class="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all"
                   >
-                    Simulate Fingerprint Scan
+                    Fingerprint Preview Only
                   </button>
                 </div>
               </div>
@@ -549,6 +637,17 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@keyframes modalFade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes scanLine {
   0% { transform: translateY(-100%); }
   100% { transform: translateY(100%); }
@@ -556,5 +655,15 @@ onUnmounted(() => {
 
 .animate-scan-line {
   animation: scanLine 2s linear infinite;
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-fade-enter-active .max-w-lg,
+.modal-fade-leave-active .max-w-lg {
+  animation: modalFade 0.2s ease;
 }
 </style>

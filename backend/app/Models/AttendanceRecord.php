@@ -17,14 +17,11 @@ class AttendanceRecord extends Model
         'attendance_date',
         'status',
         'check_in_time',
-<<<<<<< HEAD
         'recorded_at',
         'justification_status',
         'comment',
-=======
         'is_locked',
         'location',
->>>>>>> admin-dashboard-backend
     ];
 
     protected $casts = [

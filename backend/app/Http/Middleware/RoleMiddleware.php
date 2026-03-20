@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Student;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,6 +18,17 @@ class RoleMiddleware
 
         $userRole = strtolower((string) optional($user->role)->name);
         $allowed = array_map(fn ($role) => strtolower((string) $role), $roles);
+
+        if (
+            !$userRole
+            && $user
+            && (
+                $user->student_id
+                || Student::query()->where('email', $user->email)->exists()
+            )
+        ) {
+            $userRole = 'student';
+        }
 
         if (!$userRole || !in_array($userRole, $allowed, true)) {
             return response()->json(['message' => 'Forbidden'], Response::HTTP_FORBIDDEN);

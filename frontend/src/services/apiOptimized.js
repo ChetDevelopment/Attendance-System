@@ -145,6 +145,7 @@ export const getDeduplicated = async (url, options = {}) => {
  * Clear specific cache or all caches
  */
 export const clearCache = (url = null) => {
+  console.log('Clearing cache for', url || 'ALL');
   if (url) {
     [...responseCache.keys()].forEach((cacheKey) => {
       if (cacheKey.startsWith(`${url}:`)) {

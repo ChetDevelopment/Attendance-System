@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Models\StudentClass;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -39,14 +40,22 @@ class UserProfileController extends Controller
 
     private function payload($user): array
     {
-        $user->loadMissing('role');
+        $user->loadMissing(['role', 'student.class']);
         $hasTheme = Schema::hasColumn('users', 'theme');
         $hasNotificationEmail = Schema::hasColumn('users', 'notification_email');
         $hasNotificationPush = Schema::hasColumn('users', 'notification_push');
+        $hasTwoFactorEnabled = Schema::hasColumn('users', 'two_factor_enabled');
+        $hasFaceIdEnabled = Schema::hasColumn('users', 'face_id_enabled');
+        $student = $user->student;
+        $studentClass = null;
+
+        if ($student?->class_id) {
+            $studentClass = StudentClass::query()->find($student->class_id);
+        }
 
         return [
             'id' => $user->id,
-            'name' => $user->name,
+            'name' => $student?->fullname ?: $user->name,
             'email' => $user->email,
             'role' => strtolower((string) optional($user->role)->name),
             'avatar_url' => $user->avatar_url,
@@ -55,6 +64,17 @@ class UserProfileController extends Controller
             'theme' => $hasTheme ? ($user->theme ?? 'light') : 'light',
             'notification_email' => $hasNotificationEmail ? (bool) ($user->notification_email ?? true) : true,
             'notification_push' => $hasNotificationPush ? (bool) ($user->notification_push ?? true) : true,
+            'two_factor_enabled' => $hasTwoFactorEnabled ? (bool) ($user->two_factor_enabled ?? false) : false,
+            'face_id_enabled' => $hasFaceIdEnabled ? (bool) ($user->face_id_enabled ?? false) : false,
+            'student' => $student ? [
+                'id' => $student->id,
+                'student_code' => $student->student_code,
+                'fullname' => $student->fullname,
+                'username' => $student->username,
+                'email' => $student->email,
+                'class_name' => $studentClass?->class_name ?: (is_string($student->class ?? null) ? $student->class : null),
+                'profile' => $student->profile,
+            ] : null,
         ];
     }
 
@@ -118,6 +138,11 @@ class UserProfileController extends Controller
             $user->fill($validated);
             $saved = $user->save();
 
+            if ($saved && $user->student && array_key_exists('name', $validated)) {
+                $user->student->fullname = $validated['name'];
+                $user->student->save();
+            }
+
             if (!$saved) {
                 Log::error('Failed to save user model for profile update', ['user_id' => $user->id]);
                 return response()->json(['message' => 'Failed to save changes to database'], 500);
@@ -155,22 +180,28 @@ class UserProfileController extends Controller
                 'theme' => ['nullable', 'string', 'in:light,dark'],
                 'notification_email' => ['nullable', 'boolean'],
                 'notification_push' => ['nullable', 'boolean'],
+                'two_factor_enabled' => ['nullable', 'boolean'],
+                'face_id_enabled' => ['nullable', 'boolean'],
             ]);
 
-            $missingColumns = $this->missingUserColumns(array_keys($validated));
-            if (!empty($missingColumns)) {
-                Log::error('Cannot update settings because users table columns are missing.', [
-                    'user_id' => $user->id,
-                    'missing_columns' => $missingColumns,
-                ]);
+            $persistableSettings = $this->filterExistingUserColumns($validated);
+            $missingColumns = array_values(array_diff(array_keys($validated), array_keys($persistableSettings)));
 
+            if (empty($persistableSettings)) {
                 return response()->json([
                     'message' => 'Settings fields are not ready in database. Please run migrations.',
                     'missing_columns' => $missingColumns,
                 ], 500);
             }
 
-            $user->fill($validated);
+            if (!empty($missingColumns)) {
+                Log::warning('Skipping unavailable settings columns while saving profile settings.', [
+                    'user_id' => $user->id,
+                    'missing_columns' => $missingColumns,
+                ]);
+            }
+
+            $user->fill($persistableSettings);
             $user->save();
 
             // Refresh to get latest data
@@ -240,5 +271,3 @@ class UserProfileController extends Controller
         }
     }
 }
-
-

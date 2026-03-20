@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { 
   LayoutDashboard, 
@@ -12,12 +12,15 @@ import {
   Fingerprint,
   LogOut
 } from 'lucide-vue-next';
-import { getUser, logout } from '../../services/auth';
+import { getUser, logout, setUser, studentProfile } from '../../services/auth';
 import { prefetchStudentPortalData } from '../../services/studentPortalService';
+import { profileService } from '../../services/profileService';
 
 const router = useRouter();
 const route = useRoute();
-const user = getUser();
+const currentUser = computed(() => getUser() || {});
+const currentStudentProfile = computed(() => studentProfile.value);
+const headerSearch = ref('');
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/student/dashboard' },
@@ -32,14 +35,74 @@ const handleLogout = () => {
   router.push('/login');
 };
 
+const resolveSearchTarget = (query: string) => {
+  const normalizedQuery = query.trim().toLowerCase();
+
+  if (!normalizedQuery) {
+    return { path: '/student/history', query: {} };
+  }
+
+  const keywordMap = [
+    { keywords: ['dashboard', 'overview', 'stats'], path: '/student/dashboard' },
+    { keywords: ['self attendance', 'attendance', 'check in', 'check-in', 'qr'], path: '/student/attendance' },
+    { keywords: ['biometric', 'fingerprint', 'card scan', 'scan'], path: '/student/biometric-scan' },
+    { keywords: ['history', 'records', 'recent activity'], path: '/student/history' },
+    { keywords: ['settings', 'profile', 'account'], path: '/student/settings' },
+  ];
+
+  const matchedRoute = keywordMap.find((item) =>
+    item.keywords.some((keyword) => normalizedQuery.includes(keyword))
+  );
+
+  if (matchedRoute) {
+    return { path: matchedRoute.path, query: {} };
+  }
+
+  return {
+    path: '/student/history',
+    query: { q: query.trim() },
+  };
+};
+
+const submitHeaderSearch = () => {
+  const trimmedQuery = headerSearch.value.trim();
+  const target = resolveSearchTarget(trimmedQuery);
+
+  router.push(target);
+};
+
 const onImageError = (e: Event) => {
   const target = e.target as HTMLImageElement;
   target.src = 'https://api.dicebear.com/7.x/avataaars/svg?seed=student';
 };
 
 onMounted(() => {
+  headerSearch.value = typeof route.query.q === 'string' ? route.query.q : '';
   prefetchStudentPortalData();
+  profileService.getProfile()
+    .then((profile) => {
+      const existingUser = getUser() || {};
+      setUser({
+        ...existingUser,
+        name: profile?.name || existingUser.name,
+        fullname: profile?.student?.fullname || profile?.name || existingUser.fullname,
+        email: profile?.email || existingUser.email,
+        avatar_url: profile?.avatar_url || existingUser.avatar_url,
+        avatar: profile?.avatar_url || existingUser.avatar,
+        student: profile?.student || existingUser.student,
+      });
+    })
+    .catch(() => {
+      // Keep the existing local state if profile refresh fails.
+    });
 });
+
+watch(
+  () => route.query.q,
+  (value) => {
+    headerSearch.value = typeof value === 'string' ? value : '';
+  }
+);
 </script>
 
 <template>
@@ -85,14 +148,20 @@ onMounted(() => {
     <main class="flex-1 ml-64 flex flex-col min-h-screen">
       <!-- Header -->
       <header class="h-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 sticky top-0 z-40">
-        <div class="flex items-center gap-4 bg-white px-4 py-2 rounded-2xl w-96 border border-slate-200">
-          <Search class="text-slate-400" :size="18" />
+        <form
+          class="flex items-center gap-4 bg-white px-4 py-2 rounded-2xl w-96 border border-slate-200"
+          @submit.prevent="submitHeaderSearch"
+        >
+          <button type="submit" class="text-slate-400 transition-colors hover:text-blue-600">
+            <Search :size="18" />
+          </button>
           <input 
+            v-model="headerSearch"
             type="text" 
             placeholder="Search courses, records..." 
             class="bg-transparent border-none outline-none text-sm w-full"
           />
-        </div>
+        </form>
 
         <div class="flex items-center gap-6">
           <div class="flex items-center gap-2">
@@ -106,11 +175,11 @@ onMounted(() => {
           
         <div class="flex items-center gap-3">
           <div class="text-right">
-            <p class="text-sm font-bold">{{ user?.fullname || user?.username || 'Student' }}</p>
-            <p class="text-[10px] text-slate-500 font-mono">ID: {{ user?.id || 'N/A' }}</p>
+            <p class="text-sm font-bold">{{ currentStudentProfile.name }}</p>
+            <p class="text-[10px] text-slate-500 font-mono">ID: {{ currentStudentProfile.id }}</p>
           </div>
           <img 
-            :src="user?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=student'" 
+            :src="currentStudentProfile.avatar || currentUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=student'" 
             class="w-10 h-10 rounded-xl object-cover ring-2 ring-blue-500/10"
             @error="onImageError"
           />

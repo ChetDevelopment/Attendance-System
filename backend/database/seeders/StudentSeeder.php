@@ -2,16 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-<<<<<<< HEAD
-use App\Models\SchoolClass;
-use App\Models\Student;
-=======
-use App\Models\StudentClass; 
->>>>>>> admin-dashboard-backend
-use Carbon\Carbon;
+use App\Models\StudentClass;
 
 class StudentSeeder extends Seeder
 {
@@ -20,35 +13,66 @@ class StudentSeeder extends Seeder
      */
     public function run(): void
     {
-<<<<<<< HEAD
         // Get first class
-        $class = SchoolClass::first();
-=======
-         // Get first class
         $class = StudentClass::first();
->>>>>>> admin-dashboard-backend
-
         if (!$class) {
-            return; // Stop if no class exists
+            return;
         }
 
-        $students = [
-            [
-                'student_code' => 'PNC2026-037',
-                'first_name' => 'Serey',
-                'last_name' => 'Phem',
-                'email' => 'serey.phem@student.passerellesnumeriques.org',
-                'gender' => 'Male',
-                'date_of_birth' => '2006-02-12',
-                'class_id' => $class->id,
-                'qr_code' => 'qr_pnc2026-037.png',
-                'card_id' => 'CARD-037',
-                'face_image' => 'faces/pnc2026037.jpg',
-                'face_image' => 'pnc2026037.jpg',
-                'parent_number' => '+855 12 345 678',
-                'contact' => '+855 12 345 678',
+        // Create test students
+        $testStudent1 = DB::table('students')->insertGetId([
+            'student_code' => 'TEST-001',
+            'first_name' => 'Test',
+            'last_name' => 'Student',
+            'fullname' => 'Test Student',
+            'email' => 'test.student@student.passerellesnumeriques.org',
+            'gender' => 'Male',
+            'date_of_birth' => '2000-01-01',
+            'class_id' => $class->id,
+            'qr_code' => 'test-qr.png',
+            'card_id' => 'TEST-CARD-001',
+            'face_image' => 'test-face.jpg',
+            'is_active' => true,
+            'fingerprint_enrolled' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $testStudent2 = DB::table('students')->insertGetId([
+            'student_code' => 'PNC2026-037',
+            'first_name' => 'Serey',
+            'last_name' => 'Phem',
+            'email' => 'serey.phem@student.passerellesnumeriques.org',
+            'gender' => 'Male',
+            'date_of_birth' => '2006-02-12',
+            'class_id' => $class->id,
+            'qr_code' => 'qr_pnc2026-037.png',
+            'card_id' => 'CARD-037',
+            'face_image' => 'faces/pnc2026037.jpg',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Link test student #1 to new User with role 'student'
+        $studentRoleId = DB::table('roles')->where('name', 'Student')->value('id');
+        if ($studentRoleId) {
+            DB::table('users')->insert([
+                'name' => 'Test Student',
+                'email' => 'test.student@student.passerellesnumeriques.org',
+                'password' => '$2y$10$92DgjTkDQWdwgtfoZ49GYO4gVmyq8HHp9SzJA0q93B4qQyL6nH5nW',
+                'role_id' => $studentRoleId,
+                'student_id' => $testStudent1,
                 'is_active' => true,
-            ],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        unset($testStudent2);
+
+        // Original students
+        DB::table('students')->insert([
             [
                 'student_code' => 'PNC2026-038',
                 'first_name' => 'Vichet',
@@ -60,31 +84,10 @@ class StudentSeeder extends Seeder
                 'qr_code' => 'qr_pnc2026-038.png',
                 'card_id' => 'CARD-038',
                 'face_image' => 'faces/pnc2026038.jpg',
-                'parent_number' => '+855 10 234 567',
-                'contact' => '+855 10 234 567',
                 'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
-            [
-                'student_code' => 'PNC2026-039',
-                'first_name' => 'Sreyroth',
-                'last_name' => 'Sang',
-                'email' => 'sreyroth.sang@student.passerellesnumeriques.org',
-                'gender' => 'Female',
-                'date_of_birth' => '2007-06-11',
-                'class_id' => $class->id,
-                'qr_code' => 'qr_pnc2026-039.png',
-                'face_image' => 'faces/pnc2026039.jpg',
-                'parent_number' => '+855 98 765 432',
-                'contact' => '+855 98 765 432',
-                'is_active' => true,
-            ],
-        ];
-
-        foreach ($students as $student) {
-            Student::firstOrCreate(
-                ['student_code' => $student['student_code']],
-                $student
-            );
-        }
+        ]);
     }
 }

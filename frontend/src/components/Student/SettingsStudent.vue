@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { 
   Camera, 
   X, 
   FlipHorizontal, 
   BadgeCheck, 
-  Lock, 
   Bell, 
   Loader2,
   CheckCircle2, 
@@ -16,9 +15,17 @@ import { profileService } from '../../services/profileService';
 
 const editName = ref(studentProfile.value.name);
 const editAvatar = ref(studentProfile.value.avatar);
+const selectedAvatarFile = ref<File | null>(null);
 const isProcessing = ref(false);
 const notificationEmail = ref(true);
 const notificationPush = ref(true);
+const originalState = ref({
+  name: studentProfile.value.name,
+  avatar: studentProfile.value.avatar,
+  notificationEmail: true,
+  notificationPush: true,
+  email: studentProfile.value.email,
+});
 const isSettingsCameraOpen = ref(false);
 const isMirrored = ref(true);
 const showFlash = ref(false);
@@ -28,6 +35,10 @@ const videoDevices = ref<MediaDeviceInfo[]>([]);
 const selectedDeviceId = ref<string>('');
 const videoResolution = ref('0x0');
 const notification = ref<{ message: string; type: 'success' | 'error' } | null>(null);
+const emailAddress = computed(() => originalState.value.email || getUser()?.email || studentProfile.value.email || '');
+const profileCardName = computed(() => editName.value || originalState.value.name || studentProfile.value.name);
+const profileCardId = computed(() => studentProfile.value.id || getUser()?.student_id || getUser()?.id || 'N/A');
+const profileClassName = computed(() => getUser()?.student?.class_name || studentProfile.value.className || '');
 
 const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
   notification.value = { message, type };
@@ -113,6 +124,7 @@ const captureSettingsPhoto = () => {
   const photo = capturePhoto();
   if (photo) {
     editAvatar.value = photo;
+    selectedAvatarFile.value = null;
     closeSettingsCamera();
     showNotification("Photo captured!");
   } else {
@@ -120,45 +132,101 @@ const captureSettingsPhoto = () => {
   }
 };
 
-const saveSettings = () => {
+const handleAvatarFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0] || null;
+
+  if (!file) {
+    return;
+  }
+
+  if (!file.type.startsWith('image/')) {
+    showNotification("Please choose an image file.", "error");
+    target.value = '';
+    return;
+  }
+
+  selectedAvatarFile.value = file;
+  editAvatar.value = URL.createObjectURL(file);
+};
+
+const dataUrlToFile = async (dataUrl: string, filename: string) => {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  return new File([blob], filename, { type: blob.type || 'image/jpeg' });
+};
+
+const saveSettings = async () => {
   if (!editName.value.trim()) {
     showNotification("Name cannot be empty", "error");
     return;
   }
   isProcessing.value = true;
 
-  Promise.all([
-    profileService.updateProfile({
-      name: editName.value.trim(),
-      avatar_url: editAvatar.value,
-    }),
-    profileService.updateSettings({
-      notification_email: notificationEmail.value,
-      notification_push: notificationPush.value,
-    }),
-  ])
-    .then(([profileResponse, settingsResponse]) => {
-      const currentUser = getUser() || {};
-      const updatedUser = {
-        ...currentUser,
-        name: profileResponse?.name || editName.value.trim(),
-        fullname: profileResponse?.name || editName.value.trim(),
-        email: profileResponse?.email || currentUser.email,
-        avatar_url: profileResponse?.avatar_url || editAvatar.value,
-        avatar: profileResponse?.avatar_url || editAvatar.value,
-        notification_email: settingsResponse?.user?.notification_email ?? notificationEmail.value,
-        notification_push: settingsResponse?.user?.notification_push ?? notificationPush.value,
-      };
+  try {
+    let avatarUrl = editAvatar.value;
 
-      setUser(updatedUser);
-      showNotification("Profile updated successfully!");
-    })
-    .catch((error: any) => {
-      showNotification(error?.message || "Failed to save settings.", "error");
-    })
-    .finally(() => {
-      isProcessing.value = false;
-    });
+    if (selectedAvatarFile.value) {
+      const uploadResponse = await profileService.uploadAvatar(selectedAvatarFile.value);
+      avatarUrl = uploadResponse?.avatar_url || avatarUrl;
+    } else if (avatarUrl.startsWith('data:image/')) {
+      // Camera captures are base64 data URLs; upload them as files instead of
+      // trying to store the entire string in avatar_url.
+      const avatarFile = await dataUrlToFile(avatarUrl, `student-avatar-${Date.now()}.jpg`);
+      const uploadResponse = await profileService.uploadAvatar(avatarFile);
+      avatarUrl = uploadResponse?.avatar_url || avatarUrl;
+    }
+
+    const [profileResponse, settingsResponse] = await Promise.all([
+      profileService.updateProfile({
+        name: editName.value.trim(),
+        avatar_url: avatarUrl,
+      }),
+      profileService.updateSettings({
+        notification_email: notificationEmail.value,
+        notification_push: notificationPush.value,
+      }),
+    ]);
+
+    const currentUser = getUser() || {};
+    const updatedUser = {
+      ...currentUser,
+      name: profileResponse?.name || editName.value.trim(),
+      fullname: profileResponse?.name || editName.value.trim(),
+      email: profileResponse?.email || currentUser.email,
+      avatar_url: profileResponse?.avatar_url || avatarUrl,
+      avatar: profileResponse?.avatar_url || avatarUrl,
+      student: profileResponse?.student || currentUser.student,
+      notification_email: settingsResponse?.user?.notification_email ?? notificationEmail.value,
+      notification_push: settingsResponse?.user?.notification_push ?? notificationPush.value,
+    };
+
+    setUser(updatedUser);
+    originalState.value = {
+      name: updatedUser.fullname || updatedUser.name || editName.value.trim(),
+      avatar: updatedUser.avatar || updatedUser.avatar_url || avatarUrl,
+      notificationEmail: updatedUser.notification_email ?? notificationEmail.value,
+      notificationPush: updatedUser.notification_push ?? notificationPush.value,
+      email: updatedUser.email || emailAddress.value,
+    };
+    editAvatar.value = originalState.value.avatar;
+    selectedAvatarFile.value = null;
+    showNotification("Profile updated successfully!");
+  } catch (error: any) {
+    showNotification(error?.message || "Failed to save settings.", "error");
+  } finally {
+    isProcessing.value = false;
+  }
+};
+
+const cancelChanges = () => {
+  editName.value = originalState.value.name || 'Student';
+  editAvatar.value = originalState.value.avatar || studentProfile.value.avatar;
+  notificationEmail.value = originalState.value.notificationEmail;
+  notificationPush.value = originalState.value.notificationPush;
+  selectedAvatarFile.value = null;
+  stopWebcam();
+  isSettingsCameraOpen.value = false;
 };
 
 onMounted(async () => {
@@ -177,9 +245,17 @@ onMounted(async () => {
       email: profile?.email || currentUser.email,
       avatar_url: profile?.avatar_url || currentUser.avatar_url,
       avatar: profile?.avatar_url || currentUser.avatar,
+      student: profile?.student || currentUser.student,
       notification_email: profile?.notification_email ?? currentUser.notification_email,
       notification_push: profile?.notification_push ?? currentUser.notification_push,
     });
+    originalState.value = {
+      name: profile?.name || editName.value,
+      avatar: profile?.avatar_url || editAvatar.value,
+      notificationEmail: profile?.notification_email ?? true,
+      notificationPush: profile?.notification_push ?? true,
+      email: profile?.email || currentUser.email || studentProfile.value.email,
+    };
   } catch (error: any) {
     showNotification(error?.message || "Unable to load profile settings.", "error");
   }
@@ -225,8 +301,9 @@ onUnmounted(() => {
               <Camera :size="16" />
             </button>
           </div>
-          <h3 class="font-bold dark:text-white">{{ studentProfile.name }}</h3>
-          <p class="text-xs text-slate-500 font-mono mt-1">ID: {{ studentProfile.id }}</p>
+          <h3 class="font-bold dark:text-white">{{ profileCardName }}</h3>
+          <p class="text-xs text-slate-500 font-mono mt-1">ID: {{ profileCardId }}</p>
+          <p v-if="profileClassName" class="text-xs text-slate-500 mt-1">{{ profileClassName }}</p>
         </div>
 
         <!-- Settings Camera Modal -->
@@ -306,17 +383,23 @@ onUnmounted(() => {
               />
             </div>
             <div class="md:col-span-2">
-              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">Avatar URL</label>
-              <input 
-                v-model="editAvatar"
-                type="text" 
-                class="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-primary outline-none dark:text-white"
-              />
+              <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">Profile Picture</label>
+              <div class="space-y-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  @change="handleAvatarFileChange"
+                  class="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-primary outline-none dark:text-white file:mr-4 file:rounded-xl file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-bold file:text-white hover:file:bg-blue-600"
+                />
+                <p class="text-xs text-slate-500">
+                  Choose an image from your device, or use the camera button on the profile card.
+                </p>
+              </div>
             </div>
             <div>
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">Student ID</label>
               <input 
-                :value="studentProfile.id"
+                :value="profileCardId"
                 disabled
                 type="text" 
                 class="w-full px-4 py-3.5 bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-500 cursor-not-allowed"
@@ -325,38 +408,11 @@ onUnmounted(() => {
             <div>
               <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">Email Address</label>
               <input 
-                value="mary.sao@student.passerellesnumeriques.org"
+                :value="emailAddress"
                 disabled
                 type="email" 
                 class="w-full px-4 py-3.5 bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-500 cursor-not-allowed"
               />
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <h3 class="text-lg font-bold mb-6 dark:text-white flex items-center gap-2">
-            <Lock class="text-primary" :size="20" />
-            Security & Privacy
-          </h3>
-          <div class="space-y-4">
-            <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
-              <div>
-                <p class="text-sm font-bold dark:text-white">Two-Factor Authentication</p>
-                <p class="text-xs text-slate-500">Add an extra layer of security to your account.</p>
-              </div>
-              <div class="w-12 h-6 bg-slate-200 dark:bg-slate-700 rounded-full relative cursor-pointer">
-                <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
-              </div>
-            </div>
-            <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
-              <div>
-                <p class="text-sm font-bold dark:text-white">Face ID Login</p>
-                <p class="text-xs text-slate-500">Use your camera to log in automatically.</p>
-              </div>
-              <div class="w-12 h-6 bg-primary rounded-full relative cursor-pointer">
-                <div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
-              </div>
             </div>
           </div>
         </div>
@@ -379,7 +435,9 @@ onUnmounted(() => {
         </div>
 
         <div class="flex justify-end gap-4">
-          <button class="px-8 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
+          <button 
+            @click="cancelChanges"
+            class="px-8 py-4 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
             Cancel Changes
           </button>
           <button 

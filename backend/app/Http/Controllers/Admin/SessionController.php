@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Services\SessionService;
+use App\Services\ActivityLogService;
 use App\Models\Session;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -11,10 +12,12 @@ use Carbon\Carbon;
 class SessionController extends Controller
 {
     protected $sessionService;
+    private ActivityLogService $activityLogService;
 
-    public function __construct(SessionService $sessionService)
+    public function __construct(SessionService $sessionService, ActivityLogService $activityLogService)
     {
         $this->sessionService = $sessionService;
+        $this->activityLogService = $activityLogService;
     }
 
     /**
@@ -161,6 +164,13 @@ class SessionController extends Controller
         }
         
         $session = $this->sessionService->createSession($validated);
+
+        $this->activityLogService->recordFromRequest(
+            $request->user(),
+            $request,
+            'Created session',
+            'Created session ' . $session->name
+        );
         
         return response()->json([
             'success' => true,
@@ -194,6 +204,13 @@ class SessionController extends Controller
                 'message' => 'Session not found',
             ], 404);
         }
+
+        $this->activityLogService->recordFromRequest(
+            $request->user(),
+            $request,
+            'Updated session',
+            'Updated session #' . $id
+        );
         
         return response()->json([
             'success' => true,
@@ -207,6 +224,7 @@ class SessionController extends Controller
      */
     public function destroy($id): JsonResponse
     {
+        $session = $this->sessionService->getSessionById($id);
         $deleted = $this->sessionService->deleteSession($id);
         
         if (!$deleted) {
@@ -215,6 +233,13 @@ class SessionController extends Controller
                 'message' => 'Session not found',
             ], 404);
         }
+
+        $this->activityLogService->record(
+            request()->user(),
+            'Deleted session',
+            'Deleted session ' . ($session?->name ?? ('#' . $id)),
+            request()->ip()
+        );
         
         return response()->json([
             'success' => true,
@@ -235,6 +260,13 @@ class SessionController extends Controller
                 'message' => 'Session not found',
             ], 404);
         }
+
+        $this->activityLogService->record(
+            request()->user(),
+            'Toggled session status',
+            'Updated active state for session #' . $id,
+            request()->ip()
+        );
         
         return response()->json([
             'success' => true,
@@ -345,5 +377,3 @@ class SessionController extends Controller
         ]);
     }
 }
-
-

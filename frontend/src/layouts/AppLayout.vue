@@ -31,6 +31,8 @@ import Profile from '../components/Admin/Profile.vue';
 import AbsenceManagement from '../components/Admin/AbsenceManagement.vue';
 import AttendanceControl from '../components/Admin/AttendanceControl.vue';
 import SystemSettings from '../components/Admin/SystemSettings.vue';
+import SessionManagement from '../components/Admin/SessionManagement.vue';
+import BiometricManagement from '../components/Admin/BiometricManagement.vue';
 import { getUserRole } from '../services/auth';
 
 const currentModule = ref('');
@@ -46,6 +48,8 @@ const moduleMap = computed(() => {
     return {
       dashboard: Dashboard,
       attendance: AttendanceControl,
+      sessions: SessionManagement,
+      biometric: BiometricManagement,
       absences: AbsenceManagement,
     } as const;
   } else if (userRole.value === 'education') {
@@ -55,6 +59,8 @@ const moduleMap = computed(() => {
       academic: AcademicStructure,
       students: StudentManagement,
       attendance: AttendanceControl,
+      sessions: SessionManagement,
+      biometric: BiometricManagement,
       absences: AbsenceManagement,
       settings: SystemSettings,
       profile: Profile,
@@ -66,6 +72,8 @@ const moduleMap = computed(() => {
       academic: AcademicStructure,
       students: StudentManagement,
       attendance: AttendanceControl,
+      sessions: SessionManagement,
+      biometric: BiometricManagement,
       absences: AbsenceManagement,
       settings: SystemSettings,
       profile: Profile,

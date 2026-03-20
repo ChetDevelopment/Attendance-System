@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Models\Student;
 use App\Models\Role;
+use App\Models\Student;
+use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly ActivityLogService $activityLogService)
+    {
+    }
+
     private function getStudentRole(): Role
     {
         return Role::query()
@@ -59,7 +64,6 @@ class AuthController extends Controller
         $payload = $user->toArray();
         $resolvedRole = strtolower((string) optional($user->role)->name);
 
-        // Fallback: treat linked student accounts as student even if the role record is missing.
         if (!$resolvedRole && ($user->student_id || $this->findStudentByEmail((string) $user->email))) {
             $resolvedRole = 'student';
         }
@@ -81,19 +85,16 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'role_id' => ['required', 'exists:roles,id'],
         ]);
-
-        // Ensure registration is only for teachers: create or get teacher role
-        $teacherRole = Role::firstOrCreate(['name' => 'teacher']);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role_id' => $teacherRole->id,
+            'role_id' => $validated['role_id'],
         ]);
 
-        // If the role is student, ensure a Student record exists and link it.
         $roleName = Role::find($validated['role_id'])?->name;
         if ($roleName && strtolower($roleName) === 'student') {
             $student = Student::firstOrCreate(
@@ -108,6 +109,13 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('auth-token')->plainTextToken;
+
+        $this->activityLogService->recordFromRequest(
+            $user,
+            $request,
+            'User registered',
+            'Registered new account for ' . $user->email
+        );
 
         return response()->json([
             'message' => 'User registered successfully.',
@@ -137,14 +145,13 @@ class AuthController extends Controller
                 $user = $this->syncUserWithStudent($user, $student);
             }
         } elseif ($student && !empty($student->password) && Hash::check($validated['password'], $student->password)) {
-            // Support legacy student accounts that were stored only in the students table.
             $user = $user ?: new User();
             $user->fill([
                 'name' => $user->name ?: ($student->fullname ?: trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? ''))),
                 'email' => $student->email,
                 'password' => $student->password,
             ]);
-            $user->exists ? $user->save() : $user->save();
+            $user->save();
             $user = $this->syncUserWithStudent($user, $student);
         } else {
             throw ValidationException::withMessages([
@@ -152,10 +159,15 @@ class AuthController extends Controller
             ]);
         }
 
-        // Load the role relationship for the frontend
         $user->load('role');
-
         $token = $user->createToken('auth-token')->plainTextToken;
+
+        $this->activityLogService->recordFromRequest(
+            $user,
+            $request,
+            'User login',
+            'User logged in successfully'
+        );
 
         return response()->json([
             'message' => 'Login successful.',
@@ -166,6 +178,13 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        $this->activityLogService->recordFromRequest(
+            $request->user(),
+            $request,
+            'User logout',
+            'User logged out'
+        );
+
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([

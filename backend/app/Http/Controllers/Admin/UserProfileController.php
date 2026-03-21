@@ -42,6 +42,7 @@ class UserProfileController extends Controller
     {
         $user->loadMissing(['role', 'student.class']);
         $hasTheme = Schema::hasColumn('users', 'theme');
+        $hasLanguage = Schema::hasColumn('users', 'language');
         $hasNotificationEmail = Schema::hasColumn('users', 'notification_email');
         $hasNotificationPush = Schema::hasColumn('users', 'notification_push');
         $hasTwoFactorEnabled = Schema::hasColumn('users', 'two_factor_enabled');
@@ -66,6 +67,7 @@ class UserProfileController extends Controller
             'phone' => $user->phone,
             'bio' => $user->bio,
             'theme' => $hasTheme ? ($user->theme ?? 'light') : 'light',
+            'language' => $hasLanguage ? ($user->language ?? 'en') : 'en',
             'notification_email' => $hasNotificationEmail ? (bool) ($user->notification_email ?? true) : true,
             'notification_push' => $hasNotificationPush ? (bool) ($user->notification_push ?? true) : true,
             'two_factor_enabled' => $hasTwoFactorEnabled ? (bool) ($user->two_factor_enabled ?? false) : false,
@@ -182,6 +184,7 @@ class UserProfileController extends Controller
             $user = $request->user();
             $validated = $request->validate([
                 'theme' => ['nullable', 'string', 'in:light,dark'],
+                'language' => ['nullable', 'string', 'in:en,fr,km'],
                 'notification_email' => ['nullable', 'boolean'],
                 'notification_push' => ['nullable', 'boolean'],
                 'two_factor_enabled' => ['nullable', 'boolean'],

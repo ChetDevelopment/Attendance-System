@@ -19,21 +19,36 @@ class NotificationController extends Controller
     {
         try {
             $user = $request->user();
-            
+
             if (!$user) {
                 return response()->json([
                     'message' => 'Unauthorized'
                 ], 401);
             }
-            
+
             // Get notifications based on user role
             $query = AbsenceNotification::with(['student', 'session']);
-            
+
             // If user is a student, only show their notifications
             if (isset($user->student_id) && $user->student_id) {
                 $query->where('student_id', $user->student_id);
             }
-            
+            // If user is a teacher, show notifications for students in their classes
+            elseif ($user->role && strtolower($user->role->name) === 'teacher') {
+                $teacherClassIds = \App\Models\SchoolClass::where('teacher_id', $user->id)
+                    ->where('is_active', true)
+                    ->pluck('id');
+
+                if ($teacherClassIds->isNotEmpty()) {
+                    $studentIds = \App\Models\Student::whereIn('class_id', $teacherClassIds)
+                        ->pluck('id');
+                    $query->whereIn('student_id', $studentIds);
+                } else {
+                    // Teacher has no classes, return empty
+                    $query->whereNull('id');
+                }
+            }
+
             $notifications = $query
                 ->orderBy('created_at', 'desc')
                 ->limit(50)
@@ -52,7 +67,7 @@ class NotificationController extends Controller
                         'read' => strtolower($notification->status ?? '') !== 'pending',
                     ];
                 });
-            
+
             return response()->json([
                 'notifications' => $notifications,
                 'unread_count' => $notifications->where('read', false)->count(),
@@ -64,7 +79,7 @@ class NotificationController extends Controller
             ], 500);
         }
     }
-    
+
     /**
      * Get notification title based on type
      */
@@ -76,61 +91,61 @@ class NotificationController extends Controller
             'attendance_reminder' => 'Attendance Reminder',
             'low_attendance' => 'Low Attendance Notice',
         ];
-        
+
         return $titles[$notification->notification_type] ?? 'Notification';
     }
-    
+
     /**
      * Mark a notification as read
      */
     public function markAsRead(Request $request, $id)
     {
         $notification = AbsenceNotification::findOrFail($id);
-        
+
         $notification->update([
             'status' => 'read'
         ]);
-        
+
         return response()->json([
             'message' => 'Notification marked as read',
             'notification' => $notification,
         ]);
     }
-    
+
     /**
      * Mark all notifications as read
      */
     public function markAllAsRead(Request $request)
     {
         $user = $request->user();
-        
+
         if (!$user) {
             return response()->json([
                 'message' => 'Unauthorized'
             ], 401);
         }
-        
+
         $query = AbsenceNotification::where('status', 'pending');
-        
+
         // If user is a student, only update their notifications
         if ($user->student_id) {
             $query->where('student_id', $user->student_id);
         }
-        
+
         $query->update(['status' => 'read']);
-        
+
         return response()->json([
             'message' => 'All notifications marked as read',
         ]);
     }
-    
+
     /**
      * Delete a notification
      */
     public function destroy(Request $request, $id)
     {
         $notification = AbsenceNotification::findOrFail($id);
-        
+
         // Check if user owns this notification (for students)
         $user = $request->user();
         if ($user && $user->student_id && $notification->student_id !== $user->student_id) {
@@ -138,35 +153,35 @@ class NotificationController extends Controller
                 'message' => 'Unauthorized'
             ], 403);
         }
-        
+
         $notification->delete();
-        
+
         return response()->json([
             'message' => 'Notification deleted',
         ]);
     }
-    
+
     /**
      * Get unread notification count
      */
     public function unreadCount(Request $request)
     {
         $user = $request->user();
-        
+
         if (!$user) {
             return response()->json([
                 'count' => 0
             ]);
         }
-        
+
         $query = AbsenceNotification::where('status', 'pending');
-        
+
         if ($user->student_id) {
             $query->where('student_id', $user->student_id);
         }
-        
+
         $count = $query->count();
-        
+
         return response()->json([
             'count' => $count
         ]);

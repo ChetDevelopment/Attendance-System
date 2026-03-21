@@ -493,14 +493,14 @@ class TeacherAttendanceController extends Controller
             $calendarId = $request->input('calendar_id');
         }
 
-// DEBUG: Log the calendar ID being used
+        // DEBUG: Log the calendar ID being used
         Log::info('getTodaySchedule: Using calendar_id: ' . $calendarId . ' for date: ' . $date);
 
         try {
             $timetableService = new TimetableService();
             $scheduleData = $timetableService->getTeacherSchedule($calendarId, $date);
 
-// DEBUG: Log the result
+            // DEBUG: Log the result
             Log::info('getTodaySchedule: Result - total_sessions: ' . ($scheduleData['total_sessions'] ?? 0));
 
             return response()->json([
@@ -638,35 +638,71 @@ class TeacherAttendanceController extends Controller
         // Build notifications array
         $notifications = [];
 
-        // Check for pending justifications
-        $pendingJustifications = AttendanceRecord::whereHas('attendance', function ($query) use ($teacherId) {
-            $query->where('submitted_by', $teacherId);
-        })
-            ->where('status', 'absent')
-            ->whereNull('justification_status')
-            ->count();
+        // Get teacher's assigned classes
+        $teacherClassIds = SchoolClass::where('teacher_id', $teacherId)
+            ->where('is_active', true)
+            ->pluck('id');
+
+        // Check for pending justifications - students in teacher's classes who are absent without justification
+        $pendingJustifications = 0;
+        if ($teacherClassIds->isNotEmpty()) {
+            $pendingJustifications = AttendanceRecord::whereIn('attendance_id', function ($query) use ($teacherClassIds, $today) {
+                $query->select('id')
+                    ->from('attendances')
+                    ->whereIn('class_id', $teacherClassIds)
+                    ->whereDate('date', $today);
+            })
+                ->where('status', 'absent')
+                ->whereNull('justification_status')
+                ->count();
+        }
 
         if ($pendingJustifications > 0) {
             $notifications[] = [
-                'id' => 'pending_justifications',
+                'id' => 'pending_justifications_' . $today->format('Y-m-d'),
+                'unread' => true,
                 'type' => 'warning',
                 'title' => 'Pending Justifications',
                 'message' => "You have {$pendingJustifications} absent student(s) awaiting justification.",
+                'time' => $today->format('h:i A'),
                 'created_at' => $today->toISOString(),
             ];
         }
 
-        // Check for today's attendance not submitted
-        $todayAttendance = Attendance::whereDate('date', $today)
-            ->where('submitted_by', $teacherId)
-            ->exists();
+        // Check for today's attendance not submitted for any of teacher's classes
+        if ($teacherClassIds->isNotEmpty()) {
+            $submittedClasses = Attendance::whereDate('date', $today)
+                ->whereIn('class_id', $teacherClassIds)
+                ->pluck('class_id')
+                ->toArray();
 
-        if (!$todayAttendance) {
+            $unsubmittedClasses = $teacherClassIds->filter(function ($classId) use ($submittedClasses) {
+                return !in_array($classId, $submittedClasses);
+            });
+
+            if ($unsubmittedClasses->isNotEmpty()) {
+                $classCount = $unsubmittedClasses->count();
+                $notifications[] = [
+                    'id' => 'attendance_not_submitted_' . $today->format('Y-m-d'),
+                    'unread' => true,
+                    'type' => 'info',
+                    'title' => 'Attendance Not Submitted',
+                    'message' => "You have not submitted attendance for {$classCount} class(es) today.",
+                    'time' => $today->format('h:i A'),
+                    'created_at' => $today->toISOString(),
+                ];
+            }
+        }
+
+        // Add a success notification if all attendance is submitted and no pending justifications
+        if (empty($notifications)) {
             $notifications[] = [
-                'id' => 'attendance_not_submitted',
-                'type' => 'info',
-                'title' => 'Attendance Not Submitted',
-                'message' => 'You have not submitted attendance for today.',
+                'id' => 'all_caught_up_' . $today->format('Y-m-d'),
+                'unread' => false,
+                'type' => 'success',
+                'title' => 'All Caught Up',
+                'message' => 'You have no pending tasks. Great job!',
+                'time' => $today->format('h:i A'),
                 'created_at' => $today->toISOString(),
             ];
         }

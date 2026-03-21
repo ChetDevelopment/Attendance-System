@@ -64,7 +64,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/receive-card-id', [StudentAttendanceController::class, 'cardScan']);
 
-    Route::prefix('teacher')->group(function () {
+    Route::prefix('teacher')->middleware('role:teacher')->group(function () {
         Route::get('/students', [TeacherAttendanceController::class, 'getAllStudents']);
         Route::get('/classes/{classId}/students', [TeacherAttendanceController::class, 'getStudentsByClass']);
         Route::get('/schedule', [TeacherAttendanceController::class, 'getSchedule']);

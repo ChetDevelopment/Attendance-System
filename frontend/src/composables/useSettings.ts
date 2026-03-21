@@ -12,6 +12,27 @@ export const useSettings = () => {
     localStorage.getItem(STORAGE_KEY_LANGUAGE) || 'en'
   )
 
+  // Initialize dark mode and language from backend settings
+  const initFromBackend = (theme: string, lang: string) => {
+    // Only use backend values if localStorage doesn't have values
+    if (!localStorage.getItem(STORAGE_KEY_DARK_MODE)) {
+      darkMode.value = theme === 'dark'
+      if (darkMode.value) {
+        document.documentElement.classList.add('dark')
+      }
+    } else {
+      // Apply existing localStorage value
+      if (darkMode.value) {
+        document.documentElement.classList.add('dark')
+      }
+    }
+    
+    if (!localStorage.getItem(STORAGE_KEY_LANGUAGE)) {
+      language.value = lang || 'en'
+      localStorage.setItem(STORAGE_KEY_LANGUAGE, language.value)
+    }
+  }
+
   const toggleDarkMode = () => {
     darkMode.value = !darkMode.value
     localStorage.setItem(STORAGE_KEY_DARK_MODE, String(darkMode.value))
@@ -32,6 +53,7 @@ export const useSettings = () => {
     language,
     toggleDarkMode,
     setLanguage,
+    initFromBackend,
   }
 }
 

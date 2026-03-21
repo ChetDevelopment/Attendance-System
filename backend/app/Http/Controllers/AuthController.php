@@ -12,9 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly ActivityLogService $activityLogService)
-    {
-    }
+    public function __construct(private readonly ActivityLogService $activityLogService) {}
 
     private function getStudentRole(): Role
     {
@@ -35,6 +33,21 @@ class AuthController extends Controller
     {
         $studentRole = $this->getStudentRole();
 
+        // Don't link teachers/admins to students at all - only sync for actual students
+        $currentRole = $user->role;
+        $isTeacherOrAdmin = $currentRole &&
+            in_array(strtolower($currentRole->name ?? ''), ['teacher', 'admin', 'education team', 'training team']);
+
+        // If user is a teacher/admin, don't link to student or sync any data
+        // Also clear any incorrect student_id they might have from previous logins
+        if ($isTeacherOrAdmin) {
+            if ($user->student_id) {
+                $user->student_id = null;
+                $user->save();
+            }
+            return $user;
+        }
+
         $updates = [];
 
         if ((int) $user->student_id !== (int) $student->id) {
@@ -45,6 +58,7 @@ class AuthController extends Controller
             $updates['role_id'] = $studentRole->id;
         }
 
+        // Only update name from student for users with student role
         if (empty($user->name) && !empty($student->fullname)) {
             $updates['name'] = $student->fullname;
         }
@@ -140,6 +154,11 @@ class AuthController extends Controller
         $user = User::where('email', $validated['email'])->first();
         $student = $this->findStudentByEmail($validated['email']);
 
+        // Load role early so syncUserWithStudent can make informed decisions
+        if ($user) {
+            $user->load('role');
+        }
+
         if ($user && Hash::check($validated['password'], $user->password)) {
             if ($student) {
                 $user = $this->syncUserWithStudent($user, $student);
@@ -152,6 +171,7 @@ class AuthController extends Controller
                 'password' => $student->password,
             ]);
             $user->save();
+            $user->load('role'); // Ensure role is loaded before sync
             $user = $this->syncUserWithStudent($user, $student);
         } else {
             throw ValidationException::withMessages([

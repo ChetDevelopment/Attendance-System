@@ -14,13 +14,36 @@ import { useSettings } from '../composables/useSettings';
 
 const { darkMode, language } = useSettings();
 
+import { getUser } from '../../services/auth';
+import { profileService } from '../../services/profileService';
+
 const currentTab = ref<'profile' | 'notifications'>('profile');
 
+// Initialize with stored user data
+const storedUser = getUser();
 const profile = ref({
-  name: 'Dr. Smith',
-  email: 'smith.math@school.edu',
-  department: 'Mathematics & Physics'
+  name: storedUser?.name || '',
+  email: storedUser?.email || '',
+  department: storedUser?.department || ''
 });
+
+// Fetch latest profile data on mount
+const loadProfile = async () => {
+  try {
+    const data = await profileService.getProfile();
+    if (data) {
+      profile.value = {
+        name: data.name || '',
+        email: data.email || '',
+        department: ''
+      };
+    }
+  } catch (e) {
+    console.error('Failed to load profile:', e);
+  }
+};
+
+loadProfile();
 
 const notifications = ref({
   email: true,

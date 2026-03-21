@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import Sidebar, { ViewType, User } from "../components/Teacher/Sidebar.vue";
 import Header from "../components/Teacher/Header.vue";
@@ -14,20 +14,36 @@ import SettingsView from "../components/Teacher/SettingsView.vue";
 import NotificationsView from "../components/Teacher/NotificationsView.vue";
 import api from "../services/api";
 import { teacherService } from "../services/teacherService";
+import { profileService } from "../services/profileService";
 import {
   clearStudentSession,
   clearToken,
   clearUser,
   clearUserRole,
   getUser,
+  setUser,
 } from "../services/auth";
 
 const router = useRouter();
 const DEFAULT_TEACHER_PHOTO = "/default-teacher.svg";
 
-// Initialize with stored user
-// The user data is set during login and stored in localStorage
-const loggedUser = getUser();
+// Fetch fresh user profile from backend
+const fetchAndUpdateUserProfile = async () => {
+  try {
+    const profile = await profileService.getProfile();
+    if (profile) {
+      // Update local storage with fresh data
+      setUser(profile);
+      return profile;
+    }
+  } catch (e) {
+    console.error("Failed to fetch user profile:", e);
+  }
+  return getUser();
+};
+
+// Initialize with stored user (will be refreshed on mount)
+let initialUser = getUser();
 
 // Get the proper fields from the backend user response
 // Backend returns: name, email, role, profile_image, calendar_id
@@ -36,7 +52,7 @@ const getUserPhoto = (user: any) => {
   // First check for profile_image (backend field)
   if (user?.profile_image) {
     // Check if it's a valid path (starts with /teacherFaces/)
-    if (user.profile_image.startsWith('/teacherFaces/')) {
+    if (user.profile_image.startsWith("/teacherFaces/")) {
       return user.profile_image;
     }
   }
@@ -55,19 +71,42 @@ const getUserPhoto = (user: any) => {
 };
 
 // Only show the current logged-in user, not all teachers
+const currentUserData = ref<any>(initialUser);
+
+// Update user data after fetching fresh profile
+const updateCurrentUser = (profileData: any) => {
+  if (profileData) {
+    currentUserData.value = profileData;
+  }
+};
+
 const MOCK_USERS = ref<User[]>([
   {
-    name: loggedUser?.name || "Teacher",
+    name: currentUserData.value?.name || "Teacher",
     role: "teacher",
-    department: loggedUser?.department || "Teacher",
+    department: currentUserData.value?.department || "Teacher",
     photo:
-      loggedUser?.photo ||
-      "https://image2url.com/r2/default/images/1773553855939-e3b32a24-8b55-46a4-86fa-46b9710946fb.png",
+      currentUserData.value?.photo || currentUserData.value?.avatar_url || "",
   },
 ]);
 
 const currentView = ref<ViewType>("dashboard");
-const user = ref<User>(MOCK_USERS.value[0]);
+
+// Computed user that updates when MOCK_USERS changes
+const selectedUserIndex = ref(0);
+
+const user = computed<User>(() => {
+  const users = MOCK_USERS.value;
+  if (users && users.length > 0) {
+    return users[selectedUserIndex.value] || users[0];
+  }
+  return {
+    name: "Teacher",
+    role: "teacher" as const,
+    department: "Teacher",
+    photo: DEFAULT_TEACHER_PHOTO,
+  };
+});
 
 // Academic year state
 const academicYears = ref<any[]>([]);
@@ -85,7 +124,24 @@ const loadAcademicYears = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  // Fetch fresh user profile from backend
+  const freshProfile = await fetchAndUpdateUserProfile();
+  if (freshProfile) {
+    updateCurrentUser(freshProfile);
+    // Update MOCK_USERS with fresh data
+    MOCK_USERS.value = [
+      {
+        name: freshProfile.name || "Teacher",
+        role: "teacher",
+        department: freshProfile.department || "Teacher",
+        photo:
+          freshProfile.photo ||
+          freshProfile.avatar_url ||
+          getUserPhoto(freshProfile),
+      },
+    ];
+  }
   loadAcademicYears();
 });
 
@@ -94,12 +150,16 @@ const handleViewChange = (view: ViewType) => {
 };
 
 const handleUserChange = (newUser: User) => {
-  user.value = newUser;
+  // Find the index of the selected user and update
+  const idx = MOCK_USERS.value.findIndex((u: User) => u.name === newUser.name);
+  if (idx >= 0) {
+    selectedUserIndex.value = idx;
+  }
 };
 
 const handleLogout = async () => {
   try {
-    await api.post("/auth/logout");
+    await api.post("/auth/logout", {});
   } catch {
     // Ignore API failures and proceed with local logout.
   } finally {

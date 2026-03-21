@@ -53,11 +53,15 @@ class UserProfileController extends Controller
             $studentClass = StudentClass::query()->find($student->class_id);
         }
 
+        $roleName = strtolower((string) optional($user->role)->name);
+        // Only use student name for users with student role
+        $displayName = ($roleName === 'student' && $student?->fullname) ? $student->fullname : $user->name;
+
         return [
             'id' => $user->id,
-            'name' => $student?->fullname ?: $user->name,
+            'name' => $displayName,
             'email' => $user->email,
-            'role' => strtolower((string) optional($user->role)->name),
+            'role' => $roleName,
             'avatar_url' => $user->avatar_url,
             'phone' => $user->phone,
             'bio' => $user->bio,

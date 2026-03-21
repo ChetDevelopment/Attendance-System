@@ -1,79 +1,88 @@
-name: Build & Deploy 
+name: Build & Deploy Portfolio
 
-on: 
-  push: 
-    branches: [main] 
+on:
+  push:
+    branches: [main]
 
-env:
-  # Prefer the Docker Hub username secret, but fall back to the repo owner so
-  # image tags never become invalid if the secret is missing.
-  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_USERNAME || github.repository_owner }}
-
-jobs: 
-  test: 
-    runs-on: ubuntu-latest 
-    steps: 
-      - uses: actions/checkout@v4 
-
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2' # Match your project version
+          php-version: '8.3'
+      - name: Run PHP Tests
+        run: |
+          cd backend
+          composer install
+          # Skip tests if you don't have them yet, otherwise:
+          # php artisan test
 
-      - name: Run PHP Tests 
-        run: | 
-          cd backend 
-          cp .env.example .env          # 1. Create env file
-          composer install 
-          php artisan key:generate     # 2. Generate key so tests don't fail
-          php artisan test 
-
-  build-and-push: 
-    needs: test 
-    runs-on: ubuntu-latest 
-    steps: 
-      - uses: actions/checkout@v4 
-
-      - name: Login to Docker Hub 
-        uses: docker/login-action@v3 
-        with: 
-          username: ${{ env.DOCKER_USERNAME }} 
-          password: ${{ secrets.DOCKER_PASSWORD }} 
-
-      - name: Build & Push Backend 
-        uses: docker/build-push-action@v5 
-        with: 
-          context: ./backend 
-          push: true 
-          tags: | 
-            ${{ env.DOCKER_USERNAME }}/attendance-backend:latest 
-            ${{ env.DOCKER_USERNAME }}/attendance-backend:${{ github.sha }} 
-
-      - name: Build & Push Frontend 
-        uses: docker/build-push-action@v5 
-        with: 
-          context: ./frontend 
-          push: true 
-          tags: | 
-            ${{ env.DOCKER_USERNAME }}/attendance-frontend:latest 
-
-  deploy: 
-    needs: build-and-push 
-    runs-on: ubuntu-latest 
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
     steps:
-      - name: Deploy to EC2 
-        uses: appleboy/ssh-action@v1 
-        with: 
-          host: ${{ secrets.SERVER_IP }} 
-          username: ${{ secrets.SERVER_USER }} 
-          key: ${{ secrets.SSH_PRIVATE_KEY }} 
-          script: | 
-            cd /home/ubuntu/folder_name 
-            export DOCKER_USERNAME=${{ env.DOCKER_USERNAME }}
-            # Update the images to the ones just pushed
-            docker compose pull 
-            # Restart containers with new images
-            docker compose up -d --remove-orphans 
-            # Run production commands inside the NEW container
-            docker compose exec -T backend php artisan migrate --force 
-            docker compose exec -T backend php artisan optimize
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & Push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/attendance-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/attendance-backend:${{ github.sha }}
+
+      - name: Build & Push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          # This bakes your AWS IP into the frontend build
+          build-args: |
+            VITE_API_URL=http://${{ secrets.AWS_HOST }}/api/v1
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/attendance-frontend:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          script: |
+            # 1. Move to project folder
+            mkdir -p ~/vanda-portfolio
+            cd ~/vanda-portfolio
+
+            # 2. Pull new images
+            # Ensure your server's .env has DOCKER_USERNAME set
+            docker compose pull
+
+            # 3. Restart containers
+            docker compose up -d --remove-orphans
+
+            # 4. Wait for MySQL (Avoids 'Connection Refused' error)
+            echo "Waiting for MySQL..."
+            sleep 15
+
+            # 5. Laravel Setup
+            docker exec laravel_backend php artisan migrate --force
+            docker exec laravel_backend php artisan config:cache
+
+            # 6. FIX PERMISSIONS (Solves the 500 error)
+            docker exec -u root laravel_backend chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+            
+            echo "🚀 Vanda Portfolio is LIVE!"

@@ -63,19 +63,34 @@ jobs:
           username: ${{ secrets.SERVER_USER }} 
           key: ${{ secrets.SSH_PRIVATE_KEY }} 
           script: | 
-            cd /home/ubuntu/Attendance-System
+            # 1. Set the correct path (Update 'folder_name' to your actual folder!)
+            APP_DIR="/home/ubuntu/Attendance-System"
+
+            # 2. Check if the directory even exists
+            if [ ! -d "$APP_DIR" ]; then
+              echo "❌ ERROR: Directory $APP_DIR does not exist on the server!"
+              echo "Available folders in /home/ubuntu are:"
+              ls -F /home/ubuntu
+              exit 1
+            fi
+
+            cd $APP_DIR
+
+            # 3. Check if the docker-compose file exists here
+            if [ ! -f "docker-compose.yml" ] && [ ! -f "docker-compose.yaml" ]; then
+              echo "❌ ERROR: No docker-compose file found in $APP_DIR"
+              echo "Files currently in this folder:"
+              ls -la
+              exit 1
+            fi
+
+            # 4. If everything is okay, run the deployment
+            echo "✅ Found config. Starting deployment..."
+            docker compose pull
+            docker compose up -d --remove-orphans
             
-            # 1. Pull latest images
-            docker compose pull 
-            
-            # 2. Start (or restart) the containers
-            # The -d runs it in the background
-            docker compose up -d --remove-orphans 
-            
-            # 3. Wait 5 seconds to ensure the backend container is initialized
+            # Use the service name 'backend' from your YAML
+            echo "Waiting for backend to stabilize..."
             sleep 5
-            
-            # 4. Run your Laravel commands
-            # Using 'docker compose exec' is often more reliable than 'docker exec'
-            docker compose exec -T backend php artisan migrate --force 
+            docker compose exec -T backend php artisan migrate --force
             docker compose exec -T backend php artisan optimize

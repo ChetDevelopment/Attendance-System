@@ -33,6 +33,11 @@ class UserSeeder extends Seeder
                 'name' => 'Teacher User',
                 'email' => 'teacher@pnc.com',
                 'password' => Hash::make('teacher123'),
+                'role_id' => 2, // Teacher role
+                'is_active' => true,
+                'calendar_id' => null,
+            ],
+            [
                 'name' => 'Davy',
                 'email' => 'davy@pnc.com',
                 'password' => Hash::make('davy123'),

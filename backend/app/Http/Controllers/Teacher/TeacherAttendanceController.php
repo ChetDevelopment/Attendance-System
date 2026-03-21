@@ -11,6 +11,7 @@ use App\Models\Session;
 use App\Models\SchoolClass;
 use App\Models\AbsenceComment;
 use App\Models\AcademicYear;
+use App\Services\TimetableService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -492,14 +493,14 @@ class TeacherAttendanceController extends Controller
             $calendarId = $request->input('calendar_id');
         }
 
-        // DEBUG: Log the calendar ID being used
+// DEBUG: Log the calendar ID being used
         Log::info('getTodaySchedule: Using calendar_id: ' . $calendarId . ' for date: ' . $date);
 
         try {
             $timetableService = new TimetableService();
             $scheduleData = $timetableService->getTeacherSchedule($calendarId, $date);
 
-            // DEBUG: Log the result
+// DEBUG: Log the result
             Log::info('getTodaySchedule: Result - total_sessions: ' . ($scheduleData['total_sessions'] ?? 0));
 
             return response()->json([

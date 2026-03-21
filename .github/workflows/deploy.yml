@@ -7,7 +7,7 @@ on:
 env:
   # Prefer the Docker Hub username secret, but fall back to the repo owner so
   # image tags never become invalid if the secret is missing.
-  DOCKER_NAMESPACE: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_USERNAME || github.repository_owner }}
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_USERNAME || github.repository_owner }}
 
 jobs: 
   test: 
@@ -69,7 +69,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }} 
           script: | 
             cd /home/ubuntu/folder_name 
-            export DOCKER_USERNAME=${{ env.DOCKER_NAMESPACE }}
+            export DOCKER_USERNAME=${{ env.DOCKER_USERNAME }}
             # Update the images to the ones just pushed
             docker compose pull 
             # Restart containers with new images

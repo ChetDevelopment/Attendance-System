@@ -59,8 +59,10 @@ const MOCK_USERS = ref<User[]>([
   {
     name: loggedUser?.name || "Teacher",
     role: "teacher",
-    department: loggedUser?.department || loggedUser?.role?.name || "Teacher",
-    photo: getUserPhoto(loggedUser),
+    department: loggedUser?.department || "Teacher",
+    photo:
+      loggedUser?.photo ||
+      "https://image2url.com/r2/default/images/1773553855939-e3b32a24-8b55-46a4-86fa-46b9710946fb.png",
   },
 ]);
 

@@ -11,7 +11,6 @@ use App\Models\Session;
 use App\Models\SchoolClass;
 use App\Models\AbsenceComment;
 use App\Models\AcademicYear;
-use App\Services\TimetableService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;

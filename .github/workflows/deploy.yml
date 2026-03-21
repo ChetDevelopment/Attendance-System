@@ -63,7 +63,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }} 
           key: ${{ secrets.SSH_PRIVATE_KEY }} 
           script: | 
-            cd /home/ubuntu/folder_name 
+            cd /home/ubuntu/Attendance-System
             
             # 1. Pull the new images from Docker Hub
             docker compose pull 

@@ -65,16 +65,17 @@ jobs:
           script: | 
             cd /home/ubuntu/Attendance-System
             
-            # 1. Pull the new images from Docker Hub
+            # 1. Pull latest images
             docker compose pull 
             
-            # 2. Restart containers with the updated images
+            # 2. Start (or restart) the containers
+            # The -d runs it in the background
             docker compose up -d --remove-orphans 
             
-            # 3. Run migrations and optimization inside the backend container
-            # Using 'laravel_backend' to match your docker-compose.yml
-            docker exec laravel_backend php artisan migrate --force 
-            docker exec laravel_backend php artisan optimize
+            # 3. Wait 5 seconds to ensure the backend container is initialized
+            sleep 5
             
-            # 4. Fix folder permissions (standard for Laravel on Linux)
-            docker exec laravel_backend chown -R www-data:www-data storage bootstrap/cache
+            # 4. Run your Laravel commands
+            # Using 'docker compose exec' is often more reliable than 'docker exec'
+            docker compose exec -T backend php artisan migrate --force 
+            docker compose exec -T backend php artisan optimize

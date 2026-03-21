@@ -56,41 +56,34 @@ jobs:
     needs: build-and-push 
     runs-on: ubuntu-latest 
     steps:
-      - name: Deploy to EC2 via SSH
+      - uses: actions/checkout@v4 # Gets the files from your GitHub repo
+
+      - name: Copy Config to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # Path to your files in the repo -> Path on the server
+          source: "docker-compose.yml,nginx/default.conf"
+          target: "/home/ubuntu/Attendance-System"
+
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1 
         with: 
           host: ${{ secrets.SERVER_IP }} 
           username: ${{ secrets.SERVER_USER }} 
           key: ${{ secrets.SSH_PRIVATE_KEY }} 
           script: | 
-            # 1. Set the correct path (Update 'folder_name' to your actual folder!)
-            APP_DIR="/home/ubuntu/Attendance-System"
-
-            # 2. Check if the directory even exists
-            if [ ! -d "$APP_DIR" ]; then
-              echo "❌ ERROR: Directory $APP_DIR does not exist on the server!"
-              echo "Available folders in /home/ubuntu are:"
-              ls -F /home/ubuntu
-              exit 1
-            fi
-
-            cd $APP_DIR
-
-            # 3. Check if the docker-compose file exists here
-            if [ ! -f "docker-compose.yml" ] && [ ! -f "docker-compose.yaml" ]; then
-              echo "❌ ERROR: No docker-compose file found in $APP_DIR"
-              echo "Files currently in this folder:"
-              ls -la
-              exit 1
-            fi
-
-            # 4. If everything is okay, run the deployment
-            echo "✅ Found config. Starting deployment..."
-            docker compose pull
-            docker compose up -d --remove-orphans
+            cd /home/ubuntu/Attendance-System
             
-            # Use the service name 'backend' from your YAML
-            echo "Waiting for backend to stabilize..."
+            # 1. Pull the images using the file we just uploaded
+            docker compose pull 
+            
+            # 2. Start everything
+            docker compose up -d --remove-orphans 
+            
+            # 3. Run Laravel commands (matching your service names)
             sleep 5
-            docker compose exec -T backend php artisan migrate --force
+            docker compose exec -T backend php artisan migrate --force 
             docker compose exec -T backend php artisan optimize

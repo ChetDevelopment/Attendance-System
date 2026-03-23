@@ -323,7 +323,9 @@ class TeacherAttendanceController extends Controller
             }
         }
 
-        $classes = $classQuery->orderBy('name')->get();
+        $classes = $this->deduplicateClassesForTeacher(
+            $classQuery->orderBy('name')->orderBy('id')->get()
+        );
 
         // Get all teachers for the dropdown
         $teachers = \App\Models\User::whereHas('role', function ($query) {
@@ -346,6 +348,37 @@ class TeacherAttendanceController extends Controller
             'teachers' => $teachers,
             'class_id' => $classes->first()->id ?? null,
         ]);
+    }
+
+    /**
+     * Hide legacy duplicate classes for the same academic year.
+     *
+     * Some data sets contain both a short code like `WEP-A-20261` and a longer
+     * generated code like `WEP-A-20252026` for the same class/year. We keep the
+     * shorter code in teacher attendance to avoid duplicate dropdown options.
+     */
+    private function deduplicateClassesForTeacher($classes)
+    {
+        return $classes
+            ->groupBy(fn ($class) => ($class->academic_year_id ?? 'null') . ':' . trim((string) $class->name))
+            ->map(function ($group) {
+                return $group
+                    ->sort(function ($left, $right) {
+                        $lengthCompare = strlen((string) $left->code) <=> strlen((string) $right->code);
+
+                        if ($lengthCompare !== 0) {
+                            return $lengthCompare;
+                        }
+
+                        return $left->id <=> $right->id;
+                    })
+                    ->first();
+            })
+            ->sortBy([
+                ['name', 'asc'],
+                ['code', 'asc'],
+            ])
+            ->values();
     }
 
     /**

@@ -31,7 +31,7 @@ class AttendanceSeeder extends Seeder
         $today = '2026-03-18';
         
         // Sample attendance records for today
-         DB::table('attendances')->insert([
+        DB::table('attendances')->upsert([
             [
                 'class_id' => $classId,
                 'session_id' => $session1,
@@ -88,6 +88,6 @@ class AttendanceSeeder extends Seeder
                 'updated_at' => Carbon::now(),
             ],
             
-        ]);
+        ], ['class_id', 'session_id', 'date'], ['submitted_by', 'is_locked', 'updated_at']);
     }
 }

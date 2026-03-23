@@ -11,9 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('attendance_records', function (Blueprint $table) {
-            $table->dropUnique('attendance_records_student_id_session_id_unique');
-        });
+        if (!Schema::hasTable('attendance_records')) {
+            return;
+        }
+
+        try {
+            Schema::table('attendance_records', function (Blueprint $table) {
+                $table->dropUnique('attendance_records_student_id_session_id_unique');
+            });
+        } catch (\Throwable $e) {
+            // No-op when the legacy unique index was never created.
+        }
     }
 
     /**
@@ -26,4 +34,3 @@ return new class extends Migration
         });
     }
 };
-

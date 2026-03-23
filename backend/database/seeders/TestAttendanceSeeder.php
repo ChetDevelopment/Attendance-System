@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 use App\Models\Student;
 use App\Models\Session;
@@ -31,38 +32,56 @@ class TestAttendanceSeeder extends Seeder
             $session = (object) ['id' => $sessionId];
         }
 
-        // Sample attendance records - removed check_in_time
-        DB::table('attendance_records')->insert([
+        $teacherId = DB::table('users')->where('role_id', 2)->value('id') ?? 1;
+        $dateColumn = Schema::hasColumn('attendance_records', 'attendance_date')
+            ? 'attendance_date'
+            : 'date';
+
+        $records = [
             [
                 'student_id' => $student->id,
                 'session_id' => $session->id,
-                'status' => 'PRESENT',
-                'attendance_date' => now()->subDays(1)->format('Y-m-d'),
-                'submitted_by' => 6, // test user id
-                'created_at' => now(),
-                'updated_at' => now(),
+                'status' => 'present',
+                $dateColumn => now()->subDays(1)->format('Y-m-d'),
             ],
             [
                 'student_id' => $student->id,
                 'session_id' => $session->id,
-                'status' => 'LATE',
-                'attendance_date' => now()->subDays(2)->format('Y-m-d'),
-                'submitted_by' => 6,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'status' => 'late',
+                $dateColumn => now()->subDays(2)->format('Y-m-d'),
             ],
             [
                 'student_id' => $student->id,
                 'session_id' => $session->id,
-                'status' => 'PRESENT',
-                'attendance_date' => now()->format('Y-m-d'),
-                'submitted_by' => 6,
+                'status' => 'present',
+                $dateColumn => now()->format('Y-m-d'),
+            ],
+        ];
+
+        foreach ($records as $record) {
+            $payload = array_merge($record, [
                 'created_at' => now(),
                 'updated_at' => now(),
-            ],
-        ]);
+            ]);
+
+            if (Schema::hasColumn('attendance_records', 'submitted_by')) {
+                $payload['submitted_by'] = $teacherId;
+            }
+
+            if (Schema::hasColumn('attendance_records', 'recorded_by')) {
+                $payload['recorded_by'] = $teacherId;
+            }
+
+            DB::table('attendance_records')->updateOrInsert(
+                [
+                    'student_id' => $record['student_id'],
+                    'session_id' => $record['session_id'],
+                    $dateColumn => $record[$dateColumn],
+                ],
+                $payload
+            );
+        }
 
         $this->command->info('Test attendance data created for TEST-001');
     }
 }
-

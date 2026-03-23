@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('students') || !Schema::hasColumn('students', 'parent_name')) {
+            return;
+        }
+
         Schema::table('students', function (Blueprint $table) {
             $table->dropColumn('parent_name');
         });

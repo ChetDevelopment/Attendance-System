@@ -58,10 +58,22 @@ class ClassSeeder extends Seeder
             ];
 
             foreach ($classes as $class) {
-                // Update existing class or create new one
-                $existingClass = SchoolClass::where('code', $class['code'])->first();
-                if ($existingClass) {
-                    $existingClass->update(['teacher_id' => $class['teacher_id']]);
+                $duplicateClasses = SchoolClass::where('name', $class['name'])
+                    ->where('academic_year_id', $class['academic_year_id'])
+                    ->orderByRaw('CHAR_LENGTH(code) asc')
+                    ->orderBy('id')
+                    ->get();
+
+                if ($duplicateClasses->isNotEmpty()) {
+                    $canonicalClass = $duplicateClasses->first();
+                    $canonicalClass->update([
+                        'description' => $class['description'],
+                        'teacher_id' => $class['teacher_id'],
+                        'is_active' => true,
+                    ]);
+
+                    SchoolClass::whereIn('id', $duplicateClasses->pluck('id')->slice(1))
+                        ->update(['is_active' => false]);
                 } else {
                     SchoolClass::create($class);
                 }

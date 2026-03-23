@@ -55,7 +55,8 @@ class EducationDashboardController extends Controller
     public function absentToday()
     {
         $rows = AbsenceNotification::query()
-            ->with(['student:id,fullname,class,class_id', 'attendanceRecord:id'])
+            ->with(['student:id,fullname,class,class_id', 'student.schoolClass:id,name', 'attendanceRecord:id'])
+            ->where('status', 'active')
             ->whereDate('created_at', today())
             ->latest()
             ->get()
@@ -63,7 +64,7 @@ class EducationDashboardController extends Controller
                 return [
                     'attendance_id' => $absence->attendance_record_id ?: $absence->id,
                     'name' => $absence->student?->fullname ?? 'Unknown Student',
-                    'class' => $absence->student?->class ?? 'Unknown Class',
+                    'class' => $absence->student?->schoolClass?->name ?? $absence->student?->class ?? 'Unknown Class',
                     'resolved' => strtoupper((string) $absence->absence_status) !== 'PENDING',
                 ];
             });
@@ -74,7 +75,9 @@ class EducationDashboardController extends Controller
     public function allAbsent()
     {
         $rows = AbsenceNotification::query()
-            ->with('student:id,fullname,class')
+            ->with('student:id,fullname,class,class_id')
+            ->with('student.schoolClass:id,name')
+            ->where('status', 'active')
             ->latest()
             ->limit(100)
             ->get()
@@ -82,7 +85,7 @@ class EducationDashboardController extends Controller
                 return [
                     'attendance_id' => $absence->attendance_record_id ?: $absence->id,
                     'name' => $absence->student?->fullname ?? 'Unknown Student',
-                    'class' => $absence->student?->class ?? 'Unknown Class',
+                    'class' => $absence->student?->schoolClass?->name ?? $absence->student?->class ?? 'Unknown Class',
                     'date' => optional($absence->created_at)->toDateString(),
                     'reason' => $absence->absence_reason,
                     'resolved' => strtoupper((string) $absence->absence_status) !== 'PENDING',
@@ -100,14 +103,15 @@ class EducationDashboardController extends Controller
             ->whereRaw('LOWER(status) = ?', ['absent'])
             ->groupBy('student_id')
             ->havingRaw('COUNT(*) >= 3')
-            ->with('student:id,fullname,class')
+            ->with('student:id,fullname,class,class_id')
+            ->with('student.schoolClass:id,name')
             ->orderByDesc('absence_count')
             ->limit(20)
             ->get()
             ->map(function (AttendanceRecord $record) {
                 return [
                     'name' => $record->student?->fullname ?? 'Unknown Student',
-                    'class' => $record->student?->class ?? 'Unknown Class',
+                    'class' => $record->student?->schoolClass?->name ?? $record->student?->class ?? 'Unknown Class',
                     'absence_count' => (int) $record->absence_count,
                     'latest_attendance_id' => (int) $record->latest_attendance_id,
                 ];
@@ -122,7 +126,7 @@ class EducationDashboardController extends Controller
             ->join('students as s', 's.id', '=', 'ar.student_id')
             ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
             ->selectRaw("
-                COALESCE(c.class_name, s.class, 'Unknown Class') as class,
+                COALESCE(c.name, c.class_name, s.class, 'Unknown Class') as class,
                 SUM(CASE WHEN LOWER(ar.status) = 'present' THEN 1 ELSE 0 END) as present_count,
                 SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count,
                 SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count
@@ -165,7 +169,7 @@ class EducationDashboardController extends Controller
         return response()->json([
             'id' => $absence->attendance_record_id ?: $absence->id,
             'name' => $absence->student?->fullname ?? 'Unknown Student',
-            'class' => $absence->student?->class ?? 'Unknown Class',
+            'class' => $absence->student?->schoolClass?->name ?? $absence->student?->class ?? 'Unknown Class',
             'date' => optional($absence->created_at)->toDateString(),
             'contact_info' => $absence->student?->parent_number ?: $absence->student?->contact ?: 'No contact available',
             'reason' => $absence->absence_reason ?? '',

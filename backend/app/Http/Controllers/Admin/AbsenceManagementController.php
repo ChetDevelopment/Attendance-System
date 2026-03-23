@@ -37,12 +37,13 @@ class AbsenceManagementController extends Controller
                 ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
                 ->leftJoin('sessions as sess', 'sess.id', '=', 'an.session_id')
                 ->leftJoin('attendance_records as ar', 'ar.id', '=', 'an.attendance_record_id')
+                ->where('an.status', 'active')
                 ->selectRaw("
                     an.id,
                     an.student_id,
                     s.fullname as student_name,
                     s.username as student_code,
-                    COALESCE(c.name, s.class, 'Unknown') as class_name,
+                    COALESCE(c.name, c.class_name, s.class, 'Unknown') as class_name,
                     s.class_id,
                     DATE(an.created_at) as absence_date,
                     sess.name as session_name,
@@ -479,6 +480,7 @@ class AbsenceManagementController extends Controller
             $endDate = $request->input('end_date', Carbon::today()->toDateString());
 
             $summary = AbsenceNotification::whereBetween('created_at', [$startDate, $endDate])
+                ->where('status', 'active')
                 ->selectRaw(
                     "COUNT(*) as total,
                      SUM(CASE WHEN absence_status = ? THEN 1 ELSE 0 END) as pending,
@@ -503,10 +505,11 @@ class AbsenceManagementController extends Controller
             $byClass = DB::table('absence_notifications as an')
                 ->join('students as s', 's.id', '=', 'an.student_id')
                 ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
+                ->where('an.status', 'active')
                 ->whereBetween('an.created_at', [$startDate, $endDate])
-                ->groupBy('c.class_name', 's.class')
+                ->groupBy('c.name', 'c.class_name', 's.class')
                 ->selectRaw("
-                    COALESCE(c.class_name, s.class, 'Unknown') as class_name,
+                    COALESCE(c.name, c.class_name, s.class, 'Unknown') as class_name,
                     COUNT(*) as total,
                     SUM(CASE WHEN an.absence_status = 'PENDING' THEN 1 ELSE 0 END) as pending,
                     SUM(CASE WHEN an.absence_status = 'EXCUSED' THEN 1 ELSE 0 END) as excused,
@@ -521,6 +524,7 @@ class AbsenceManagementController extends Controller
                     Carbon::today()->subDays(6)->startOfDay(),
                     Carbon::today()->endOfDay(),
                 ])
+                ->where('status', 'active')
                 ->groupBy(DB::raw('DATE(created_at)'))
                 ->selectRaw("
                     DATE(created_at) as date,
@@ -610,5 +614,4 @@ class AbsenceManagementController extends Controller
         return "{$existingText}\n\n{$entry}";
     }
 }
-
 

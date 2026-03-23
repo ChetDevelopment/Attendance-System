@@ -14,7 +14,7 @@ class AttendanceRecord extends Model
         'student_id',
         'session_id',
         'attendance_id',
-        'recorded_by',
+        'submitted_by',
         'attendance_date',
         'status',
         'check_in_time',
@@ -44,6 +44,16 @@ class AttendanceRecord extends Model
     public function teacher()
     {
         return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    public function setRecordedByAttribute($value): void
+    {
+        $this->attributes['submitted_by'] = $value;
+    }
+
+    public function getRecordedByAttribute()
+    {
+        return $this->attributes['submitted_by'] ?? null;
     }
 
     public function absenceComments()

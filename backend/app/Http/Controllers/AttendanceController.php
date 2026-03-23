@@ -13,9 +13,15 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use App\Enums\AttendanceStatus;
 use Illuminate\Support\Facades\Log;
+use App\Services\AttendanceIntegrationService;
 
 class AttendanceController extends Controller
 {
+    public function __construct(
+        private readonly AttendanceIntegrationService $attendanceIntegrationService
+    ) {
+    }
+
     /**
      * Mark attendance for a student (general endpoint)
      * Payload: { class_id, student_id, status, attendance_date (optional), session_id (optional) }
@@ -296,7 +302,7 @@ class AttendanceController extends Controller
             // Build record data
             $recordData = [
                 'status' => $status->value,
-                'recorded_by' => auth()->id(),
+                'submitted_by' => auth()->id(),
                 'recorded_at' => Carbon::now(),
                 'attendance_id' => $attendance->id,
             ];
@@ -314,6 +320,8 @@ class AttendanceController extends Controller
                 ],
                 $recordData
             );
+
+            $this->attendanceIntegrationService->syncAttendanceRecord($record);
 
             DB::commit();
 

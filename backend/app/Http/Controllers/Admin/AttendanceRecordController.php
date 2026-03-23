@@ -3,14 +3,22 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attendance;
 use App\Models\AttendanceRecord;
 use App\Models\Session;
+use App\Models\Student;
+use App\Services\AttendanceIntegrationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AttendanceRecordController extends Controller
 {
+    public function __construct(
+        private readonly AttendanceIntegrationService $attendanceIntegrationService
+    ) {
+    }
+
     public function index(Request $request)
     {
         $query = DB::table('attendance_records as ar')
@@ -61,7 +69,7 @@ class AttendanceRecordController extends Controller
     public function update(Request $request, AttendanceRecord $attendanceRecord)
     {
         $validated = $request->validate([
-            'status' => ['required', 'in:Present,Absent,Late,Excused'],
+            'status' => ['required', 'in:Present,Absent,Late'],
         ]);
 
         if ($attendanceRecord->is_locked) {
@@ -71,9 +79,11 @@ class AttendanceRecordController extends Controller
         }
 
         $attendanceRecord->update([
-            'status' => $validated['status'],
+            'status' => strtoupper($validated['status']),
             'submitted_by' => $request->user()->id,
         ]);
+
+        $this->attendanceIntegrationService->syncAttendanceRecord($attendanceRecord->fresh());
 
         return response()->json([
             'message' => 'Attendance record updated successfully.',
@@ -108,24 +118,39 @@ class AttendanceRecordController extends Controller
         $validated = $request->validate([
             'student_id' => 'required|exists:students,id',
             'session_id' => 'required|exists:sessions,id',
-            'status' => 'required|in:Present,Absent,Late,Excused',
+            'status' => 'required|in:Present,Absent,Late',
             'date' => 'sometimes|date',
         ]);
 
         $date = $validated['date'] ?? Carbon::today()->toDateString();
+        $student = Student::findOrFail($validated['student_id']);
+        $attendance = Attendance::firstOrCreate(
+            [
+                'class_id' => $student->class_id,
+                'session_id' => $validated['session_id'],
+                'date' => $date,
+            ],
+            [
+                'submitted_by' => $request->user()->id,
+                'is_locked' => false,
+            ]
+        );
 
-        $attendance = AttendanceRecord::updateOrCreate(
+        $attendanceRecord = AttendanceRecord::updateOrCreate(
             [
                 'student_id' => $validated['student_id'],
                 'session_id' => $validated['session_id'],
                 'attendance_date' => $date,
             ],
             [
-                'status' => $validated['status'],
+                'attendance_id' => $attendance->id,
+                'status' => strtoupper($validated['status']),
                 'submitted_by' => $request->user()->id,
                 'is_locked' => false, // Unlock when manually corrected
             ]
         );
+
+        $this->attendanceIntegrationService->syncAttendanceRecord($attendanceRecord);
 
         $record = DB::table('attendance_records as ar')
             ->join('students as s', 's.id', '=', 'ar.student_id')
@@ -146,7 +171,7 @@ class AttendanceRecordController extends Controller
                 'ses.name as session_name',
                 'u.name as submitted_by_name',
             ])
-            ->where('ar.id', $attendance->id)
+            ->where('ar.id', $attendanceRecord->id)
             ->first();
 
         return response()->json([
@@ -180,5 +205,4 @@ class AttendanceRecordController extends Controller
         ];
     }
 }
-
 

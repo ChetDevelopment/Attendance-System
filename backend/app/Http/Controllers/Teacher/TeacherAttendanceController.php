@@ -11,7 +11,9 @@ use App\Models\Session;
 use App\Models\SchoolClass;
 use App\Models\AbsenceComment;
 use App\Models\AcademicYear;
+use App\Models\AbsenceNotification;
 use App\Services\TimetableService;
+use App\Services\AttendanceIntegrationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -21,6 +23,11 @@ use App\Services\ActivityLogger;
 
 class TeacherAttendanceController extends Controller
 {
+    public function __construct(
+        private readonly AttendanceIntegrationService $attendanceIntegrationService
+    ) {
+    }
+
     private function isTeacher(): bool
     {
         $roleName = strtolower((string) optional(auth()->user()?->role)->name);
@@ -96,11 +103,11 @@ class TeacherAttendanceController extends Controller
         if ($request->has('records')) {
             $rules['records'] = 'required|array';
             $rules['records.*.student_id'] = 'required|exists:students,id';
-            $rules['records.*.status'] = 'required|in:present,absent,late';
+            $rules['records.*.status'] = 'required|in:present,absent,late,Present,Absent,Late';
         } else {
             $rules['students'] = 'required|array';
             $rules['students.*.student_id'] = 'required|exists:students,id';
-            $rules['students.*.status'] = 'required|in:present,absent,late';
+            $rules['students.*.status'] = 'required|in:present,absent,late,Present,Absent,Late';
         }
 
         $request->validate($rules);
@@ -214,11 +221,13 @@ class TeacherAttendanceController extends Controller
                     'student_id' => $studentId,
                     'session_id' => $sessionId,
                     'attendance_id' => $attendance->id,
-                    'recorded_by' => auth()->id(),
+                    'submitted_by' => auth()->id(),
                     'attendance_date' => $date,
                     'status' => $status,
                     'recorded_at' => Carbon::now(),
-                ]);
+                ])->tap(function ($record) {
+                    $this->attendanceIntegrationService->syncAttendanceRecord($record);
+                });
             }
 
             DB::commit();
@@ -427,12 +436,21 @@ class TeacherAttendanceController extends Controller
         }
 
         // Get today's attendance counts - show ALL records for today (not filtered by teacher)
-        $allTodayRecords = AttendanceRecord::whereHas('attendance', function ($query) use ($today) {
-            $query->whereDate('date', $today);
-        })->get();
+        $todayRecordsQuery = AttendanceRecord::query()->where(function ($query) use ($today) {
+            $query->whereDate('attendance_date', $today)
+                ->orWhere(function ($fallback) use ($today) {
+                    $fallback->whereNull('attendance_date')
+                        ->whereDate('date', $today);
+                });
+        });
 
-        $checkedInCount = $allTodayRecords->where('status', 'PRESENT')->count();
-        $absentCount = $allTodayRecords->whereIn('status', ['ABSENT', 'LATE'])->count();
+        $checkedInCount = (clone $todayRecordsQuery)
+            ->whereRaw('UPPER(status) = ?', ['PRESENT'])
+            ->count();
+        $absentCount = (clone $todayRecordsQuery)
+            ->whereRaw('UPPER(status) IN (?, ?)', ['ABSENT', 'LATE'])
+            ->count();
+        $totalRecordsToday = (clone $todayRecordsQuery)->count();
 
         // Get next upcoming session (after current active session ends)
         $nextToday = null;
@@ -481,7 +499,7 @@ class TeacherAttendanceController extends Controller
             'debug' => [
                 'today' => $today->toDateString(),
                 'teacher_id' => $teacherId,
-                'total_records_today' => $allTodayRecords->count(),
+                'total_records_today' => $totalRecordsToday,
             ]
         ]);
     }
@@ -567,42 +585,61 @@ class TeacherAttendanceController extends Controller
         $teacherId = auth()->id();
 
         // Get absent and late records that might need justification
-        $absentRecords = AttendanceRecord::whereHas('attendance', function ($query) use ($teacherId) {
-            $query->where('submitted_by', $teacherId);
-        })
-            ->whereIn('status', ['absent', 'late'])
-            ->with([
-                'student:id,first_name,last_name,student_code,class_id,face_image',
-                'session:id,name',
-                'attendance.class:id,name,code'
-            ])
-            ->orderBy('attendance_date', 'desc')
+        $absentRecords = DB::table('attendance_records as ar')
+            ->join('students as s', 's.id', '=', 'ar.student_id')
+            ->join('sessions as sess', 'sess.id', '=', 'ar.session_id')
+            ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
+            ->join('attendances as a', function ($join) {
+                $join->on('a.class_id', '=', 's.class_id')
+                    ->on('a.session_id', '=', 'ar.session_id')
+                    ->whereRaw('DATE(a.date) = DATE(COALESCE(ar.attendance_date, ar.date))');
+            })
+            ->leftJoin('absence_notifications as an', function ($join) {
+                $join->on('an.attendance_record_id', '=', 'ar.id')
+                    ->where('an.status', '=', 'active');
+            })
+            ->where('a.submitted_by', $teacherId)
+            ->whereRaw('UPPER(ar.status) IN (?, ?)', ['ABSENT', 'LATE'])
+            ->selectRaw("
+                ar.id,
+                s.student_code,
+                s.face_image,
+                COALESCE(NULLIF(s.fullname, ''), TRIM(CONCAT(COALESCE(s.first_name, ''), ' ', COALESCE(s.last_name, '')))) as student_name,
+                COALESCE(c.code, s.class, '') as class_code,
+                COALESCE(c.name, s.class, 'Unknown Class') as class_name,
+                sess.name as session_name,
+                COALESCE(ar.attendance_date, ar.date) as attendance_date,
+                ar.status,
+                an.absence_status,
+                COALESCE(an.comment, an.follow_up_notes, ar.justification, '') as education_comment
+            ")
+            ->orderByDesc(DB::raw('COALESCE(ar.attendance_date, ar.date)'))
             ->limit(50)
             ->get()
             ->map(function ($record) {
                 // Build photo URL
                 $photoUrl = null;
-                if ($record->student->face_image) {
-                    if (str_starts_with($record->student->face_image, 'http')) {
-                        $photoUrl = $record->student->face_image;
+                if ($record->face_image) {
+                    if (str_starts_with($record->face_image, 'http')) {
+                        $photoUrl = $record->face_image;
                     } else {
-                        $photoUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $record->student->face_image;
+                        $photoUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $record->face_image;
                     }
                 }
 
                 return [
                     'id' => $record->id,
-                    'studentId' => $record->student->student_code,
-                    'studentName' => $record->student->first_name . ' ' . $record->student->last_name,
-                    'student_code' => $record->student->student_code,
+                    'studentId' => $record->student_code,
+                    'studentName' => $record->student_name,
+                    'student_code' => $record->student_code,
                     'studentPhoto' => $photoUrl,
-                    'classCode' => $record->attendance->class->code ?? null,
-                    'subject' => $record->attendance->class->name ?? null,
-                    'sessionName' => $record->session->name ?? null,
+                    'classCode' => $record->class_code,
+                    'subject' => $record->class_name,
+                    'sessionName' => $record->session_name,
                     'date' => $record->attendance_date,
                     'status' => $record->status,
-                    'justificationStatus' => $record->justification_status,
-                    'educationComment' => $record->comment,
+                    'justificationStatus' => $record->absence_status,
+                    'educationComment' => $record->education_comment,
                 ];
             });
 
@@ -679,14 +716,19 @@ class TeacherAttendanceController extends Controller
         // Check for pending justifications - students in teacher's classes who are absent without justification
         $pendingJustifications = 0;
         if ($teacherClassIds->isNotEmpty()) {
-            $pendingJustifications = AttendanceRecord::whereIn('attendance_id', function ($query) use ($teacherClassIds, $today) {
-                $query->select('id')
-                    ->from('attendances')
-                    ->whereIn('class_id', $teacherClassIds)
-                    ->whereDate('date', $today);
-            })
-                ->where('status', 'absent')
-                ->whereNull('justification_status')
+            $pendingJustifications = DB::table('attendance_records as ar')
+                ->join('students as s', 's.id', '=', 'ar.student_id')
+                ->leftJoin('absence_notifications as an', function ($join) {
+                    $join->on('an.attendance_record_id', '=', 'ar.id')
+                        ->where('an.status', '=', 'active');
+                })
+                ->whereIn('s.class_id', $teacherClassIds)
+                ->whereDate(DB::raw('COALESCE(ar.attendance_date, ar.date)'), $today)
+                ->whereRaw('UPPER(ar.status) = ?', ['ABSENT'])
+                ->where(function ($query) {
+                    $query->whereNull('an.id')
+                        ->orWhere('an.absence_status', AbsenceNotification::STATUS_PENDING);
+                })
                 ->count();
         }
 

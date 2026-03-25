@@ -26,7 +26,7 @@ const updateForm = (key: string, value: any) => {
       <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
         <div>
           <h3 class="text-xl font-bold text-slate-900">{{ selectedAttendance.name }}</h3>
-          <p class="text-sm text-slate-500">{{ selectedAttendance.class }} • {{ selectedAttendance.date }}</p>
+          <p class="text-sm text-slate-500">{{ selectedAttendance.class }} | {{ selectedAttendance.date }}</p>
         </div>
         <button @click="emit('close')" class="p-2 hover:bg-slate-200 rounded-full transition-colors">
           <Plus :size="24" class="rotate-45 text-slate-400" />
@@ -34,18 +34,32 @@ const updateForm = (key: string, value: any) => {
       </div>
 
       <div class="flex-1 overflow-y-auto p-6 space-y-8">
-        <!-- Contact Info -->
         <div class="bg-[#135bec]/5 p-4 rounded-2xl border border-[#135bec]/10">
           <h4 class="text-xs font-bold text-[#135bec] uppercase tracking-widest mb-2">Contact Information</h4>
           <p class="text-sm text-slate-700 font-medium">{{ selectedAttendance.contact_info }}</p>
         </div>
 
-        <!-- Follow-up Form -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Teacher Record</h4>
+            <p class="text-sm font-semibold text-slate-900">{{ selectedAttendance.marked_by || 'System' }}</p>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Session</h4>
+            <p class="text-sm font-semibold text-slate-900">{{ selectedAttendance.session_name || 'Unknown Session' }}</p>
+            <p v-if="selectedAttendance.session_time" class="text-xs text-slate-500 mt-1">{{ selectedAttendance.session_time }}</p>
+          </div>
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Current Status</h4>
+            <p class="text-sm font-semibold text-slate-900">{{ selectedAttendance.status || 'PENDING' }}</p>
+          </div>
+        </div>
+
         <div class="space-y-6">
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Absence Reason</label>
-              <select 
+              <select
                 :value="followUpForm.reason"
                 @change="(e) => updateForm('reason', (e.target as HTMLSelectElement).value)"
                 class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#135bec]/20"
@@ -59,7 +73,7 @@ const updateForm = (key: string, value: any) => {
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Follow-up Status</label>
-              <select 
+              <select
                 :value="followUpForm.status"
                 @change="(e) => updateForm('status', (e.target as HTMLSelectElement).value)"
                 class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#135bec]/20"
@@ -76,7 +90,7 @@ const updateForm = (key: string, value: any) => {
             <div class="flex-1">
               <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Attendance Type</label>
               <div class="flex gap-4">
-                <button 
+                <button
                   @click="updateForm('isExcused', true)"
                   :class="cn(
                     'flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all',
@@ -85,7 +99,7 @@ const updateForm = (key: string, value: any) => {
                 >
                   Excused
                 </button>
-                <button 
+                <button
                   @click="updateForm('isExcused', false)"
                   :class="cn(
                     'flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all',
@@ -100,7 +114,7 @@ const updateForm = (key: string, value: any) => {
 
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Add Comment</label>
-            <textarea 
+            <textarea
               :value="followUpForm.comment"
               @input="(e) => updateForm('comment', (e.target as HTMLTextAreaElement).value)"
               placeholder="Enter comment history..."
@@ -110,7 +124,7 @@ const updateForm = (key: string, value: any) => {
 
           <div>
             <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Follow-up Note</label>
-            <input 
+            <input
               type="text"
               :value="followUpForm.note"
               @input="(e) => updateForm('note', (e.target as HTMLInputElement).value)"
@@ -120,8 +134,8 @@ const updateForm = (key: string, value: any) => {
           </div>
 
           <div class="flex items-center gap-3">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               id="resolved"
               :checked="followUpForm.resolved"
               @change="(e) => updateForm('resolved', (e.target as HTMLInputElement).checked)"
@@ -131,7 +145,6 @@ const updateForm = (key: string, value: any) => {
           </div>
         </div>
 
-        <!-- History Timeline -->
         <div class="space-y-4">
           <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Follow-up History</h4>
           <div class="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-px before:bg-slate-100">
@@ -154,7 +167,7 @@ const updateForm = (key: string, value: any) => {
       </div>
 
       <div class="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-4">
-        <button 
+        <button
           @click="emit('sendAlert')"
           class="px-6 py-3 rounded-2xl text-sm font-bold bg-blue-500 text-white hover:bg-blue-600 shadow-lg shadow-blue-200 transition-all flex items-center gap-2"
         >
@@ -162,13 +175,13 @@ const updateForm = (key: string, value: any) => {
           Send Alert
         </button>
         <div class="flex-1 flex gap-4">
-          <button 
+          <button
             @click="emit('close')"
             class="flex-1 py-3 rounded-2xl text-sm font-bold text-slate-600 hover:bg-slate-200 transition-all"
           >
             Cancel
           </button>
-          <button 
+          <button
             @click="emit('submit')"
             class="flex-1 py-3 rounded-2xl text-sm font-bold bg-[#135bec] text-white hover:bg-[#135bec]/90 shadow-lg shadow-[#135bec]/20 transition-all"
           >

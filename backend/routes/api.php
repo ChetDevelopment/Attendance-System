@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\CollaborationController;
 use App\Http\Controllers\Admin\AbsenceManagementController;
 use App\Http\Controllers\Admin\AcademicYearController;
 use App\Http\Controllers\Admin\ActivityLogController;
@@ -198,4 +199,15 @@ Route::prefix('education')->middleware(['auth:sanctum', 'role:admin,teacher,educ
     Route::get('/attendance/detail/{id}', [EducationDashboardController::class, 'attendanceDetail']);
     Route::post('/attendance/follow-up', [EducationDashboardController::class, 'submitFollowUp']);
     Route::post('/attendance/alert', [EducationDashboardController::class, 'sendAlert']);
+});
+
+// Collaboration routes - shared by Admin, Education, and Teacher
+Route::middleware(['auth:sanctum', 'role:admin,teacher,education'])->group(function () {
+    Route::get('/collaboration/activity-feed', [CollaborationController::class, 'activityFeed']);
+    Route::get('/collaboration/team-members', [CollaborationController::class, 'teamMembers']);
+    Route::post('/collaboration/request', [CollaborationController::class, 'createRequest']);
+    Route::get('/collaboration/requests', [CollaborationController::class, 'pendingRequests']);
+    Route::put('/collaboration/requests/{id}', [CollaborationController::class, 'resolveRequest']);
+    Route::get('/collaboration/stats', [CollaborationController::class, 'collaborationStats']);
+    Route::get('/collaboration/quick-stats', [CollaborationController::class, 'quickStats']);
 });

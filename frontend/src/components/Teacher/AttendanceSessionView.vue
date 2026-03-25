@@ -25,7 +25,7 @@ const onAcademicYearChange = (event: Event) => {
   emit("update:academicYearId", value);
 };
 
-type StatusType = "Present" | "Absent" | "Late" | "Excused";
+type StatusType = "Present" | "Absent" | "Late";
 
 const loading = ref(false);
 const saving = ref(false);
@@ -142,14 +142,23 @@ const saveAttendance = async () => {
   successMessage.value = "";
 
   try {
-    for (const student of filteredStudents.value) {
-      await attendanceService.markAttendance({
-        class_id: Number(classId.value),
+    const today = new Date();
+    const attendanceDate = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, "0"),
+      String(today.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    await attendanceService.submitTeacherAttendance({
+      class_id: Number(classId.value),
+      session_id: Number(selectedSessionId.value),
+      attendance_date: attendanceDate,
+      records: filteredStudents.value.map((student) => ({
         student_id: student.id,
-        session_id: Number(selectedSessionId.value),
-        status: statuses[student.id] || "Present",
-      });
-    }
+        status: (statuses[student.id] || "Present").toLowerCase(),
+      })),
+    });
+
     successMessage.value = "Attendance saved successfully.";
   } catch (error: any) {
     errorMessage.value = error.message || "Failed to save attendance.";
@@ -305,7 +314,6 @@ onMounted(loadData);
                 <option value="Present">Present</option>
                 <option value="Absent">Absent</option>
                 <option value="Late">Late</option>
-                <option value="Excused">Excused</option>
               </select>
             </td>
           </tr>

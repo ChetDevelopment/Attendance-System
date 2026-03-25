@@ -19,29 +19,49 @@ class EducationDashboardController extends Controller
 
     public function stats()
     {
-        $today = Carbon::today();
+        $today = Carbon::today()->toDateString();
 
-        $absentToday = AttendanceRecord::query()
-            ->whereDate('attendance_date', $today)
-            ->whereRaw('LOWER(status) = ?', ['absent'])
+        $absentToday = AbsenceNotification::query()
+            ->where('status', 'active')
+            ->where('absence_status', AbsenceNotification::STATUS_PENDING)
+            ->whereHas('attendanceRecord', function ($query) use ($today) {
+                $query->whereDate('attendance_date', $today)
+                    ->orWhere(function ($fallback) use ($today) {
+                        $fallback->whereNull('attendance_date')
+                            ->whereDate('date', $today);
+                    });
+            })
             ->count();
 
         $lateToday = AttendanceRecord::query()
-            ->whereDate('attendance_date', $today)
+            ->where(function ($query) use ($today) {
+                $query->whereDate('attendance_date', $today)
+                    ->orWhere(function ($fallback) use ($today) {
+                        $fallback->whereNull('attendance_date')
+                            ->whereDate('date', $today);
+                    });
+            })
             ->whereRaw('LOWER(status) = ?', ['late'])
             ->count();
 
         $highRisk = AttendanceRecord::query()
             ->select('student_id')
-            ->whereDate('attendance_date', '>=', now()->subDays(30)->toDateString())
+            ->where(function ($query) {
+                $query->whereDate('attendance_date', '>=', now()->subDays(30)->toDateString())
+                    ->orWhere(function ($fallback) {
+                        $fallback->whereNull('attendance_date')
+                            ->whereDate('date', '>=', now()->subDays(30)->toDateString());
+                    });
+            })
             ->whereRaw('LOWER(status) = ?', ['absent'])
             ->groupBy('student_id')
             ->havingRaw('COUNT(*) >= 3')
             ->get()
             ->count();
 
-        $pendingFollowUp = AttendanceFollowUp::query()
-            ->where('resolved', false)
+        $pendingFollowUp = AbsenceNotification::query()
+            ->where('status', 'active')
+            ->where('absence_status', AbsenceNotification::STATUS_PENDING)
             ->count();
 
         return response()->json([
@@ -55,16 +75,30 @@ class EducationDashboardController extends Controller
     public function absentToday()
     {
         $rows = AbsenceNotification::query()
-            ->with(['student:id,fullname,class,class_id', 'student.schoolClass:id,name', 'attendanceRecord:id'])
+            ->with([
+                'student:id,fullname,class,class_id',
+                'student.schoolClass:id,name',
+                'attendanceRecord:id,attendance_date,date,status,submitted_by,session_id',
+            ])
             ->where('status', 'active')
-            ->whereDate('created_at', today())
+            ->whereHas('attendanceRecord', function ($query) {
+                $query->whereDate('attendance_date', today())
+                    ->orWhere(function ($fallback) {
+                        $fallback->whereNull('attendance_date')
+                            ->whereDate('date', today());
+                    });
+            })
             ->latest()
             ->get()
             ->map(function (AbsenceNotification $absence) {
+                $attendanceDate = optional($absence->attendanceRecord?->attendance_date ?? $absence->attendanceRecord?->date)?->toDateString()
+                    ?? optional($absence->created_at)->toDateString();
+
                 return [
                     'attendance_id' => $absence->attendance_record_id ?: $absence->id,
                     'name' => $absence->student?->fullname ?? 'Unknown Student',
                     'class' => $absence->student?->schoolClass?->name ?? $absence->student?->class ?? 'Unknown Class',
+                    'date' => $attendanceDate,
                     'resolved' => strtoupper((string) $absence->absence_status) !== 'PENDING',
                 ];
             });
@@ -77,16 +111,20 @@ class EducationDashboardController extends Controller
         $rows = AbsenceNotification::query()
             ->with('student:id,fullname,class,class_id')
             ->with('student.schoolClass:id,name')
+            ->with('attendanceRecord:id,attendance_date,date,status,submitted_by,session_id')
             ->where('status', 'active')
             ->latest()
             ->limit(100)
             ->get()
             ->map(function (AbsenceNotification $absence) {
+                $attendanceDate = optional($absence->attendanceRecord?->attendance_date ?? $absence->attendanceRecord?->date)?->toDateString()
+                    ?? optional($absence->created_at)->toDateString();
+
                 return [
                     'attendance_id' => $absence->attendance_record_id ?: $absence->id,
                     'name' => $absence->student?->fullname ?? 'Unknown Student',
                     'class' => $absence->student?->schoolClass?->name ?? $absence->student?->class ?? 'Unknown Class',
-                    'date' => optional($absence->created_at)->toDateString(),
+                    'date' => $attendanceDate,
                     'reason' => $absence->absence_reason,
                     'resolved' => strtoupper((string) $absence->absence_status) !== 'PENDING',
                 ];
@@ -99,7 +137,13 @@ class EducationDashboardController extends Controller
     {
         $rows = AttendanceRecord::query()
             ->select('student_id', DB::raw('COUNT(*) as absence_count'), DB::raw('MAX(id) as latest_attendance_id'))
-            ->whereDate('attendance_date', '>=', now()->subDays(30)->toDateString())
+            ->where(function ($query) {
+                $query->whereDate('attendance_date', '>=', now()->subDays(30)->toDateString())
+                    ->orWhere(function ($fallback) {
+                        $fallback->whereNull('attendance_date')
+                            ->whereDate('date', '>=', now()->subDays(30)->toDateString());
+                    });
+            })
             ->whereRaw('LOWER(status) = ?', ['absent'])
             ->groupBy('student_id')
             ->havingRaw('COUNT(*) >= 3')
@@ -122,17 +166,19 @@ class EducationDashboardController extends Controller
 
     public function classReports()
     {
+        $classExpression = "COALESCE(c.name, c.class_name, s.class, 'Unknown Class')";
+
         $rows = DB::table('attendance_records as ar')
             ->join('students as s', 's.id', '=', 'ar.student_id')
             ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
             ->selectRaw("
-                COALESCE(c.name, c.class_name, s.class, 'Unknown Class') as class,
+                {$classExpression} as class,
                 SUM(CASE WHEN LOWER(ar.status) = 'present' THEN 1 ELSE 0 END) as present_count,
                 SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count,
                 SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count
             ")
-            ->groupBy('class')
-            ->orderBy('class')
+            ->groupByRaw($classExpression)
+            ->orderByRaw($classExpression)
             ->get();
 
         return response()->json($rows);
@@ -141,7 +187,12 @@ class EducationDashboardController extends Controller
     public function attendanceDetail(int $id)
     {
         $absence = AbsenceNotification::query()
-            ->with(['student', 'session'])
+            ->with([
+                'student.schoolClass:id,name',
+                'session',
+                'attendanceRecord.teacher:id,name',
+                'attendanceRecord.session:id,name,start_time,end_time',
+            ])
             ->where('id', $id)
             ->orWhere('attendance_record_id', $id)
             ->latest('id')
@@ -152,6 +203,10 @@ class EducationDashboardController extends Controller
                 'message' => 'Attendance detail not found.',
             ], 404);
         }
+
+        $attendanceDate = $absence->attendanceRecord?->attendance_date?->toDateString()
+            ?? optional($absence->attendanceRecord?->date)->toDateString()
+            ?? optional($absence->created_at)->toDateString();
 
         $followUps = AttendanceFollowUp::query()
             ->where('attendance_record_id', $absence->attendance_record_id)
@@ -170,10 +225,17 @@ class EducationDashboardController extends Controller
             'id' => $absence->attendance_record_id ?: $absence->id,
             'name' => $absence->student?->fullname ?? 'Unknown Student',
             'class' => $absence->student?->schoolClass?->name ?? $absence->student?->class ?? 'Unknown Class',
-            'date' => optional($absence->created_at)->toDateString(),
+            'date' => $attendanceDate,
             'contact_info' => $absence->student?->parent_number ?: $absence->student?->contact ?: 'No contact available',
             'reason' => $absence->absence_reason ?? '',
+            'status' => strtoupper((string) $absence->absence_status),
+            'resolved' => strtoupper((string) $absence->absence_status) !== 'PENDING',
             'is_excused' => strtoupper((string) $absence->absence_status) === 'EXCUSED' ? 1 : 0,
+            'marked_by' => $absence->attendanceRecord?->teacher?->name ?? 'System',
+            'session_name' => $absence->session?->name ?? $absence->attendanceRecord?->session?->name,
+            'session_time' => $absence->session
+                ? trim(($absence->session->start_time ?? '') . ' - ' . ($absence->session->end_time ?? ''))
+                : trim(($absence->attendanceRecord?->session?->start_time ?? '') . ' - ' . ($absence->attendanceRecord?->session?->end_time ?? '')),
             'followUps' => $followUps,
         ]);
     }
@@ -235,18 +297,25 @@ class EducationDashboardController extends Controller
         $validated = $request->validate([
             'attendanceId' => ['required', 'integer'],
             'studentName' => ['nullable', 'string', 'max:255'],
+            'className' => ['nullable', 'string', 'max:255'],
+            'date' => ['nullable', 'date'],
         ]);
 
         $this->activityLogService->recordFromRequest(
             $request->user(),
             $request,
-            'Education alert sent',
-            'Sent alert for attendance record #' . $validated['attendanceId'] . ($validated['studentName'] ? ' (' . $validated['studentName'] . ')' : '')
+            'Request: escalation',
+            trim(
+                'Education escalation for attendance record #' . $validated['attendanceId']
+                . ($validated['studentName'] ? ' - ' . $validated['studentName'] : '')
+                . ($validated['className'] ? ' (' . $validated['className'] . ')' : '')
+                . ($validated['date'] ? ' on ' . $validated['date'] : '')
+            )
         );
 
         return response()->json([
             'success' => true,
-            'message' => 'Alert recorded successfully.',
+            'message' => 'Alert sent to the shared Teacher/Admin activity stream.',
         ]);
     }
 }

@@ -23,4 +23,13 @@ export const attendanceService = {
       throw formatError(error)
     }
   },
+
+  async submitTeacherAttendance(payload) {
+    try {
+      const response = await api.post('/teacher/attendance', payload)
+      return response.data
+    } catch (error) {
+      throw formatError(error)
+    }
+  },
 }

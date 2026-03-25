@@ -217,7 +217,7 @@ class TeacherAttendanceController extends Controller
                     return response()->json(['message' => $e->getMessage()], 422);
                 }
 
-                AttendanceRecord::create([
+                $record = AttendanceRecord::create([
                     'student_id' => $studentId,
                     'session_id' => $sessionId,
                     'attendance_id' => $attendance->id,
@@ -225,9 +225,9 @@ class TeacherAttendanceController extends Controller
                     'attendance_date' => $date,
                     'status' => $status,
                     'recorded_at' => Carbon::now(),
-                ])->tap(function ($record) {
-                    $this->attendanceIntegrationService->syncAttendanceRecord($record);
-                });
+                ]);
+
+                $this->attendanceIntegrationService->syncAttendanceRecord($record);
             }
 
             DB::commit();
@@ -444,11 +444,12 @@ class TeacherAttendanceController extends Controller
                 });
         });
 
+        // Treat late students as checked in on the dashboard.
         $checkedInCount = (clone $todayRecordsQuery)
-            ->whereRaw('UPPER(status) = ?', ['PRESENT'])
+            ->whereRaw('UPPER(status) IN (?, ?)', ['PRESENT', 'LATE'])
             ->count();
         $absentCount = (clone $todayRecordsQuery)
-            ->whereRaw('UPPER(status) IN (?, ?)', ['ABSENT', 'LATE'])
+            ->whereRaw('UPPER(status) = ?', ['ABSENT'])
             ->count();
         $totalRecordsToday = (clone $todayRecordsQuery)->count();
 

@@ -12,12 +12,12 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-    <div class="flex justify-between items-center mb-4">
-      <h3 class="font-bold text-lg text-slate-900">Risk Students</h3>
+  <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div class="mb-4 flex items-center justify-between">
+      <h3 class="text-lg font-black text-slate-900">Risk Students</h3>
       <button 
         @click="emit('viewAll')"
-        class="text-[10px] font-black text-[#135bec] uppercase tracking-widest hover:underline"
+        class="text-[10px] font-bold uppercase tracking-[0.22em] text-primary hover:underline"
       >
         VIEW ALL
       </button>
@@ -27,11 +27,11 @@ const emit = defineEmits<{
         v-for="(student, i) in students" 
         :key="i" 
         @click="emit('quickFollowUp', student.latest_attendance_id)"
-        class="flex items-center justify-between p-3.5 rounded-xl border border-rose-100 bg-rose-50 transition-all hover:scale-[1.02] cursor-pointer"
+        class="flex cursor-pointer items-center justify-between rounded-2xl border border-rose-100 bg-rose-50/70 p-4 transition-colors hover:bg-rose-100/80"
       >
         <div class="flex items-center gap-3">
-          <div class="size-10 rounded-full border-2 border-rose-500 p-0.5">
-            <div class="size-full rounded-full bg-white flex items-center justify-center text-slate-400">
+          <div class="rounded-full border-2 border-rose-500 p-0.5">
+            <div class="flex size-10 items-center justify-center rounded-full bg-white text-slate-400">
               <UserCircle :size="20" />
             </div>
           </div>
@@ -45,7 +45,7 @@ const emit = defineEmits<{
     </div>
     <button 
       @click="emit('viewAll')"
-      class="w-full mt-6 py-3 text-[10px] font-bold text-slate-500 hover:text-[#135bec] transition-all flex items-center justify-center gap-2 group tracking-widest"
+      class="group mt-6 flex w-full items-center justify-center gap-2 py-3 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500 transition-all hover:text-primary"
     >
       VIEW DETAILED ANALYSIS 
       <ArrowRight :size="14" class="group-hover:translate-x-1 transition-transform" />

@@ -60,27 +60,32 @@ export const normalizeRole = (role) => {
   return typeof role === 'string' ? role.trim().toLowerCase() : ''
 }
 
+const mapRoleValue = (role) => {
+  const normalized = normalizeRole(role)
+
+  if (!normalized) return ''
+  if (normalized === 'admin') return 'admin'
+  if (normalized === 'teacher') return 'teacher'
+  if (['education', 'education team', 'education_team', 'education-team'].includes(normalized)) return 'education'
+  if (['training', 'training team', 'training_team', 'training-team'].includes(normalized)) return 'training'
+  if (normalized === 'student') return 'student'
+
+  return normalized
+}
+
 export const resolveUserRole = (user) => {
   if (!user) return ''
 
   if (typeof user.role === 'object' && user.role) {
-    const roleName = user.role.name ? normalizeRole(user.role.name) : ''
-    const roleSlug = user.role.slug ? normalizeRole(user.role.slug) : ''
+    const roleName = mapRoleValue(user.role.name)
+    const roleSlug = mapRoleValue(user.role.slug)
 
     if (roleName) {
-      if (roleName === 'admin') return 'admin'
-      if (roleName === 'teacher') return 'teacher'
-      if (roleName === 'education team') return 'education'
-      if (roleName === 'training team') return 'training'
-      if (roleName === 'student') return 'student'
+      return roleName
     }
 
     if (roleSlug) {
-      if (roleSlug === 'admin') return 'admin'
-      if (roleSlug === 'teacher') return 'teacher'
-      if (roleSlug === 'education_team') return 'education'
-      if (roleSlug === 'training_team') return 'training'
-      if (roleSlug === 'student') return 'student'
+      return roleSlug
     }
   }
 
@@ -89,13 +94,8 @@ export const resolveUserRole = (user) => {
       ? user.role
       : ''
 
-  const directRole = normalizeRole(roleValue)
+  const directRole = mapRoleValue(roleValue)
   if (directRole) {
-    if (directRole === 'admin') return 'admin'
-    if (directRole === 'teacher') return 'teacher'
-    if (directRole === 'education_team') return 'education'
-    if (directRole === 'training_team') return 'training'
-    if (directRole === 'student') return 'student'
     return directRole
   }
 

@@ -17,12 +17,12 @@ const calculatePercentage = (report: ClassReport) => {
 </script>
 
 <template>
-  <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-    <div class="flex justify-between items-center mb-6">
-      <h3 class="font-bold text-lg text-slate-900">Class Attendance Reports</h3>
+  <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div class="mb-6 flex items-center justify-between">
+      <h3 class="text-lg font-black text-slate-900">Class Attendance Reports</h3>
       <button 
         @click="emit('export')"
-        class="px-4 py-2 bg-[#135bec] text-white text-xs font-bold rounded-xl hover:bg-[#135bec]/90 transition-all flex items-center gap-2"
+        class="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white transition-all hover:bg-primary/90"
       >
         <FileText :size="16" />
         Export CSV
@@ -31,7 +31,7 @@ const calculatePercentage = (report: ClassReport) => {
     <div class="overflow-x-auto">
       <table class="w-full text-left">
         <thead>
-          <tr class="bg-slate-50/50 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+          <tr class="bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
             <th class="px-6 py-4">Class</th>
             <th class="px-6 py-4">Attendance %</th>
             <th class="px-6 py-4">Present</th>
@@ -39,13 +39,13 @@ const calculatePercentage = (report: ClassReport) => {
             <th class="px-6 py-4">Late</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-50">
-          <tr v-for="(report, i) in reports" :key="i" class="hover:bg-slate-50/50 transition-colors">
+        <tbody class="divide-y divide-slate-100">
+          <tr v-for="(report, i) in reports" :key="i" class="transition-colors hover:bg-slate-50/60">
             <td class="px-6 py-4 font-bold text-slate-900">{{ report.class }}</td>
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
                 <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div class="h-full bg-[#135bec]" :style="{ width: `${calculatePercentage(report)}%` }"></div>
+                  <div class="h-full bg-primary" :style="{ width: `${calculatePercentage(report)}%` }"></div>
                 </div>
                 <span class="text-sm font-bold text-slate-700">{{ calculatePercentage(report) }}%</span>
               </div>

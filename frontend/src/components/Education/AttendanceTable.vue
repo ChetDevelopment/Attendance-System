@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Plus } from 'lucide-vue-next';
 import { cn } from '../../utils/cn';
+import { setImageFallback } from '../../utils/imageFallback';
 
 const props = withDefaults(defineProps<{
   title: string;
@@ -57,8 +58,18 @@ const emit = defineEmits<{
             <td v-if="showDate" class="px-6 py-4 text-sm font-medium text-slate-500">{{ student.date }}</td>
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
-                <div class="flex size-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                  {{ (student.name || 'Unknown').split(' ').map((n: any) => n[0]).join('') }}
+                <div class="flex size-9 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  <img
+                    v-if="student.studentPhoto"
+                    :src="student.studentPhoto"
+                    :alt="student.name || 'Student photo'"
+                    class="size-full object-cover"
+                    referrerPolicy="no-referrer"
+                    @error="(event) => setImageFallback(event, '/default-student.svg')"
+                  />
+                  <template v-else>
+                    {{ (student.name || 'Unknown').split(' ').map((n: any) => n[0]).join('') }}
+                  </template>
                 </div>
                 <span class="text-sm font-semibold text-slate-900">{{ student.name || 'Unknown Student' }}</span>
               </div>

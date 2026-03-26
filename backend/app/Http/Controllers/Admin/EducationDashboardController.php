@@ -17,6 +17,25 @@ class EducationDashboardController extends Controller
     {
     }
 
+    private function buildStudentPhotoUrl($student): ?string
+    {
+        $photo = $student?->profile ?: $student?->face_image;
+
+        if (!$photo) {
+            return null;
+        }
+
+        if (str_starts_with($photo, 'http://') || str_starts_with($photo, 'https://')) {
+            return $photo;
+        }
+
+        if (str_starts_with($photo, '/storage') || str_starts_with($photo, 'storage/')) {
+            return rtrim(config('app.url', 'http://localhost'), '/') . '/' . ltrim($photo, '/');
+        }
+
+        return rtrim(config('app.frontend_url', 'http://localhost:3000'), '/') . '/' . ltrim($photo, '/');
+    }
+
     public function stats()
     {
         $today = Carbon::today()->toDateString();
@@ -76,7 +95,7 @@ class EducationDashboardController extends Controller
     {
         $rows = AbsenceNotification::query()
             ->with([
-                'student:id,fullname,class,class_id',
+                'student:id,fullname,class,class_id,profile,face_image',
                 'student.schoolClass:id,name',
                 'attendanceRecord:id,attendance_date,date,status,submitted_by,session_id',
             ])
@@ -98,6 +117,7 @@ class EducationDashboardController extends Controller
                     'attendance_id' => $absence->attendance_record_id ?: $absence->id,
                     'name' => $absence->student?->fullname ?? 'Unknown Student',
                     'class' => $absence->student?->schoolClass?->name ?? $absence->student?->class ?? 'Unknown Class',
+                    'studentPhoto' => $this->buildStudentPhotoUrl($absence->student),
                     'date' => $attendanceDate,
                     'resolved' => strtoupper((string) $absence->absence_status) !== 'PENDING',
                 ];
@@ -109,7 +129,7 @@ class EducationDashboardController extends Controller
     public function allAbsent()
     {
         $rows = AbsenceNotification::query()
-            ->with('student:id,fullname,class,class_id')
+            ->with('student:id,fullname,class,class_id,profile,face_image')
             ->with('student.schoolClass:id,name')
             ->with('attendanceRecord:id,attendance_date,date,status,submitted_by,session_id')
             ->where('status', 'active')
@@ -124,6 +144,7 @@ class EducationDashboardController extends Controller
                     'attendance_id' => $absence->attendance_record_id ?: $absence->id,
                     'name' => $absence->student?->fullname ?? 'Unknown Student',
                     'class' => $absence->student?->schoolClass?->name ?? $absence->student?->class ?? 'Unknown Class',
+                    'studentPhoto' => $this->buildStudentPhotoUrl($absence->student),
                     'date' => $attendanceDate,
                     'reason' => $absence->absence_reason,
                     'resolved' => strtoupper((string) $absence->absence_status) !== 'PENDING',

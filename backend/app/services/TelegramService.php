@@ -128,6 +128,24 @@ class TelegramService
     }
 
     /**
+     * Send a teacher attendance summary that lists late and absent students.
+     *
+     * @param array{
+     *   teacher_name?: string|null,
+     *   class_name?: string|null,
+     *   session_name?: string|null,
+     *   session_time?: string|null,
+     *   date?: string|null,
+     *   late_students?: array<int, array{name?: string|null, student_id?: string|null, class?: string|null}>,
+     *   absent_students?: array<int, array{name?: string|null, student_id?: string|null, class?: string|null}>
+     * } $summary
+     */
+    public function sendAttendanceSubmissionSummary(array $summary): array
+    {
+        return $this->sendMessage($this->formatAttendanceSubmissionSummary($summary));
+    }
+
+    /**
      * Send message with inline keyboard
      */
     public function sendMessageWithInlineKeyboard(string $message, string $reasonUrl): array
@@ -233,6 +251,68 @@ class TelegramService
 
 <i>Please contact the student's parent/guardian.</i>
 MESSAGE;
+    }
+
+    /**
+     * Format teacher attendance submission summary.
+     */
+    private function formatAttendanceSubmissionSummary(array $summary): string
+    {
+        $teacherName = htmlspecialchars((string) ($summary['teacher_name'] ?? 'Teacher'));
+        $className = htmlspecialchars((string) ($summary['class_name'] ?? 'N/A'));
+        $sessionName = htmlspecialchars((string) ($summary['session_name'] ?? 'N/A'));
+        $sessionTime = htmlspecialchars((string) ($summary['session_time'] ?? 'N/A'));
+        $date = htmlspecialchars((string) ($summary['date'] ?? 'N/A'));
+
+        $lateStudents = $summary['late_students'] ?? [];
+        $absentStudents = $summary['absent_students'] ?? [];
+
+        $lines = [
+            "━━━━━━━━━━━━━━━━━━",
+            "📋 <b>ATTENDANCE REPORT</b>",
+            "━━━━━━━━━━━━━━━━━━",
+            "",
+            "👨‍🏫 <b>Teacher:</b> {$teacherName}",
+            "🏫 <b>Class:</b> {$className}",
+            "⏰ <b>Session:</b> {$sessionName} ({$sessionTime})",
+            "📅 <b>Date:</b> {$date}",
+            "",
+            "━━━━━━━━━━━━━━━━━━",
+            "🟡 <b>LATE STUDENTS</b> (" . count($lateStudents) . ")",
+            "━━━━━━━━━━━━━━━━━━",
+            $this->formatAttendanceStudentListDetailed($lateStudents),
+            "",
+            "━━━━━━━━━━━━━━━━━━",
+            "🔴 <b>ABSENT STUDENTS</b> (" . count($absentStudents) . ")",
+            "━━━━━━━━━━━━━━━━━━",
+            $this->formatAttendanceStudentListDetailed($absentStudents),
+            "",
+            "<i>Total: " . (count($lateStudents) + count($absentStudents)) . " students</i>",
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Format student lines for attendance summaries with detailed info.
+     *
+     * @param array<int, array{name?: string|null, student_id?: string|null, class?: string|null}> $students
+     */
+    private function formatAttendanceStudentListDetailed(array $students): string
+    {
+        if (empty($students)) {
+            return "• No students";
+        }
+
+        return collect($students)
+            ->map(function (array $student): string {
+                $name = htmlspecialchars((string) ($student['name'] ?? 'Unknown Student'));
+                $studentId = htmlspecialchars((string) ($student['student_id'] ?? 'N/A'));
+                $className = htmlspecialchars((string) ($student['class'] ?? 'N/A'));
+
+                return "• {$name}\n  └─ ID: {$studentId} | Class: {$className}";
+            })
+            ->implode("\n");
     }
 
     /**

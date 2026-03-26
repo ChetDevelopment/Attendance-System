@@ -24,6 +24,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Student\StudentAttendanceController;
 use App\Http\Controllers\Student\StudentDashboardController;
 use App\Http\Controllers\Teacher\TeacherAttendanceController;
+use App\Http\Controllers\TelegramController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -43,6 +44,10 @@ Route::middleware('auth:sanctum')->post('/attendances/mark-present', [Attendance
 Route::middleware('auth:sanctum')->post('/attendances/mark-absent', [AttendanceController::class, 'markAbsent']);
 Route::middleware('auth:sanctum')->post('/attendances/mark-late', [AttendanceController::class, 'markLate']);
 Route::middleware('auth:sanctum')->post('/attendances/{attendance}/unlock', [AttendanceController::class, 'unlock']);
+
+// Telegram test endpoints (accessible without auth for testing)
+Route::post('/telegram/test', [TelegramController::class, 'testConnection']);
+Route::post('/telegram/send', [TelegramController::class, 'sendTestMessage']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('student/attendance')->group(function () {

@@ -14,6 +14,7 @@ use App\Models\AcademicYear;
 use App\Models\AbsenceNotification;
 use App\Services\TimetableService;
 use App\Services\AttendanceIntegrationService;
+use App\Services\TelegramService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -24,7 +25,8 @@ use App\Services\ActivityLogger;
 class TeacherAttendanceController extends Controller
 {
     public function __construct(
-        private readonly AttendanceIntegrationService $attendanceIntegrationService
+        private readonly AttendanceIntegrationService $attendanceIntegrationService,
+        private readonly TelegramService $telegramService
     ) {
     }
 
@@ -172,6 +174,18 @@ class TeacherAttendanceController extends Controller
             ], 400);
         }
 
+        $session = Session::find($sessionId);
+        $teacher = auth()->user();
+        $attendanceSummary = [
+            'teacher_name' => $teacher?->name,
+            'class_name' => $class?->name ?? ('Class ' . $request->class_id),
+            'session_name' => $session?->name ?? 'Session',
+            'session_time' => $this->formatSessionTimeRange($session),
+            'date' => $attendanceDate->format('Y-m-d'),
+            'late_students' => [],
+            'absent_students' => [],
+        ];
+
         Log::info('TeacherAttendance submit', [
             'input' => $request->all(),
             'sessionId' => $sessionId,
@@ -211,7 +225,7 @@ class TeacherAttendanceController extends Controller
 
                 // Normalize status to enum value and save recorded_at
                 try {
-                    $status = AttendanceStatus::fromString($student['status'])->value;
+                    $status = AttendanceStatus::fromString($student['status']);
                 } catch (\InvalidArgumentException $e) {
                     DB::rollBack();
                     return response()->json(['message' => $e->getMessage()], 422);
@@ -223,14 +237,35 @@ class TeacherAttendanceController extends Controller
                     'attendance_id' => $attendance->id,
                     'submitted_by' => auth()->id(),
                     'attendance_date' => $date,
-                    'status' => $status,
+                    'status' => $status->value,
                     'recorded_at' => Carbon::now(),
                 ]);
 
                 $this->attendanceIntegrationService->syncAttendanceRecord($record);
+
+                if (in_array($status, [AttendanceStatus::LATE, AttendanceStatus::ABSENT], true)) {
+                    $summaryKey = $status === AttendanceStatus::LATE ? 'late_students' : 'absent_students';
+
+                    $attendanceSummary[$summaryKey][] = [
+                        'name' => trim(($s->first_name ?? '') . ' ' . ($s->last_name ?? '')) ?: ($s->fullname ?? 'Unknown Student'),
+                        'student_id' => $s->student_code,
+                        'class' => $class?->name ?? null,
+                    ];
+                }
             }
 
             DB::commit();
+
+            if ($this->telegramService->isConfigured()) {
+                $telegramResult = $this->telegramService->sendAttendanceSubmissionSummary($attendanceSummary);
+
+                if (!$telegramResult['success']) {
+                    Log::warning('Attendance summary Telegram notification failed', [
+                        'attendance_id' => $attendance->id,
+                        'error' => $telegramResult['error'] ?? 'Unknown error',
+                    ]);
+                }
+            }
 
             // Log teacher activity (CREATE)
             ActivityLogger::log(
@@ -253,6 +288,19 @@ class TeacherAttendanceController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    private function formatSessionTimeRange(?Session $session): string
+    {
+        if (!$session) {
+            return 'N/A';
+        }
+
+        if ($session->start_time && $session->end_time) {
+            return "{$session->start_time} - {$session->end_time}";
+        }
+
+        return $session->start_time ?? $session->end_time ?? 'N/A';
     }
 
     /**

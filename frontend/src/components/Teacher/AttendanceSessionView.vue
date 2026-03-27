@@ -14,14 +14,30 @@ const emit = defineEmits<{
   (e: "update:academicYearId", value: number | null): void;
 }>();
 
+const academicYearOptionsLocal = computed(() =>
+  Array.isArray(props.academicYearOptions)
+    ? props.academicYearOptions.map((year) => ({
+        ...year,
+        id: Number(year.id),
+        name: String(
+          year.name && String(year.name).trim()
+            ? year.name
+            : `Academic Year ${year.id}`,
+        ),
+      }))
+    : [],
+);
+
+const academicYearSelectValue = computed(() =>
+  props.academicYearId === null || props.academicYearId === undefined
+    ? ""
+    : String(props.academicYearId),
+);
+
 // Method to handle academic year change
 const onAcademicYearChange = (event: Event) => {
   const target = event.target as HTMLSelectElement;
-  // Handle "All Years" option across DOM string values and null-ish values.
-  const value =
-    target.value && target.value !== "" && target.value !== "null"
-      ? Number(target.value)
-      : null;
+  const value = target.value ? Number(target.value) : null;
   emit("update:academicYearId", value);
 };
 
@@ -202,15 +218,15 @@ onMounted(loadData);
           >Academic Year</label
         >
         <select
-          :value="props.academicYearId"
+          :value="academicYearSelectValue"
           @change="onAcademicYearChange"
           class="mt-1 w-full px-3 py-2 border rounded-lg bg-white"
         >
-          <option :value="null">All Years</option>
+          <option value="">All Years</option>
           <option
-            v-for="year in academicYearOptions"
+            v-for="year in academicYearOptionsLocal"
             :key="year.id"
-            :value="year.id"
+            :value="String(year.id)"
           >
             {{ year.name }}
           </option>

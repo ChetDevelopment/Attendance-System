@@ -2,8 +2,6 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import {
   Search,
-  Filter,
-  Download,
   RefreshCw,
   Clock,
   CheckCircle2,
@@ -19,6 +17,7 @@ import {
 } from 'lucide-vue-next'
 import { absenceManagementService } from '../../services/absenceManagementService'
 import Modal from './Modal.vue'
+import AdminPageHeader from './AdminPageHeader.vue'
 
 // Types
 interface Absence {
@@ -385,79 +384,48 @@ onMounted(() => {
 
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div>
-        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900">Absence Management</h2>
-        <p class="text-sm text-slate-500 font-medium">Manage absence reasons, comments, and status tracking</p>
-      </div>
-      <div class="flex items-center gap-2">
+    <AdminPageHeader
+      eyebrow="Follow-up Workflow"
+      title="Absence Management"
+      description="Review absence reasons, update case status, and keep follow-up actions clear for the admin team."
+    >
+      <template #actions>
         <button
           @click="loadAbsences(currentPage)"
-          class="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          title="Refresh"
+          class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
         >
-          <RefreshCw class="size-4 text-slate-600" />
+          <RefreshCw class="size-4" />
+          Refresh
         </button>
-      </div>
+      </template>
+
+      <template #meta>
+        <div v-if="stats" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Total Absences</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ stats.summary.total }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-amber-600">Pending</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ stats.summary.pending }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-emerald-600">Excused</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ stats.summary.excused }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-rose-600">Unexcused</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ stats.summary.unexcused }}</p>
+          </div>
+        </div>
+      </template>
+    </AdminPageHeader>
+
+    <div v-if="error" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">
+      {{ error }}
     </div>
 
-    <!-- Stats Cards -->
-    <div v-if="stats" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs font-bold text-slate-500 uppercase">Total Absences</p>
-            <p class="text-2xl font-black text-slate-900">{{ stats.summary.total }}</p>
-          </div>
-          <div class="size-10 bg-slate-100 rounded-full flex items-center justify-center">
-            <AlertCircle class="size-5 text-slate-500" />
-          </div>
-        </div>
-      </div>
-      <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs font-bold text-yellow-600 uppercase">Pending</p>
-            <p class="text-2xl font-black text-slate-900">{{ stats.summary.pending }}</p>
-          </div>
-          <div class="size-10 bg-yellow-100 rounded-full flex items-center justify-center">
-            <Clock class="size-5 text-yellow-600" />
-          </div>
-        </div>
-      </div>
-      <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs font-bold text-green-600 uppercase">Excused</p>
-            <p class="text-2xl font-black text-slate-900">{{ stats.summary.excused }}</p>
-          </div>
-          <div class="size-10 bg-green-100 rounded-full flex items-center justify-center">
-            <CheckCircle2 class="size-5 text-green-600" />
-          </div>
-        </div>
-      </div>
-      <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-xs font-bold text-red-600 uppercase">Unexcused</p>
-            <p class="text-2xl font-black text-slate-900">{{ stats.summary.unexcused }}</p>
-          </div>
-          <div class="size-10 bg-red-100 rounded-full flex items-center justify-center">
-            <XCircle class="size-5 text-red-600" />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Error Message -->
-    <div v-if="error" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
-      <p class="font-bold">Error</p>
-      <p>{{ error }}</p>
-    </div>
-
-    <!-- Filters -->
-    <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+    <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         <div class="relative lg:col-span-2">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
@@ -504,9 +472,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Bulk Actions -->
-    <div v-if="selectedAbsences.length > 0" class="flex items-center gap-4 bg-primary/10 p-4 rounded-lg">
-      <span class="text-sm font-bold text-primary">{{ selectedAbsences.length }} selected</span>
+    <div v-if="selectedAbsences.length > 0" class="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 md:flex-row md:items-center md:justify-between">
+      <span class="text-sm font-bold text-primary">{{ selectedAbsences.length }} cases selected for bulk action</span>
       <div class="flex gap-2">
         <button
           @click="bulkUpdateStatus('EXCUSED')"
@@ -529,8 +496,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
       <table class="w-full text-left">
         <thead class="bg-slate-50 text-slate-500 uppercase text-xs font-bold">
           <tr>

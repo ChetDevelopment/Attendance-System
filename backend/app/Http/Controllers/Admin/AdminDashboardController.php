@@ -24,7 +24,7 @@ class AdminDashboardController extends Controller
     const CACHE_TTL_SHORT = 60;      // 1 minute for frequently changing data
     const CACHE_TTL_MEDIUM = 300;     // 5 minutes for moderately static data
     const CACHE_TTL_LONG = 600;       // 10 minutes for static data
-    
+
     /**
      * Get comprehensive admin dashboard data
      * Combines all essential dashboard endpoints into one call
@@ -252,11 +252,14 @@ class AdminDashboardController extends Controller
     private function getActiveSession(Carbon $now)
     {
         $cacheKey = 'admin_active_session_' . $now->format('H');
-        
+
         return Cache::remember($cacheKey, 300, function () use ($now) {
+            // Convert to local timezone for comparison with session times
+            $localNow = $now->copy()->timezone(config('sessions.timezone', 'Asia/Bangkok'));
+
             $session = DB::table('sessions')
-                ->where('start_time', '<=', $now->format('H:i:s'))
-                ->where('end_time', '>=', $now->format('H:i:s'))
+                ->where('start_time', '<=', $localNow->format('H:i:s'))
+                ->where('end_time', '>=', $localNow->format('H:i:s'))
                 ->orderBy('start_time')
                 ->first();
 
@@ -286,7 +289,7 @@ class AdminDashboardController extends Controller
     private function getAttendanceTrends(int $days)
     {
         $cacheKey = 'admin_trends_' . $days . 'days';
-        
+
         return Cache::remember($cacheKey, self::CACHE_TTL_MEDIUM, function () use ($days) {
             $startDate = Carbon::today()->subDays($days - 1);
             $endDate = Carbon::today()->endOfDay();
@@ -323,7 +326,7 @@ class AdminDashboardController extends Controller
     private function getAtRiskStudents(int $days)
     {
         $cacheKey = 'admin_risk_students_' . $days . 'days';
-        
+
         return Cache::remember($cacheKey, self::CACHE_TTL_SHORT, function () use ($days) {
             try {
                 return DB::table('v_admin_attendance_enriched as va')
@@ -572,4 +575,3 @@ class AdminDashboardController extends Controller
         });
     }
 }
-

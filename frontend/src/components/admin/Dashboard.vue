@@ -51,29 +51,30 @@ const activeAcademicYear = ref<{ id: number; name: string; current_term: string 
 const userRole = computed(() => getUserRole());
 const isAdmin = computed(() => userRole.value === 'admin');
 
-// Admin Analytics Data
 const systemStats = ref<any>(null);
 const studentAnalytics = ref<any>(null);
 
 const filteredLateStudents = computed(() =>
   lateStudents.value.filter(
-    (s) =>
-      s.name.toLowerCase().includes(lateSearchQuery.value.toLowerCase()) ||
-      s.class.toLowerCase().includes(lateSearchQuery.value.toLowerCase())
-  )
+    (student) =>
+      student.name.toLowerCase().includes(lateSearchQuery.value.toLowerCase())
+      || student.class.toLowerCase().includes(lateSearchQuery.value.toLowerCase()),
+  ),
 );
 const filteredOffsiteStudents = computed(() =>
   offsiteStudents.value.filter(
-    (s) =>
-      s.name.toLowerCase().includes(offsiteSearchQuery.value.toLowerCase()) ||
-      s.class.toLowerCase().includes(offsiteSearchQuery.value.toLowerCase())
-  )
+    (student) =>
+      student.name.toLowerCase().includes(offsiteSearchQuery.value.toLowerCase())
+      || student.class.toLowerCase().includes(offsiteSearchQuery.value.toLowerCase()),
+  ),
 );
 const visibleNotifications = computed(() =>
-  notifications.value.filter((item) => !dismissedNotificationIds.value.includes(item.id))
+  notifications.value.filter((item) => !dismissedNotificationIds.value.includes(item.id)),
 );
-
+const highlightedNotification = computed(() => visibleNotifications.value[0] ?? null);
 const currentStats = computed(() => stats.value[selectedPeriod.value]);
+const biometricEnrollment = computed(() => studentAnalytics.value?.biometric_enrollment ?? null);
+const periodOptions: Period[] = ['Today', 'Weekly', 'Monthly'];
 
 const setPeriod = (period: string) => {
   selectedPeriod.value = period as Period;
@@ -127,6 +128,7 @@ const loadSystemStats = async () => {
 const refreshNotifications = async () => {
   notificationLoading.value = true;
   notificationError.value = '';
+
   try {
     const notificationRes = await dashboardService.getNotifications();
     notifications.value = normalizeNotifications(notificationRes);
@@ -195,32 +197,32 @@ const applyDashboardPayload = (data: any) => {
   };
 
   lateStudents.value = Array.isArray(lateRes)
-    ? lateRes.map((s: any) => ({
-        name: String(s?.name || 'Unknown'),
-        class: String(s?.class || 'Unknown'),
-        time: String(s?.time || '--:--'),
-        status: String(s?.status || 'Late'),
+    ? lateRes.map((student: any) => ({
+        name: String(student?.name || 'Unknown'),
+        class: String(student?.class || 'Unknown'),
+        time: String(student?.time || '--:--'),
+        status: String(student?.status || 'Late'),
       }))
     : [];
 
   offsiteStudents.value = Array.isArray(offsiteRes)
-    ? offsiteRes.map((s: any) => ({
-        name: String(s?.name || 'Unknown'),
-        class: String(s?.class || 'Unknown'),
-        time: String(s?.check_in_time || '--:--'),
-        status: String(s?.status || 'Present'),
-        distance_km: Number(s?.distance_km || 0),
-        location: String(s?.location || ''),
+    ? offsiteRes.map((student: any) => ({
+        name: String(student?.name || 'Unknown'),
+        class: String(student?.class || 'Unknown'),
+        time: String(student?.check_in_time || '--:--'),
+        status: String(student?.status || 'Present'),
+        distance_km: Number(student?.distance_km || 0),
+        location: String(student?.location || ''),
       }))
     : [];
 
   activeSession.value = sessionRes || null;
   trendData.value = trendsRes;
   riskStudents.value = Array.isArray(riskRes)
-    ? riskRes.map((s: any) => ({
-        name: String(s?.name || 'Unknown'),
-        class: String(s?.class || 'Unknown'),
-        absence_count: Number(s?.absence_count || 0),
+    ? riskRes.map((student: any) => ({
+        name: String(student?.name || 'Unknown'),
+        class: String(student?.class || 'Unknown'),
+        absence_count: Number(student?.absence_count || 0),
       }))
     : [];
 
@@ -230,7 +232,7 @@ const applyDashboardPayload = (data: any) => {
       title: String(item?.action || 'System notification'),
       subtitle: item?.student_name ? `Student: ${item.student_name}` : 'Attendance activity update',
       type: 'activity',
-    }))
+    })),
   );
   notificationError.value = '';
 };
@@ -238,6 +240,7 @@ const applyDashboardPayload = (data: any) => {
 const loadDashboard = async () => {
   loading.value = true;
   errorMessage.value = '';
+
   try {
     const data = await adminDashboardService.getDashboardData();
     applyDashboardPayload(data);
@@ -256,9 +259,7 @@ const loadDashboard = async () => {
 const autoRefreshInterval = ref<number | null>(null);
 
 const refreshDashboard = async () => {
-  loading.value = true;
   await loadDashboard();
-  loading.value = false;
 };
 
 onMounted(async () => {
@@ -277,7 +278,6 @@ onMounted(async () => {
     void loadSystemStats();
   }, 0);
 
-  // Auto-refresh every 30s for live data
   autoRefreshInterval.value = window.setInterval(refreshDashboard, 30000);
 });
 
@@ -290,54 +290,85 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-8">
-    <div v-if="errorMessage" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
-      <p class="font-bold">Error</p>
-      <p>{{ errorMessage }}</p>
-    </div>
-    <div class="flex items-end justify-between">
-      <div>
-        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900">វត្តមាន-Attendance Dashboard</h2>
-        <p v-if="activeAcademicYear" class="text-sm text-slate-500 font-medium">
-          {{ activeAcademicYear.name }} - Term {{ activeAcademicYear.current_term }}
-        </p>
-        <p v-else class="text-sm text-slate-500 font-medium">No active academic year</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <div class="flex items-center gap-3 bg-white p-1.5 rounded-lg border border-slate-200 shadow-sm">
-          <button
-            v-for="period in ['Today', 'Weekly', 'Monthly']"
-            :key="period"
-            @click="setPeriod(period)"
-            :class="[
-              'px-4 py-1.5 rounded-md text-xs font-bold transition-all',
-              selectedPeriod === period ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
-            ]"
-          >
-            {{ period }}
-          </button>
-        </div>
-        <button
-          @click="refreshDashboard"
-          :disabled="loading"
-          class="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg font-bold text-sm shadow-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          title="Refresh live data"
-        >
-          <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-          </svg>
-          Refresh
-        </button>
-      </div>
+    <div
+      v-if="errorMessage"
+      class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+      role="alert"
+    >
+      {{ errorMessage }}
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6">
+    <section class="rounded-3xl border border-slate-200 bg-white px-6 py-6 shadow-sm md:px-8">
+      <div class="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        <div class="space-y-2">
+          <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">Admin Dashboard</p>
+          <h2 class="text-3xl font-black tracking-tight text-slate-900">Attendance Operations Center</h2>
+        </div>
+
+        <div class="flex flex-col gap-3 xl:items-end">
+          <div class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
+            <button
+              v-for="period in periodOptions"
+              :key="period"
+              @click="setPeriod(period)"
+              :class="[
+                'rounded-xl px-4 py-2 text-xs font-bold transition-all',
+                selectedPeriod === period
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-white',
+              ]"
+            >
+              {{ period }}
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              @click="refreshDashboard"
+              :disabled="loading"
+              class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {{ loading ? 'Refreshing...' : 'Refresh Live Data' }}
+            </button>
+            <span class="text-xs font-semibold text-slate-500">
+              {{ loading ? 'Updating dashboard metrics...' : 'Auto-refresh every 30 seconds' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Academic Year</p>
+          <p class="mt-2 text-sm font-bold text-slate-900">
+            {{ activeAcademicYear?.name || 'No active academic year' }}
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Current Term</p>
+          <p class="mt-2 text-sm font-bold text-slate-900">
+            {{ activeAcademicYear?.current_term || 'Unavailable' }}
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Open Alerts</p>
+          <p class="mt-2 text-sm font-bold text-slate-900">
+            {{ visibleNotifications.length }} active updates
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-5">
       <StatCard
         :title="`Present ${selectedPeriod}`"
         :value="currentStats.present"
         :icon="CheckCircle2"
         icon-color="text-green-500"
         border-color="border-green-500"
-        :trend="`${currentStats.rate} Attendance rate`"
+        :trend="`${currentStats.rate} attendance rate`"
       />
       <StatCard
         :title="`Absent ${selectedPeriod}`"
@@ -353,131 +384,192 @@ onUnmounted(() => {
         :icon="Clock"
         icon-color="text-amber-500"
         border-color="border-amber-500"
-        subtitle="Peak at 08:05 AM"
+        subtitle="Review late arrivals"
       >
         <template #action>
-          <button @click="isLateModalOpen = true" class="text-[10px] text-primary font-bold hover:underline">View Details</button>
+          <button
+            @click="isLateModalOpen = true"
+            class="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700"
+          >
+            View Details
+          </button>
         </template>
       </StatCard>
       <StatCard
         :title="`Off-site ${selectedPeriod}`"
         :value="currentStats.offsite"
         :icon="MapPin"
-        icon-color="text-red-500"
-        border-color="border-red-500"
+        icon-color="text-blue-500"
+        border-color="border-blue-500"
         subtitle="Outside school perimeter"
-        footer-text="Requires verification"
       >
         <template #action>
-          <button @click="isOffsiteModalOpen = true" class="text-[10px] text-primary font-bold hover:underline">View Details</button>
+          <button
+            @click="isOffsiteModalOpen = true"
+            class="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-700"
+          >
+            View Details
+          </button>
         </template>
       </StatCard>
-      
-      <!-- New Biometric Stat Card -->
       <StatCard
-        v-if="studentAnalytics?.biometric_enrollment"
+        v-if="biometricEnrollment"
         title="Biometric Enrollment"
-        :value="`${studentAnalytics.biometric_enrollment.percentage}%`"
+        :value="`${biometricEnrollment.percentage}%`"
         :icon="Send"
         icon-color="text-blue-500"
         border-color="border-blue-500"
-        :subtitle="`${studentAnalytics.biometric_enrollment.enrolled} / ${studentAnalytics.biometric_enrollment.total} Students`"
+        :subtitle="`${biometricEnrollment.enrolled} / ${biometricEnrollment.total} students`"
       />
       <StatCard
         v-else
         title="Telegram Alerts"
-        value="Sent Status"
+        value="Online"
         :icon="Send"
         icon-color="text-primary"
         border-color="border-primary"
-        footer-text="ID: TG-99238 - 08:32 AM"
-      >
-        <template #action>
-          <div class="size-2 bg-green-500 rounded-full animate-pulse self-center ml-2"></div>
-        </template>
-      </StatCard>
+        subtitle="Alert channel ready"
+        footer-text="Monitor delivery logs"
+      />
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
-      <div class="xl:col-span-2 space-y-8">
+    <div class="grid grid-cols-1 gap-8 xl:grid-cols-3">
+      <div class="space-y-8 xl:col-span-2">
         <ActiveSession :session="activeSession" :loading="loading" />
         <AbsenceChart :data="trendData" />
       </div>
-      <div>
+
+      <div class="space-y-6">
         <RiskTable :students="riskStudents" />
+
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 class="text-lg font-black text-slate-900">Operations Snapshot</h3>
+          <p class="mt-2 text-sm text-slate-500">
+            Quick context for the current attendance workload and review queue.
+          </p>
+
+          <div class="mt-6 space-y-4">
+            <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <span class="text-sm font-semibold text-slate-600">Late students</span>
+              <span class="text-lg font-black text-slate-900">{{ lateStudents.length }}</span>
+            </div>
+            <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <span class="text-sm font-semibold text-slate-600">Off-site check-ins</span>
+              <span class="text-lg font-black text-slate-900">{{ offsiteStudents.length }}</span>
+            </div>
+            <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <span class="text-sm font-semibold text-slate-600">Trend total</span>
+              <span class="text-lg font-black text-slate-900">{{ sumTrend(trendData) }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 pb-12">
-      <!-- System Health Card -->
-      <div class="bg-slate-900 text-white rounded-xl p-8 flex items-center justify-between shadow-xl">
-        <div v-if="systemStats">
-          <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">System Health</h4>
-          <p class="text-4xl font-black">{{ systemStats.database?.size_mb }} MB</p>
-          <p class="text-[10px] text-slate-500 mt-2">Database Size • {{ systemStats.activity?.last_24h }} Activities (24h)</p>
+    <div class="grid grid-cols-1 gap-8 xl:grid-cols-3">
+      <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm xl:col-span-2">
+        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">System Overview</p>
+            <h3 class="mt-2 text-lg font-black text-slate-900">Platform Health and Capacity</h3>
+            <p class="mt-1 text-sm text-slate-500">
+              Backend health, activity flow, and biometric adoption for administrators.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div class="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <CloudCheck class="size-5" />
+            </div>
+            <div>
+              <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Status</p>
+              <p class="text-sm font-bold text-slate-900">Monitoring Active</p>
+            </div>
+          </div>
         </div>
-        <div v-else>
-          <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Weekly System Uptime</h4>
-          <p class="text-4xl font-black">99.98%</p>
-          <p class="text-[10px] text-slate-500 mt-2">Biometric and RFID sensors online across all blocks</p>
-        </div>
-        <div class="size-20 bg-primary/20 rounded-full flex items-center justify-center border-4 border-primary/40">
-          <CloudCheck class="size-10 text-primary" />
+
+        <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Database Size</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">
+              {{ systemStats?.database?.size_mb ?? 'N/A' }}
+              <span v-if="systemStats?.database?.size_mb" class="text-sm font-bold text-slate-500">MB</span>
+            </p>
+          </div>
+
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Activity (24h)</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ systemStats?.activity?.last_24h ?? 'N/A' }}</p>
+          </div>
+
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Enrollment</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">
+              {{ biometricEnrollment?.percentage ?? 'N/A' }}
+              <span v-if="biometricEnrollment?.percentage !== undefined" class="text-sm font-bold text-slate-500">%</span>
+            </p>
+          </div>
         </div>
       </div>
 
-      <div
-        v-if="notificationLoading"
-        class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest"
-      >
-        Loading notifications...
-      </div>
-      <div
-        v-else-if="notificationError"
-        class="bg-rose-50 rounded-xl p-8 border border-rose-200 shadow-sm flex items-center justify-center text-rose-600 text-xs font-bold uppercase tracking-widest"
-      >
-        {{ notificationError }}
-      </div>
-      <div
-        v-else-if="visibleNotifications.length > 0"
-        class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm flex items-center gap-8"
-      >
-        <div class="flex-1">
-          <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Recent Notification</h4>
-          <p class="text-sm font-bold text-slate-900">{{ visibleNotifications[0].title }}</p>
-          <p class="text-[10px] text-slate-400 mt-1 italic">{{ visibleNotifications[0].subtitle }}</p>
-        </div>
-        <div class="flex flex-col gap-2">
-          <button @click="refreshNotifications" class="px-4 py-2 bg-primary text-white text-[10px] font-bold rounded-lg shadow-lg shadow-primary/20">Refresh</button>
+      <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-[11px] font-bold uppercase tracking-[0.24em] text-primary">Notifications</p>
+            <h3 class="mt-2 text-lg font-black text-slate-900">Recent Activity</h3>
+          </div>
           <button
-            @click="dismissNotification(visibleNotifications[0].id)"
-            class="px-4 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-200 transition-colors"
+            @click="refreshNotifications"
+            class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100"
           >
-            Dismiss
+            Refresh
           </button>
         </div>
-      </div>
-      <div
-        v-else
-        class="bg-slate-50 rounded-xl p-8 border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest"
-      >
-        No recent notifications
+
+        <div v-if="notificationLoading" class="mt-6 rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+          Loading notifications...
+        </div>
+
+        <div v-else-if="notificationError" class="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-6 text-sm text-rose-700">
+          {{ notificationError }}
+        </div>
+
+        <div v-else-if="highlightedNotification" class="mt-6 space-y-3">
+          <div
+            v-for="item in visibleNotifications.slice(0, 3)"
+            :key="item.id"
+            class="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+          >
+            <p class="text-sm font-bold text-slate-900">{{ item.title }}</p>
+            <p class="mt-1 text-xs leading-5 text-slate-500">{{ item.subtitle }}</p>
+            <button
+              @click="dismissNotification(item.id)"
+              class="mt-3 text-[10px] font-bold uppercase tracking-wider text-primary transition-colors hover:text-primary/80"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="mt-6 rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+          No recent notifications
+        </div>
       </div>
     </div>
 
     <Modal :is-open="isLateModalOpen" title="Late Students Details" size="lg" @close="isLateModalOpen = false">
       <div class="space-y-4">
         <div class="relative">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
+          <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
           <input
             v-model="lateSearchQuery"
             type="text"
             placeholder="Filter by name or class..."
-            class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20"
+            class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
         <table class="w-full text-left text-sm">
-          <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+          <thead class="bg-slate-50 text-[10px] font-bold uppercase text-slate-500">
             <tr>
               <th class="px-4 py-2">Student</th>
               <th class="px-4 py-2">Class</th>
@@ -486,16 +578,16 @@ onUnmounted(() => {
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            <tr v-for="(s, i) in filteredLateStudents" :key="i">
-              <td class="px-4 py-3 font-bold">{{ s.name }}</td>
-              <td class="px-4 py-3">{{ s.class }}</td>
-              <td class="px-4 py-3 font-mono">{{ s.time }}</td>
+            <tr v-for="(student, index) in filteredLateStudents" :key="index">
+              <td class="px-4 py-3 font-bold">{{ student.name }}</td>
+              <td class="px-4 py-3">{{ student.class }}</td>
+              <td class="px-4 py-3 font-mono">{{ student.time }}</td>
               <td class="px-4 py-3">
-                <span class="px-2 py-0.5 bg-amber-100 text-amber-600 text-[10px] font-bold rounded">LATE</span>
+                <span class="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-600">LATE</span>
               </td>
             </tr>
             <tr v-if="filteredLateStudents.length === 0">
-              <td :colspan="4" class="px-4 py-10 text-center text-slate-400 italic">No late students found.</td>
+              <td :colspan="4" class="px-4 py-10 text-center italic text-slate-400">No late students found.</td>
             </tr>
           </tbody>
         </table>
@@ -505,16 +597,16 @@ onUnmounted(() => {
     <Modal :is-open="isOffsiteModalOpen" title="Off-site Today (Outside PNC Geofence)" size="lg" @close="isOffsiteModalOpen = false">
       <div class="space-y-4">
         <div class="relative">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
+          <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
           <input
             v-model="offsiteSearchQuery"
             type="text"
             placeholder="Filter by name or class..."
-            class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20"
+            class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
         <table class="w-full text-left text-sm">
-          <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+          <thead class="bg-slate-50 text-[10px] font-bold uppercase text-slate-500">
             <tr>
               <th class="px-4 py-2">Student</th>
               <th class="px-4 py-2">Class</th>
@@ -524,17 +616,17 @@ onUnmounted(() => {
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            <tr v-for="(s, i) in filteredOffsiteStudents" :key="`offsite-${i}`">
-              <td class="px-4 py-3 font-bold">{{ s.name }}</td>
-              <td class="px-4 py-3">{{ s.class }}</td>
-              <td class="px-4 py-3 font-mono">{{ s.time }}</td>
-              <td class="px-4 py-3 font-mono">{{ s.distance_km.toFixed(3) }} km</td>
+            <tr v-for="(student, index) in filteredOffsiteStudents" :key="`offsite-${index}`">
+              <td class="px-4 py-3 font-bold">{{ student.name }}</td>
+              <td class="px-4 py-3">{{ student.class }}</td>
+              <td class="px-4 py-3 font-mono">{{ student.time }}</td>
+              <td class="px-4 py-3 font-mono">{{ student.distance_km.toFixed(3) }} km</td>
               <td class="px-4 py-3">
-                <span class="px-2 py-0.5 bg-rose-100 text-rose-600 text-[10px] font-bold rounded uppercase">{{ s.status }}</span>
+                <span class="rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-600">{{ student.status }}</span>
               </td>
             </tr>
             <tr v-if="filteredOffsiteStudents.length === 0">
-              <td :colspan="5" class="px-4 py-10 text-center text-slate-400 italic">No off-site students found for today.</td>
+              <td :colspan="5" class="px-4 py-10 text-center italic text-slate-400">No off-site students found for today.</td>
             </tr>
           </tbody>
         </table>

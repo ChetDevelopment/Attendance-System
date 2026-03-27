@@ -202,7 +202,7 @@ class DashboardController extends Controller
 
     public function activeSession()
     {
-        $now = Carbon::now()->format('H:i:s');
+        $now = Carbon::now()->timezone(config('sessions.timezone', 'Asia/Bangkok'))->format('H:i:s');
         $cacheKey = 'admin_active_session_check';
 
         return Cache::remember($cacheKey, 60, function () use ($now) {
@@ -250,9 +250,12 @@ class DashboardController extends Controller
      */
     private function getActiveSession(Carbon $now)
     {
+        // Convert to local timezone for comparison with session times
+        $localNow = $now->copy()->timezone(config('sessions.timezone', 'Asia/Bangkok'));
+        
         $session = DB::table('sessions')
-            ->where('start_time', '<=', $now->format('H:i:s'))
-            ->where('end_time', '>=', $now->format('H:i:s'))
+            ->where('start_time', '<=', $localNow->format('H:i:s'))
+            ->where('end_time', '>=', $localNow->format('H:i:s'))
             ->orderBy('start_time')
             ->first();
 

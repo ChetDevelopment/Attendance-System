@@ -6,6 +6,32 @@ const toError = (error, fallback) => {
   return fallback
 }
 
+const normalizeAcademicYears = (payload) => {
+  const rows = Array.isArray(payload?.academic_years)
+    ? payload.academic_years
+    : Array.isArray(payload)
+      ? payload
+      : []
+
+  return rows
+    .map((year) => {
+      const id = Number(year?.id || 0)
+      const derivedName = year?.name
+        || (year?.start_year && year?.end_year ? `${year.start_year}-${year.end_year}` : '')
+        || (year?.start_date && year?.end_date
+          ? `${String(year.start_date).slice(0, 4)}-${String(year.end_date).slice(0, 4)}`
+          : '')
+
+      return {
+        ...year,
+        id,
+        name: derivedName || `Academic Year ${id || ''}`.trim(),
+        is_active: Boolean(year?.is_active),
+      }
+    })
+    .filter((year) => year.id > 0)
+}
+
 export const teacherService = {
   async getDashboard() {
     try {
@@ -99,7 +125,7 @@ export const teacherService = {
   async getAcademicYears() {
     try {
       const response = await api.get('/teacher/academic-years')
-      return response.data.academic_years ?? []
+      return normalizeAcademicYears(response.data)
     } catch (error) {
       throw new Error(toError(error, 'Failed to load academic years.'))
     }

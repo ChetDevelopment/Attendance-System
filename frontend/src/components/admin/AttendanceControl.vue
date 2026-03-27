@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Search, Unlock, Pencil } from 'lucide-vue-next'
 import Modal from './Modal.vue'
+import AdminPageHeader from './AdminPageHeader.vue'
 import { adminAttendanceService } from '../../services/adminAttendanceService'
 
 type AttendanceStatus = 'Present' | 'Absent' | 'Late' | 'Excused'
@@ -168,36 +169,40 @@ onMounted(() => loadData(1))
 
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900">Attendance Control</h2>
-        <p class="text-sm text-slate-500 font-medium">Review and manage attendance from backend records</p>
-      </div>
-      <button class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-bold" :disabled="loading" @click="loadData(page)">
-        {{ loading ? 'Refreshing...' : 'Refresh' }}
-      </button>
-    </div>
+    <AdminPageHeader
+      eyebrow="Attendance Operations"
+      title="Attendance Control"
+      description="Review attendance records, resolve locked entries, and apply manual corrections with less guesswork."
+    >
+      <template #actions>
+        <button class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50" :disabled="loading" @click="loadData(page)">
+          {{ loading ? 'Refreshing...' : 'Refresh Records' }}
+        </button>
+      </template>
 
-    <p v-if="errorMessage" class="p-3 rounded-lg bg-rose-50 text-rose-700 text-sm">{{ errorMessage }}</p>
+      <template #meta>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Loaded Records</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ stats.totalRecords }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Late Records</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ stats.lateRecords }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Locked Records</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ stats.lockedRecords }}</p>
+          </div>
+        </div>
+      </template>
+    </AdminPageHeader>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <p class="text-[10px] uppercase font-bold text-slate-500">Loaded Records</p>
-        <p class="text-2xl font-black text-slate-900">{{ stats.totalRecords }}</p>
-      </div>
-      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <p class="text-[10px] uppercase font-bold text-slate-500">Late Records</p>
-        <p class="text-2xl font-black text-slate-900">{{ stats.lateRecords }}</p>
-      </div>
-      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <p class="text-[10px] uppercase font-bold text-slate-500">Locked Records</p>
-        <p class="text-2xl font-black text-slate-900">{{ stats.lockedRecords }}</p>
-      </div>
-    </div>
+    <p v-if="errorMessage" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ errorMessage }}</p>
 
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div class="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center gap-3 justify-between">
-        <div class="flex items-center gap-3">
+    <div class="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div class="border-b border-slate-200 bg-slate-50/50 p-4">
+        <div class="flex flex-wrap items-center gap-3">
           <div class="relative max-w-xs w-full">
             <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
             <input
@@ -207,16 +212,16 @@ onMounted(() => loadData(1))
               class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none"
             />
           </div>
-          <select v-model="statusFilter" class="px-3 py-2 border border-slate-200 rounded-lg text-sm">
+          <select v-model="statusFilter" class="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
             <option value="all">All Status</option>
             <option value="Present">Present</option>
             <option value="Absent">Absent</option>
             <option value="Late">Late</option>
             <option value="Excused">Excused</option>
           </select>
-          <input v-model="dateFilter" type="date" class="px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+          <input v-model="dateFilter" type="date" class="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white" />
+          <button class="px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold bg-white" @click="loadData(1)">Apply</button>
         </div>
-        <button class="px-3 py-2 border border-slate-200 rounded-lg text-xs font-bold" @click="loadData(1)">Apply</button>
       </div>
 
       <table class="w-full text-left text-sm">
@@ -302,8 +307,11 @@ onMounted(() => loadData(1))
       </div>
     </div>
 
-    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-      <h3 class="text-lg font-bold text-slate-900">Manual Correction</h3>
+    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+      <div>
+        <h3 class="text-lg font-bold text-slate-900">Manual Correction</h3>
+        <p class="mt-1 text-sm text-slate-500">Create a correction when an attendance entry needs to be added or fixed manually.</p>
+      </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label class="text-[10px] font-bold text-slate-500 uppercase">Student ID</label>

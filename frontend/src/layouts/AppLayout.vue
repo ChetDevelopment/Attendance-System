@@ -1,19 +1,21 @@
 <template>
-  <div class="flex h-screen overflow-hidden bg-slate-50">
+  <div class="flex min-h-screen bg-slate-50">
     <Sidebar :current-module="currentModule" @module-change="setCurrentModule" />
 
-    <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
       <Navbar @navigate="setCurrentModule" />
 
       <div class="flex-1 overflow-y-auto p-8 scroll-smooth">
-        <KeepAlive>
-          <component
-            :is="activeModule"
-            :key="currentModule"
-            :classes-refresh-key="classesRefreshKey"
-            @classes-updated="handleClassesUpdated"
-          />
-        </KeepAlive>
+        <div class="mx-auto w-full max-w-[1600px]">
+          <KeepAlive>
+            <component
+              :is="activeModule"
+              :key="currentModule"
+              :classes-refresh-key="classesRefreshKey"
+              @classes-updated="handleClassesUpdated"
+            />
+          </KeepAlive>
+        </div>
       </div>
     </main>
   </div>

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { TrendingUp } from 'lucide-vue-next';
+import { computed } from 'vue';
 
 type IconComponent = any;
 
-defineProps<{
+const props = defineProps<{
   title: string;
   value: string | number;
   icon: IconComponent;
@@ -13,31 +13,46 @@ defineProps<{
   trend?: string;
   footerText?: string;
 }>();
+
+const iconBackgroundClass = computed(() => {
+  if (props.iconColor.includes('green')) return 'bg-emerald-50';
+  if (props.iconColor.includes('red')) return 'bg-rose-50';
+  if (props.iconColor.includes('amber')) return 'bg-amber-50';
+  if (props.iconColor.includes('blue')) return 'bg-blue-50';
+  if (props.iconColor.includes('primary')) return 'bg-primary/10';
+  return 'bg-slate-100';
+});
 </script>
 
 <template>
-  <div :class="['bg-white p-6 rounded-xl border-l-4 shadow-sm', borderColor]">
-    <div class="flex items-center justify-between mb-4">
-      <span class="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{{ title }}</span>
-      <component :is="icon" :class="['size-5', iconColor]" />
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <span class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">{{ title }}</span>
+      <div :class="[iconBackgroundClass, 'rounded-xl p-3']">
+        <component :is="icon" :class="['size-5', iconColor]" />
+      </div>
     </div>
 
-    <div class="flex items-baseline gap-3">
-      <p :class="['text-3xl font-black', title === 'Absent Students' ? 'text-red-500' : 'text-slate-900']">
-        {{ value }}
-      </p>
+    <div class="flex flex-wrap items-end gap-3">
+      <p class="text-3xl font-black tracking-tight text-slate-900">{{ value }}</p>
       <slot name="action" />
     </div>
 
-    <p v-if="trend" class="text-[10px] text-green-600 font-bold mt-2 flex items-center gap-1">
-      <TrendingUp class="size-3" /> {{ trend }}
-    </p>
+    <p v-if="subtitle" class="mt-3 text-sm font-medium text-slate-500">{{ subtitle }}</p>
 
-    <p v-if="subtitle" class="text-[10px] text-slate-500 font-medium mt-2 italic">{{ subtitle }}</p>
-
-    <div v-if="footerText" class="mt-4 flex items-center justify-between">
-      <p class="text-[9px] text-slate-400 font-mono">{{ footerText }}</p>
-      <button class="text-[10px] px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded font-bold transition-colors">Retry</button>
+    <div v-if="trend || footerText" class="mt-4 flex flex-wrap items-center gap-2">
+      <span
+        v-if="trend"
+        class="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700"
+      >
+        {{ trend }}
+      </span>
+      <span
+        v-if="footerText"
+        class="rounded-full bg-slate-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500"
+      >
+        {{ footerText }}
+      </span>
     </div>
   </div>
 </template>

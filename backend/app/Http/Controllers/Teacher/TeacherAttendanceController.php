@@ -27,8 +27,7 @@ class TeacherAttendanceController extends Controller
     public function __construct(
         private readonly AttendanceIntegrationService $attendanceIntegrationService,
         private readonly TelegramService $telegramService
-    ) {
-    }
+    ) {}
 
     private function isTeacher(): bool
     {
@@ -417,7 +416,7 @@ class TeacherAttendanceController extends Controller
     private function deduplicateClassesForTeacher($classes)
     {
         return $classes
-            ->groupBy(fn ($class) => ($class->academic_year_id ?? 'null') . ':' . trim((string) $class->name))
+            ->groupBy(fn($class) => ($class->academic_year_id ?? 'null') . ':' . trim((string) $class->name))
             ->map(function ($group) {
                 return $group
                     ->sort(function ($left, $right) {
@@ -468,7 +467,7 @@ class TeacherAttendanceController extends Controller
         });
 
         // Get active session (currently happening based on current time)
-        $currentTime = $now->format('H:i:s');
+        $currentTime = $now->timezone(config('sessions.timezone', 'Asia/Bangkok'))->format('H:i:s');
         $activeSession = Session::where('is_active', true)
             ->where('start_time', '<=', $currentTime)
             ->where('end_time', '>=', $currentTime)

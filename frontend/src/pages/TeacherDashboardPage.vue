@@ -147,9 +147,14 @@ const loadAcademicYears = async () => {
   try {
     const years = await teacherService.getAcademicYears();
     academicYears.value = years;
-    // Set default to active year or first one
+    // Preserve the current selection when it still exists; otherwise default to active year or first.
+    const currentSelectionStillExists = years.some(
+      (year: any) => Number(year.id) === Number(selectedAcademicYearId.value),
+    );
     const activeYear = years.find((y: any) => y.is_active);
-    selectedAcademicYearId.value = activeYear?.id || years[0]?.id || null;
+    selectedAcademicYearId.value = currentSelectionStillExists
+      ? selectedAcademicYearId.value
+      : activeYear?.id || years[0]?.id || null;
   } catch (error) {
     console.error("Failed to load academic years:", error);
   }

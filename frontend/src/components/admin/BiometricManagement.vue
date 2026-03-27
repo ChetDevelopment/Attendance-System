@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Fingerprint, CreditCard, Search, RefreshCw, Save } from 'lucide-vue-next'
+import AdminPageHeader from './AdminPageHeader.vue'
 import { biometricAdminService } from '../../services/biometricAdminService'
 
 const loading = ref(false)
@@ -83,45 +84,54 @@ onMounted(loadData)
 
 <template>
   <div class="space-y-8">
-    <div class="flex items-end justify-between gap-4">
-      <div>
-        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900">Biometric Management</h2>
-        <p class="text-sm text-slate-500 font-medium">Manage RFID cards, fingerprint enrollment, and recent biometric activity.</p>
-      </div>
-      <button
-        @click="loadData"
-        class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white"
-      >
-        <RefreshCw class="size-4" />
-        Refresh
-      </button>
-    </div>
+    <AdminPageHeader
+      eyebrow="Biometric Access"
+      title="Biometric Management"
+      description="Manage RFID cards, fingerprint enrollment, and recent biometric history from one clearer workspace."
+    >
+      <template #actions>
+        <button
+          @click="loadData"
+          class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white"
+        >
+          <RefreshCw class="size-4" />
+          Refresh
+        </button>
+      </template>
 
-    <p v-if="errorMessage" class="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ errorMessage }}</p>
-    <p v-if="successMessage" class="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ successMessage }}</p>
+      <template #meta>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Students</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ overview?.summary?.total_students || 0 }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Fingerprint Enrolled</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ overview?.summary?.fingerprint_enrolled || 0 }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">RFID Assigned</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ overview?.summary?.rfid_assigned || 0 }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Enrollment Rate</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ overview?.summary?.enrollment_percentage || 0 }}%</p>
+          </div>
+        </div>
+      </template>
+    </AdminPageHeader>
 
-    <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p class="text-xs font-bold uppercase tracking-widest text-slate-400">Students</p>
-        <p class="mt-3 text-3xl font-black text-slate-900">{{ overview?.summary?.total_students || 0 }}</p>
-      </div>
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p class="text-xs font-bold uppercase tracking-widest text-slate-400">Fingerprint Enrolled</p>
-        <p class="mt-3 text-3xl font-black text-slate-900">{{ overview?.summary?.fingerprint_enrolled || 0 }}</p>
-      </div>
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p class="text-xs font-bold uppercase tracking-widest text-slate-400">RFID Assigned</p>
-        <p class="mt-3 text-3xl font-black text-slate-900">{{ overview?.summary?.rfid_assigned || 0 }}</p>
-      </div>
-      <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p class="text-xs font-bold uppercase tracking-widest text-slate-400">Enrollment Rate</p>
-        <p class="mt-3 text-3xl font-black text-slate-900">{{ overview?.summary?.enrollment_percentage || 0 }}%</p>
-      </div>
-    </div>
+    <p v-if="errorMessage" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ errorMessage }}</p>
+    <p v-if="successMessage" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ successMessage }}</p>
 
     <div class="grid grid-cols-1 gap-8 xl:grid-cols-[1.2fr_1fr]">
       <div class="space-y-6">
-        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="mb-6">
+            <h3 class="text-sm font-bold text-slate-900">Student Enrollment Directory</h3>
+            <p class="mt-1 text-xs text-slate-500">Search by student, card, or email, then select a record to update enrollment details.</p>
+          </div>
+
           <div class="mb-6 flex flex-col gap-4 md:flex-row">
             <div class="relative flex-1">
               <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -176,10 +186,10 @@ onMounted(loadData)
       </div>
 
       <div class="space-y-6">
-        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" v-if="selectedStudent">
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm" v-if="selectedStudent">
           <div class="mb-6">
             <h3 class="text-lg font-bold text-slate-900">{{ selectedStudent.name }}</h3>
-            <p class="text-sm text-slate-500">{{ selectedStudent.student_code }} • {{ selectedStudent.class_name || 'Unknown class' }}</p>
+            <p class="text-sm text-slate-500">{{ selectedStudent.student_code }} | {{ selectedStudent.class_name || 'Unknown class' }}</p>
           </div>
 
           <div class="space-y-4">
@@ -218,7 +228,7 @@ onMounted(loadData)
           </div>
         </div>
 
-        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 class="mb-4 text-lg font-bold text-slate-900">Recent Biometric History</h3>
           <div v-if="!selectedStudent" class="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
             Select a student to view biometric history.
@@ -231,7 +241,7 @@ onMounted(loadData)
               <div class="flex items-center justify-between gap-4">
                 <div>
                   <p class="text-sm font-bold text-slate-900">{{ item.session_name }}</p>
-                  <p class="text-xs text-slate-500">{{ item.attendance_date }} • {{ item.scan_method }}</p>
+                  <p class="text-xs text-slate-500">{{ item.attendance_date }} | {{ item.scan_method }}</p>
                 </div>
                 <span class="text-xs font-bold uppercase text-slate-600">{{ item.status }}</span>
               </div>

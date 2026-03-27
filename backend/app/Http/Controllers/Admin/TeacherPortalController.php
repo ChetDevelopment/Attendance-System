@@ -38,15 +38,15 @@ class TeacherPortalController extends Controller
                     ->select('id', 'name as subject', 'start_time', 'end_time')
                     ->orderBy('start_time')
                     ->get()
-                    ->map(function($s) {
+                    ->map(function ($s) {
                         $s->classCode = 'Not Assigned';
                         return $s;
                     });
             }
 
-            $now = Carbon::now()->format('H:i:s');
-            $active = $todayClasses->first(fn ($c) => $c->start_time <= $now && $c->end_time >= $now);
-            $next = $todayClasses->first(fn ($c) => $c->start_time > $now);
+            $now = Carbon::now()->timezone(config('sessions.timezone', 'Asia/Bangkok'))->format('H:i:s');
+            $active = $todayClasses->first(fn($c) => $c->start_time <= $now && $c->end_time >= $now);
+            $next = $todayClasses->first(fn($c) => $c->start_time > $now);
 
             $checkedInCount = DB::table('attendance_records')
                 ->where('submitted_by', $userId)
@@ -95,7 +95,7 @@ class TeacherPortalController extends Controller
         try {
             // Cache for 5 minutes
             $cacheKey = 'teacher_schedule_' . $request->user()->id;
-            
+
             return Cache::remember($cacheKey, 300, function () {
                 $teachers = DB::table('users as u')
                     ->join('roles as r', 'r.id', '=', 'u.role_id')
@@ -275,5 +275,3 @@ class TeacherPortalController extends Controller
         }
     }
 }
-
-

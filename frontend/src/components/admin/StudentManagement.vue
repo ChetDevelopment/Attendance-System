@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import Modal from './Modal.vue';
+import AdminPageHeader from './AdminPageHeader.vue';
 import ConfirmationModal from '../common/ConfirmationModal.vue';
 import {
   Search,
@@ -12,7 +13,6 @@ import {
   Trash2,
   LayoutGrid,
   List,
-  Filter,
   Camera,
 } from 'lucide-vue-next';
 import { studentService } from '../../services/studentService';
@@ -159,6 +159,10 @@ const generationOptions = computed(() => {
 
   return Array.from(mergedSet).sort();
 });
+
+const biometricReadyCount = computed(() =>
+  students.value.filter((student) => Boolean(student.cardId) || Boolean(student.fingerprintEnrolled)).length,
+);
 
 const subjectOptions = computed(() => {
   const set = new Set(
@@ -727,39 +731,60 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-extrabold tracking-tight text-slate-900">Student Management</h2>
-        <p class="text-sm text-slate-500 font-medium">Add, edit, and manage student identification</p>
-      </div>
-      <div class="flex items-center gap-3">
+    <AdminPageHeader
+      eyebrow="Student Operations"
+      title="Student Management"
+      description="Add students, import batches, and manage identification details with a clearer workflow for daily admin use."
+    >
+      <template #actions>
         <button
           @click="isBulkModalOpen = true; bulkGeneration = generationOptions[0] || ''; bulkClassId = classOptions[0]?.id?.toString() || ''"
-          class="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold text-sm hover:bg-slate-200 transition-all"
+          class="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 transition-all hover:bg-slate-200"
         >
           <Upload class="size-4" />
           Bulk Import
         </button>
         <button
           @click="isAddModalOpen = true"
-          class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg font-bold text-sm shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+          class="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90"
         >
           <UserPlus class="size-4" />
           Add Student
         </button>
-      </div>
-    </div>
+      </template>
 
-    <p v-if="errorMessage" class="p-3 rounded-lg bg-rose-50 text-rose-700 text-sm">{{ errorMessage }}</p>
+      <template #meta>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Total Students</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ totalStudents }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Classes</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ classOptions.length }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Generations</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ generationOptions.length }}</p>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Biometric Ready</p>
+            <p class="mt-2 text-2xl font-black text-slate-900">{{ biometricReadyCount }}</p>
+          </div>
+        </div>
+      </template>
+    </AdminPageHeader>
 
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
+    <p v-if="errorMessage" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ errorMessage }}</p>
+
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative">
       <!-- Loading Progress Bar -->
       <div v-if="loading" class="absolute top-0 left-0 right-0 h-0.5 bg-primary/10 overflow-hidden z-10">
         <div class="h-full bg-primary animate-progress origin-left"></div>
       </div>
 
-      <div class="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-center gap-3 flex-1">
+      <div class="border-b border-slate-200 bg-slate-50/50 p-4">
+        <div class="flex flex-wrap items-center gap-3">
           <div class="relative max-w-xs w-full">
             <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
             <input
@@ -782,13 +807,6 @@ onMounted(async () => {
           <select v-model="sectionFilter" class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 min-w-[140px]">
             <option v-for="section in sectionOptions" :key="section" :value="section">{{ section }}</option>
           </select>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button class="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50">
-            <Filter class="size-4" />
-            Filters
-          </button>
           <button @click="handlePrint" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all" title="Print List">
             <Printer class="size-4 text-slate-500" />
           </button>

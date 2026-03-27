@@ -4,6 +4,7 @@ import Modal from './Modal.vue'
 import ConfirmationModal from '../common/ConfirmationModal.vue'
 import { Search, Key, Power, UserPlus, CheckCircle } from 'lucide-vue-next'
 import { userService } from '../../services/userService'
+import { setImageFallback } from '../../utils/imageFallback'
 
 type RoleType = {
   id: number
@@ -16,6 +17,11 @@ type UserType = {
   name: string
   email: string
   role_id: number
+  is_active?: boolean
+  avatar_url?: string | null
+  profile_image?: string | null
+  phone?: string | null
+  bio?: string | null
   role?: RoleType
 }
 
@@ -174,6 +180,9 @@ const filteredUsers = computed(() =>
   })
 )
 
+const userProfileImage = (user: UserType) =>
+  user.avatar_url || user.profile_image || '/default-teacher.svg'
+
 onMounted(loadData)
 </script>
 
@@ -202,7 +211,7 @@ onMounted(loadData)
       </div>
 
       <div class="p-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
-        <div class="relative max-w-xs w-full">
+        <div class="relative max-w-xs w-full flex items-center gap-3">
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-4" />
           <input
             v-model="searchQuery"
@@ -210,12 +219,12 @@ onMounted(loadData)
             placeholder="Search users..."
             class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20"
           />
-        </div>
-        <div class="flex items-center gap-2">
           <select v-model="roleFilter" class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none">
             <option value="all">All Roles</option>
             <option v-for="role in roles" :key="role.id" :value="String(role.id)">{{ role.name }}</option>
           </select>
+        </div>
+        <div class="flex items-center gap-2">
           <button class="px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs font-bold" :disabled="loading" @click="loadData">
             Refresh
           </button>
@@ -237,8 +246,21 @@ onMounted(loadData)
           </tr>
           <tr v-for="user in filteredUsers" :key="user.id" class="hover:bg-slate-50 transition-colors" :class="{ 'opacity-50 pointer-events-none': loading }">
             <td class="px-6 py-4">
-              <div class="font-bold text-slate-900">{{ user.name }}</div>
-              <div class="text-[10px] text-slate-400">{{ user.email }}</div>
+              <div class="flex items-center gap-3">
+                <div class="size-10 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+                  <img
+                    :src="userProfileImage(user)"
+                    :alt="user.name"
+                    class="size-full object-cover"
+                    referrerpolicy="no-referrer"
+                    @error="(event) => setImageFallback(event, '/default-teacher.svg')"
+                  />
+                </div>
+                <div>
+                  <div class="font-bold text-slate-900">{{ user.name }}</div>
+                  <div class="text-[10px] text-slate-400">{{ user.email }}</div>
+                </div>
+              </div>
             </td>
             <td class="px-6 py-4">
               <span class="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded uppercase">
@@ -246,7 +268,16 @@ onMounted(loadData)
               </span>
             </td>
             <td class="px-6 py-4">
-              <span class="px-2 py-1 text-[10px] font-black rounded uppercase bg-green-100 text-green-600">Active</span>
+              <span
+                :class="[
+                  'px-2 py-1 text-[10px] font-black rounded uppercase',
+                  user.is_active === false
+                    ? 'bg-slate-200 text-slate-600'
+                    : 'bg-green-100 text-green-600',
+                ]"
+              >
+                {{ user.is_active === false ? 'Inactive' : 'Active' }}
+              </span>
             </td>
             <td class="px-6 py-4 text-right">
               <div class="flex items-center justify-end gap-2">

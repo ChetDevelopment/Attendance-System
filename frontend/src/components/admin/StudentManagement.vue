@@ -104,6 +104,7 @@ const isPreviewModalOpen = ref(false);
 const selectedStudent = ref<Student | null>(null);
 const editingStudent = ref<Student | null>(null);
 const searchQuery = ref('');
+const academicYearFilter = ref('All Years');
 const classFilter = ref('All Classes');
 const subjectFilter = ref('All Subjects');
 const sectionFilter = ref('All Sections');
@@ -134,6 +135,14 @@ const classOptions = computed(() =>
     academicYearId: item.academic_year_id,
   }))
 );
+
+const academicYearOptions = computed(() => [
+  { id: 'All Years', name: 'All Years' },
+  ...academicYears.value.map((year) => ({
+    id: String(year.id),
+    name: String(year.name || year.label || year.start_year || `Year ${year.id}`),
+  })),
+]);
 
 const generationOptions = computed(() => {
   // First try to get from academic years
@@ -230,6 +239,10 @@ const buildStudentFilters = () => {
 
   if (search) {
     filters.search = search;
+  }
+
+  if (academicYearFilter.value !== 'All Years') {
+    filters.academic_year_id = Number(academicYearFilter.value);
   }
 
   if (subjectFilter.value !== 'All Subjects') {
@@ -686,7 +699,7 @@ const paginatedStudents = computed(() => students.value);
 let studentReloadDebounce: ReturnType<typeof setTimeout> | null = null;
 
 // Removed manual debounce - global API loading + reactivity handles this
-watch([searchQuery, classFilter, subjectFilter, sectionFilter], async () => {
+watch([searchQuery, academicYearFilter, classFilter, subjectFilter, sectionFilter], async () => {
   if (currentPage.value !== 1) {
     currentPage.value = 1;
     return;
@@ -794,6 +807,12 @@ onMounted(async () => {
               class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
+          <select
+            v-model="academicYearFilter"
+            class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 min-w-[140px]"
+          >
+            <option v-for="year in academicYearOptions" :key="year.id" :value="year.id">{{ year.name }}</option>
+          </select>
           <select
             v-model="classFilter"
             class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 min-w-[140px]"

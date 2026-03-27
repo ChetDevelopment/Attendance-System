@@ -12,10 +12,23 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Add recorded_at column
-        Schema::table('attendance_records', function (Blueprint $table) {
-            $table->timestamp('recorded_at')->nullable()->after('check_in_time');
-        });
+        if (!Schema::hasTable('attendance_records')) {
+            return;
+        }
+
+        if (!Schema::hasColumn('attendance_records', 'recorded_at')) {
+            $afterColumn = Schema::hasColumn('attendance_records', 'check_in_time')
+                ? 'check_in_time'
+                : null;
+
+            Schema::table('attendance_records', function (Blueprint $table) use ($afterColumn) {
+                $column = $table->timestamp('recorded_at')->nullable();
+
+                if ($afterColumn !== null) {
+                    $column->after($afterColumn);
+                }
+            });
+        }
 
         // Alter enum values to uppercase - use raw statement to be safe across drivers
         // MySQL / MariaDB
@@ -35,6 +48,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('attendance_records')) {
+            return;
+        }
+
         // Revert enum values to lowercase and drop recorded_at
         if (config('database.default') === 'mysql') {
             DB::statement("ALTER TABLE attendance_records MODIFY COLUMN status ENUM('present','absent','late') NOT NULL");
@@ -45,8 +62,10 @@ return new class extends Migration
             });
         }
 
-        Schema::table('attendance_records', function (Blueprint $table) {
-            $table->dropColumn('recorded_at');
-        });
+        if (Schema::hasColumn('attendance_records', 'recorded_at')) {
+            Schema::table('attendance_records', function (Blueprint $table) {
+                $table->dropColumn('recorded_at');
+            });
+        }
     }
 };

@@ -112,8 +112,6 @@ const studentsPerPage = 12;
 const currentPage = ref(1);
 const totalStudents = ref(0);
 const totalPages = ref(1);
-const pageFrom = ref(0);
-const pageTo = ref(0);
 const newStudent = ref<StudentForm>({
   name: '',
   studentId: '',
@@ -259,8 +257,6 @@ const loadStudents = async () => {
   students.value = batch.map(toUiStudent);
   totalStudents.value = Number(response?.total || batch.length || 0);
   totalPages.value = Math.max(Number(response?.last_page || 1), 1);
-  pageFrom.value = Number(response?.from || (batch.length ? 1 : 0));
-  pageTo.value = Number(response?.to || batch.length || 0);
 
   if (batch.length === 0 && totalStudents.value > 0 && currentPage.value > totalPages.value) {
     currentPage.value = totalPages.value;
@@ -683,10 +679,6 @@ const handlePrint = () => {
 
 const paginatedStudents = computed(() => students.value);
 
-const pageNumbers = computed(() =>
-  Array.from({ length: totalPages.value }, (_, index) => index + 1)
-);
-
 let studentReloadDebounce: ReturnType<typeof setTimeout> | null = null;
 
 // Removed manual debounce - global API loading + reactivity handles this
@@ -927,37 +919,31 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="!loading && totalStudents > 0" class="px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/70">
-        <div class="flex items-center gap-2 text-xs">
-          <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-700 font-semibold">
-            Showing {{ pageFrom }}-{{ pageTo }} of {{ totalStudents }}
-          </span>
-        </div>
-        <div v-if="totalPages > 1" class="w-full sm:w-auto flex items-center gap-1 overflow-x-auto">
+      <div
+        v-if="totalStudents > 0"
+        class="flex flex-col gap-3 border-t border-slate-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+      >
+        <p class="text-sm font-semibold text-slate-600">
+          Total: <span class="text-slate-900">{{ totalStudents }}</span> records
+        </p>
+
+        <div class="flex items-center gap-3 self-start sm:self-auto">
           <button
             @click="currentPage = Math.max(currentPage - 1, 1)"
             :disabled="currentPage === 1"
-            class="px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
           >
-            Previous
+            Prev
           </button>
-          <button
-            v-for="page in pageNumbers"
-            :key="page"
-            @click="currentPage = page"
-            :class="[
-              'min-w-9 px-3 py-2 text-xs font-semibold rounded-lg border transition-colors',
-              page === currentPage
-                ? 'bg-primary text-white border-primary'
-                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100',
-            ]"
-          >
-            {{ page }}
-          </button>
+
+          <p class="text-sm font-semibold text-slate-600">
+            Page {{ currentPage }} / {{ totalPages }}
+          </p>
+
           <button
             @click="currentPage = Math.min(currentPage + 1, totalPages)"
             :disabled="currentPage === totalPages"
-            class="px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
           >
             Next
           </button>

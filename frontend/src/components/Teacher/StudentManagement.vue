@@ -36,6 +36,8 @@ const selectedStudent = ref<Student | null>(null);
 const searchQuery = ref("");
 const classFilter = ref("All Classes");
 const viewMode = ref<"table" | "grid">("table");
+const currentPage = ref(1);
+const pageSize = 8;
 
 // Local academic year state
 const selectedAcademicYearIdLocal = ref<number | null>(props.academicYearId ?? null);
@@ -71,6 +73,7 @@ watch(
   () => props.academicYearId,
   (newVal) => {
     selectedAcademicYearIdLocal.value = newVal ?? null;
+    currentPage.value = 1;
     loadStudents();
   },
 );
@@ -97,6 +100,37 @@ const filteredStudents = computed(() =>
     return matchesSearch && matchesClass;
   }),
 );
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredStudents.value.length / pageSize)),
+);
+
+const paginatedStudents = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredStudents.value.slice(start, start + pageSize);
+});
+
+const goToPreviousPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value -= 1;
+  }
+};
+
+const goToNextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value += 1;
+  }
+};
+
+watch([searchQuery, classFilter], () => {
+  currentPage.value = 1;
+});
+
+watch(totalPages, (pageCount) => {
+  if (currentPage.value > pageCount) {
+    currentPage.value = pageCount;
+  }
+});
 
 const generationOf = (code: string) => {
   const raw = String(code || "").toUpperCase();
@@ -243,7 +277,7 @@ onMounted(loadStudents);
           </thead>
           <tbody class="divide-y divide-slate-100">
             <tr
-              v-for="s in filteredStudents"
+              v-for="s in paginatedStudents"
               :key="s.id"
               class="hover:bg-slate-50 transition-colors"
             >
@@ -292,7 +326,7 @@ onMounted(loadStudents);
         class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 bg-slate-50/30"
       >
         <div
-          v-for="s in filteredStudents"
+          v-for="s in paginatedStudents"
           :key="s.id"
           class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group relative overflow-hidden"
         >
@@ -333,6 +367,37 @@ onMounted(loadStudents);
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div
+        v-if="filteredStudents.length > 0"
+        class="flex flex-col gap-3 border-t border-slate-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p class="text-sm font-semibold text-slate-600">
+          Total: <span class="text-slate-900">{{ filteredStudents.length }}</span> records
+        </p>
+
+        <div class="flex items-center gap-3 self-start sm:self-auto">
+          <button
+            @click="goToPreviousPage"
+            :disabled="currentPage === 1"
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+          >
+            Prev
+          </button>
+
+          <p class="text-sm font-semibold text-slate-600">
+            Page {{ currentPage }} / {{ totalPages }}
+          </p>
+
+          <button
+            @click="goToNextPage"
+            :disabled="currentPage === totalPages"
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+          >
+            Next
+          </button>
         </div>
       </div>
 

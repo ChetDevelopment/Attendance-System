@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
-import { useRouter } from "vue-router";
+import { ref, onMounted, computed, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import Sidebar, { ViewType, User } from "../components/Teacher/Sidebar.vue";
 import Header from "../components/Teacher/Header.vue";
 import TeacherDashboard from "../components/Teacher/TeacherDashboard.vue";
@@ -25,7 +25,38 @@ import {
 } from "../services/auth";
 
 const router = useRouter();
+const route = useRoute();
 const DEFAULT_TEACHER_PHOTO = "/default-teacher.svg";
+const TEACHER_VIEW_STORAGE_KEY = "teacher_dashboard_current_view";
+const VALID_VIEWS: ViewType[] = [
+  "dashboard",
+  "schedule",
+  "attendance",
+  "history",
+  "students",
+  "messages",
+  "management",
+  "settings",
+  "notifications",
+];
+
+const normalizeView = (value: unknown): ViewType | null => {
+  const raw = Array.isArray(value) ? value[0] : value;
+
+  if (typeof raw !== "string") {
+    return null;
+  }
+
+  return VALID_VIEWS.includes(raw as ViewType) ? (raw as ViewType) : null;
+};
+
+const getStoredView = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return normalizeView(window.localStorage.getItem(TEACHER_VIEW_STORAGE_KEY));
+};
 
 // Fetch fresh user profile from backend
 const fetchAndUpdateUserProfile = async () => {
@@ -88,7 +119,9 @@ const MOCK_USERS = ref<User[]>([
   },
 ]);
 
-const currentView = ref<ViewType>("dashboard");
+const currentView = ref<ViewType>(
+  normalizeView(route.query.view) ?? getStoredView() ?? "dashboard",
+);
 
 // Computed user that updates when MOCK_USERS changes
 const selectedUserIndex = ref(0);
@@ -122,6 +155,23 @@ const loadAcademicYears = async () => {
   }
 };
 
+const persistCurrentView = (view: ViewType) => {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(TEACHER_VIEW_STORAGE_KEY, view);
+  }
+
+  const routeView = normalizeView(route.query.view);
+  if (routeView !== view) {
+    router.replace({
+      name: "teacher-dashboard",
+      query: {
+        ...route.query,
+        view,
+      },
+    });
+  }
+};
+
 onMounted(async () => {
   // Fetch fresh user profile from backend
   const freshProfile = await fetchAndUpdateUserProfile();
@@ -138,11 +188,32 @@ onMounted(async () => {
     ];
   }
   loadAcademicYears();
+  persistCurrentView(currentView.value);
 });
 
 const handleViewChange = (view: ViewType) => {
   currentView.value = view;
 };
+
+watch(
+  () => route.query.view,
+  (viewFromRoute) => {
+    const normalizedView = normalizeView(viewFromRoute);
+
+    if (normalizedView && normalizedView !== currentView.value) {
+      currentView.value = normalizedView;
+      return;
+    }
+
+    if (!normalizedView) {
+      persistCurrentView(currentView.value);
+    }
+  },
+);
+
+watch(currentView, (view) => {
+  persistCurrentView(view);
+});
 
 const handleUserChange = (newUser: User) => {
   // Find the index of the selected user and update

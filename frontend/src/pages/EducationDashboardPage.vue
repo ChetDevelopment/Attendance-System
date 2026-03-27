@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { UserMinus, Clock, FileText, AlertTriangle } from 'lucide-vue-next'
 import api from '../services/api'
 import Sidebar from '../components/Education/Sidebar.vue'
@@ -15,7 +16,37 @@ import AccountSettingsView from '../components/Education/AccountSettingsView.vue
 import { DashboardStats, TrendData, ClassReport } from '../components/Education/types'
 import { getUser, setUser } from '../services/auth'
 
-const activeNav = ref('Dashboard')
+const route = useRoute()
+const router = useRouter()
+const EDUCATION_NAV_STORAGE_KEY = 'education_dashboard_active_nav'
+const VALID_EDUCATION_NAVS = [
+  'Dashboard',
+  'Absence Follow-up',
+  'Reports',
+  'Risk Monitoring',
+  'My Profile',
+  'Account Settings',
+]
+
+const normalizeEducationNav = (value: unknown): string | null => {
+  const raw = Array.isArray(value) ? value[0] : value
+
+  if (typeof raw !== 'string') {
+    return null
+  }
+
+  return VALID_EDUCATION_NAVS.includes(raw) ? raw : null
+}
+
+const getStoredEducationNav = () => {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  return normalizeEducationNav(window.localStorage.getItem(EDUCATION_NAV_STORAGE_KEY))
+}
+
+const activeNav = ref(normalizeEducationNav(route.query.nav) ?? getStoredEducationNav() ?? 'Dashboard')
 const theme = ref('light')
 const currentUser = ref<any>(
   getUser() || {
@@ -203,13 +234,51 @@ const handleExportCSV = () => {
   link.click()
 }
 
+const persistActiveNav = (nav: string) => {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(EDUCATION_NAV_STORAGE_KEY, nav)
+  }
+
+  const routeNav = normalizeEducationNav(route.query.nav)
+  if (routeNav !== nav) {
+    router.replace({
+      name: 'education-dashboard',
+      query: {
+        ...route.query,
+        nav,
+      },
+    })
+  }
+}
+
 onMounted(() => {
   fetchData()
   fetchUserProfile()
+  persistActiveNav(activeNav.value)
 
   const params = new URLSearchParams(window.location.search)
   const attendanceId = params.get('attendanceId')
   if (attendanceId) handleOpenDetail(parseInt(attendanceId, 10))
+})
+
+watch(
+  () => route.query.nav,
+  (navFromRoute) => {
+    const normalizedNav = normalizeEducationNav(navFromRoute)
+
+    if (normalizedNav && normalizedNav !== activeNav.value) {
+      activeNav.value = normalizedNav
+      return
+    }
+
+    if (!normalizedNav) {
+      persistActiveNav(activeNav.value)
+    }
+  },
+)
+
+watch(activeNav, (nav) => {
+  persistActiveNav(nav)
 })
 
 watch(

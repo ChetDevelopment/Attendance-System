@@ -8,6 +8,7 @@ use App\Models\TeacherActivity;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DashboardController extends Controller
 {
@@ -40,19 +41,19 @@ class DashboardController extends Controller
                     ->first();
             });
 
-            // Single query to get all attendance counts
+            // Single query to get all attendance counts - use date range for better index utilization
             $counts = DB::table('attendance_records')
                 ->where('created_at', '>=', $monthStart)
                 ->selectRaw("
-                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'present' THEN 1 ELSE 0 END) ELSE 0 END) as today_present,
-                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'absent' THEN 1 ELSE 0 END) ELSE 0 END) as today_absent,
-                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'late' THEN 1 ELSE 0 END) ELSE 0 END) as today_late,
-                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'present' THEN 1 ELSE 0 END) ELSE 0 END) as week_present,
-                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'absent' THEN 1 ELSE 0 END) ELSE 0 END) as week_absent,
-                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'late' THEN 1 ELSE 0 END) ELSE 0 END) as week_late,
-                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as month_present,
-                    SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as month_absent,
-                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as month_late
+                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) ELSE 0 END) as today_present,
+                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) ELSE 0 END) as today_absent,
+                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'LATE' THEN 1 ELSE 0 END) ELSE 0 END) as today_late,
+                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) ELSE 0 END) as week_present,
+                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) ELSE 0 END) as week_absent,
+                    SUM(CASE WHEN created_at >= ? THEN (CASE WHEN status = 'LATE' THEN 1 ELSE 0 END) ELSE 0 END) as week_late,
+                    SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as month_present,
+                    SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as month_absent,
+                    SUM(CASE WHEN status = 'LATE' THEN 1 ELSE 0 END) as month_late
                 ", [$todayStart, $todayStart, $todayStart, $weekStart, $weekStart, $weekStart])
                 ->first();
 
@@ -463,12 +464,13 @@ class DashboardController extends Controller
 
     private function countStatusesByRange(Carbon $start, Carbon $end): array
     {
+        // Use uppercase status values directly to avoid UPPER() function
         $row = DB::table('attendance_records')
             ->whereBetween('created_at', [$start, $end])
             ->selectRaw("
-                SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count,
-                SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_count,
-                SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_count
+                SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN status = 'LATE' THEN 1 ELSE 0 END) as late_count
             ")
             ->first();
 

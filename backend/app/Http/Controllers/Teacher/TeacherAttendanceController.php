@@ -483,20 +483,25 @@ class TeacherAttendanceController extends Controller
         }
 
         // Get today's attendance counts - show ALL records for today (not filtered by teacher)
-        $todayRecordsQuery = AttendanceRecord::query()->where(function ($query) use ($today) {
-            $query->whereDate('attendance_date', $today)
-                ->orWhere(function ($fallback) use ($today) {
+        // Use date range for better index utilization
+        $todayStart = $today->copy()->startOfDay();
+        $todayEnd = $today->copy()->endOfDay();
+        
+        $todayRecordsQuery = AttendanceRecord::query()->where(function ($query) use ($todayStart, $todayEnd) {
+            $query->whereBetween('attendance_date', [$todayStart, $todayEnd])
+                ->orWhere(function ($fallback) use ($todayStart, $todayEnd) {
                     $fallback->whereNull('attendance_date')
-                        ->whereDate('date', $today);
+                        ->whereBetween('date', [$todayStart, $todayEnd]);
                 });
         });
 
         // Treat late students as checked in on the dashboard.
+        // Use uppercase status values directly to avoid UPPER() function
         $checkedInCount = (clone $todayRecordsQuery)
-            ->whereRaw('UPPER(status) IN (?, ?)', ['PRESENT', 'LATE'])
+            ->whereIn('status', ['PRESENT', 'LATE'])
             ->count();
         $absentCount = (clone $todayRecordsQuery)
-            ->whereRaw('UPPER(status) = ?', ['ABSENT'])
+            ->where('status', 'ABSENT')
             ->count();
         $totalRecordsToday = (clone $todayRecordsQuery)->count();
 
@@ -633,6 +638,7 @@ class TeacherAttendanceController extends Controller
         $teacherId = auth()->id();
 
         // Get absent and late records that might need justification
+        // Use date range for better index utilization and avoid DATE() function
         $absentRecords = DB::table('attendance_records as ar')
             ->join('students as s', 's.id', '=', 'ar.student_id')
             ->join('sessions as sess', 'sess.id', '=', 'ar.session_id')
@@ -640,14 +646,20 @@ class TeacherAttendanceController extends Controller
             ->join('attendances as a', function ($join) {
                 $join->on('a.class_id', '=', 's.class_id')
                     ->on('a.session_id', '=', 'ar.session_id')
-                    ->whereRaw('DATE(a.date) = DATE(COALESCE(ar.attendance_date, ar.date))');
+                    ->where(function ($query) {
+                        $query->whereColumn('a.date', 'ar.attendance_date')
+                            ->orWhere(function ($subQuery) {
+                                $subQuery->whereNull('ar.attendance_date')
+                                    ->whereColumn('a.date', 'ar.date');
+                            });
+                    });
             })
             ->leftJoin('absence_notifications as an', function ($join) {
                 $join->on('an.attendance_record_id', '=', 'ar.id')
                     ->where('an.status', '=', 'active');
             })
             ->where('a.submitted_by', $teacherId)
-            ->whereRaw('UPPER(ar.status) IN (?, ?)', ['ABSENT', 'LATE'])
+            ->whereIn('ar.status', ['ABSENT', 'LATE'])
             ->selectRaw("
                 ar.id,
                 s.student_code,
@@ -661,7 +673,8 @@ class TeacherAttendanceController extends Controller
                 an.absence_status,
                 COALESCE(an.comment, an.follow_up_notes, ar.justification, '') as education_comment
             ")
-            ->orderByDesc(DB::raw('COALESCE(ar.attendance_date, ar.date)'))
+            ->orderByDesc('ar.attendance_date')
+            ->orderByDesc('ar.date')
             ->limit(50)
             ->get()
             ->map(function ($record) {
@@ -706,17 +719,18 @@ class TeacherAttendanceController extends Controller
         $teacherId = auth()->id();
 
         // Get attendance history with class and session info
+        // Use eager loading with constraints to avoid loading all records
         $history = Attendance::where('submitted_by', $teacherId)
             ->with([
                 'class:id,name,code',
                 'session:id,name,start_time,end_time',
-                'records'
+                'records:id,attendance_id,status'
             ])
             ->orderBy('date', 'desc')
             ->limit(100)
             ->get()
             ->map(function ($attendance) {
-                // Calculate attendance rate
+                // Calculate attendance rate using the already loaded records
                 $totalRecords = $attendance->records->count();
                 $presentCount = $attendance->records->where('status', 'PRESENT')->count();
                 $attendanceRate = $totalRecords > 0 ? round(($presentCount / $totalRecords) * 100) : 0;
@@ -762,8 +776,12 @@ class TeacherAttendanceController extends Controller
             ->pluck('id');
 
         // Check for pending justifications - students in teacher's classes who are absent without justification
+        // Use date range for better index utilization and avoid UPPER() function
         $pendingJustifications = 0;
         if ($teacherClassIds->isNotEmpty()) {
+            $todayStart = $today->copy()->startOfDay();
+            $todayEnd = $today->copy()->endOfDay();
+            
             $pendingJustifications = DB::table('attendance_records as ar')
                 ->join('students as s', 's.id', '=', 'ar.student_id')
                 ->leftJoin('absence_notifications as an', function ($join) {
@@ -771,8 +789,14 @@ class TeacherAttendanceController extends Controller
                         ->where('an.status', '=', 'active');
                 })
                 ->whereIn('s.class_id', $teacherClassIds)
-                ->whereDate(DB::raw('COALESCE(ar.attendance_date, ar.date)'), $today)
-                ->whereRaw('UPPER(ar.status) = ?', ['ABSENT'])
+                ->where(function ($query) use ($todayStart, $todayEnd) {
+                    $query->whereBetween('ar.attendance_date', [$todayStart, $todayEnd])
+                        ->orWhere(function ($subQuery) use ($todayStart, $todayEnd) {
+                            $subQuery->whereNull('ar.attendance_date')
+                                ->whereBetween('ar.date', [$todayStart, $todayEnd]);
+                        });
+                })
+                ->where('ar.status', 'ABSENT')
                 ->where(function ($query) {
                     $query->whereNull('an.id')
                         ->orWhere('an.absence_status', AbsenceNotification::STATUS_PENDING);

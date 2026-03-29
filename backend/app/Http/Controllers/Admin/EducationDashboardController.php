@@ -39,8 +39,11 @@ class EducationDashboardController extends Controller
     public function stats()
     {
         $today = Carbon::today()->toDateString();
+        $todayStart = Carbon::today()->startOfDay();
+        $todayEnd = Carbon::today()->endOfDay();
 
         // OPTIMIZED: Single query to get all stats using conditional aggregation
+        // Use date range for better index utilization and avoid whereDate() function
         $stats = DB::table('attendance_records as ar')
             ->leftJoin('absence_notifications as an', 'an.attendance_record_id', '=', 'ar.id')
             ->selectRaw("
@@ -48,11 +51,11 @@ class EducationDashboardController extends Controller
                 COUNT(DISTINCT CASE WHEN ar.status = 'LATE' THEN ar.id END) as late_today,
                 COUNT(DISTINCT CASE WHEN ar.status = 'ABSENT' AND ar.attendance_date >= ? THEN ar.student_id END) as high_risk_students
             ", [now()->subDays(30)->toDateString()])
-            ->where(function ($query) use ($today) {
-                $query->whereDate('ar.attendance_date', $today)
-                    ->orWhere(function ($fallback) use ($today) {
+            ->where(function ($query) use ($todayStart, $todayEnd) {
+                $query->whereBetween('ar.attendance_date', [$todayStart, $todayEnd])
+                    ->orWhere(function ($fallback) use ($todayStart, $todayEnd) {
                         $fallback->whereNull('ar.attendance_date')
-                            ->whereDate('ar.date', $today);
+                            ->whereBetween('ar.date', [$todayStart, $todayEnd]);
                     });
             })
             ->first();
@@ -74,8 +77,11 @@ class EducationDashboardController extends Controller
     public function absentToday()
     {
         $today = Carbon::today()->toDateString();
+        $todayStart = Carbon::today()->startOfDay();
+        $todayEnd = Carbon::today()->endOfDay();
 
         // OPTIMIZED: Use direct query instead of whereHas with OR conditions
+        // Use date range for better index utilization and avoid whereDate() function
         $rows = AbsenceNotification::query()
             ->with([
                 'student:id,fullname,class,class_id,profile,face_image',
@@ -83,8 +89,8 @@ class EducationDashboardController extends Controller
                 'attendanceRecord:id,attendance_date,date,status,submitted_by,session_id',
             ])
             ->where('status', 'active')
-            ->whereHas('attendanceRecord', function ($query) use ($today) {
-                $query->whereDate('attendance_date', $today);
+            ->whereHas('attendanceRecord', function ($query) use ($todayStart, $todayEnd) {
+                $query->whereBetween('attendance_date', [$todayStart, $todayEnd]);
             })
             ->latest()
             ->get()
@@ -136,9 +142,12 @@ class EducationDashboardController extends Controller
     public function riskStudents()
     {
         // OPTIMIZED: Use subquery to get high-risk students first, then join with students
+        // Use date range for better index utilization and avoid whereDate() function
+        $thirtyDaysAgo = now()->subDays(30)->toDateString();
+
         $highRiskStudentIds = AttendanceRecord::query()
             ->select('student_id')
-            ->whereDate('attendance_date', '>=', now()->subDays(30)->toDateString())
+            ->where('attendance_date', '>=', $thirtyDaysAgo)
             ->where('status', 'ABSENT')
             ->groupBy('student_id')
             ->havingRaw('COUNT(*) >= 3')
@@ -147,7 +156,7 @@ class EducationDashboardController extends Controller
         $rows = AttendanceRecord::query()
             ->select('student_id', DB::raw('COUNT(*) as absence_count'), DB::raw('MAX(id) as latest_attendance_id'))
             ->whereIn('student_id', $highRiskStudentIds)
-            ->whereDate('attendance_date', '>=', now()->subDays(30)->toDateString())
+            ->where('attendance_date', '>=', $thirtyDaysAgo)
             ->where('status', 'ABSENT')
             ->groupBy('student_id')
             ->with('student:id,fullname,class,class_id')
@@ -170,6 +179,7 @@ class EducationDashboardController extends Controller
     public function classReports()
     {
         // OPTIMIZED: Add date filtering to reduce data scanned
+        // Use date range for better index utilization and avoid whereDate() function
         $thirtyDaysAgo = now()->subDays(30)->toDateString();
 
         $rows = DB::table('attendance_records as ar')
@@ -181,7 +191,7 @@ class EducationDashboardController extends Controller
                 SUM(CASE WHEN ar.status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
                 SUM(CASE WHEN ar.status = 'LATE' THEN 1 ELSE 0 END) as late_count
             ")
-            ->whereDate('ar.attendance_date', '>=', $thirtyDaysAgo)
+            ->where('ar.attendance_date', '>=', $thirtyDaysAgo)
             ->groupByRaw("COALESCE(c.name, c.class_name, s.class, 'Unknown Class')")
             ->orderByRaw("COALESCE(c.name, c.class_name, s.class, 'Unknown Class')")
             ->get();

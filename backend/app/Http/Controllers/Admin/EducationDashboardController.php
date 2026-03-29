@@ -45,8 +45,8 @@ class EducationDashboardController extends Controller
             ->leftJoin('absence_notifications as an', 'an.attendance_record_id', '=', 'ar.id')
             ->selectRaw("
                 COUNT(DISTINCT CASE WHEN an.status = 'active' AND an.absence_status = 'PENDING' THEN an.id END) as absent_today,
-                COUNT(DISTINCT CASE WHEN LOWER(ar.status) = 'late' THEN ar.id END) as late_today,
-                COUNT(DISTINCT CASE WHEN LOWER(ar.status) = 'absent' AND ar.attendance_date >= ? THEN ar.student_id END) as high_risk_students
+                COUNT(DISTINCT CASE WHEN ar.status = 'LATE' THEN ar.id END) as late_today,
+                COUNT(DISTINCT CASE WHEN ar.status = 'ABSENT' AND ar.attendance_date >= ? THEN ar.student_id END) as high_risk_students
             ", [now()->subDays(30)->toDateString()])
             ->where(function ($query) use ($today) {
                 $query->whereDate('ar.attendance_date', $today)
@@ -139,7 +139,7 @@ class EducationDashboardController extends Controller
         $highRiskStudentIds = AttendanceRecord::query()
             ->select('student_id')
             ->whereDate('attendance_date', '>=', now()->subDays(30)->toDateString())
-            ->whereRaw('LOWER(status) = ?', ['absent'])
+            ->where('status', 'ABSENT')
             ->groupBy('student_id')
             ->havingRaw('COUNT(*) >= 3')
             ->pluck('student_id');
@@ -148,7 +148,7 @@ class EducationDashboardController extends Controller
             ->select('student_id', DB::raw('COUNT(*) as absence_count'), DB::raw('MAX(id) as latest_attendance_id'))
             ->whereIn('student_id', $highRiskStudentIds)
             ->whereDate('attendance_date', '>=', now()->subDays(30)->toDateString())
-            ->whereRaw('LOWER(status) = ?', ['absent'])
+            ->where('status', 'ABSENT')
             ->groupBy('student_id')
             ->with('student:id,fullname,class,class_id')
             ->with('student.schoolClass:id,name')
@@ -177,9 +177,9 @@ class EducationDashboardController extends Controller
             ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
             ->selectRaw("
                 COALESCE(c.name, c.class_name, s.class, 'Unknown Class') as class,
-                SUM(CASE WHEN LOWER(ar.status) = 'present' THEN 1 ELSE 0 END) as present_count,
-                SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count,
-                SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count
+                SUM(CASE WHEN ar.status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN ar.status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN ar.status = 'LATE' THEN 1 ELSE 0 END) as late_count
             ")
             ->whereDate('ar.attendance_date', '>=', $thirtyDaysAgo)
             ->groupByRaw("COALESCE(c.name, c.class_name, s.class, 'Unknown Class')")
@@ -297,8 +297,8 @@ class EducationDashboardController extends Controller
                 s.face_image,
                 COALESCE(c.name, s.class, 'Unknown Class') as class_name,
                 c.code as class_code,
-                SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count,
-                SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count
+                SUM(CASE WHEN ar.status = 'LATE' THEN 1 ELSE 0 END) as late_count,
+                SUM(CASE WHEN ar.status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count
             ")
             ->groupBy(
                 's.id',

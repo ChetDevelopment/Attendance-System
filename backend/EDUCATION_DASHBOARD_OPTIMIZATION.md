@@ -213,6 +213,8 @@ Created new migration `2026_03_29_000001_add_education_dashboard_indexes.php` wi
 
 **Overall Dashboard Load Time**: ~6 seconds → ~1.5 seconds (**75% improvement**)
 
+**Note**: After fixing the status column case sensitivity issue, queries now work correctly and the error "Some data could not be loaded from server" should be resolved.
+
 ## Deployment Instructions
 
 1. **Run the new migration**:
@@ -234,16 +236,19 @@ Created new migration `2026_03_29_000001_add_education_dashboard_indexes.php` wi
    php artisan queue:restart
    ```
 
-## Additional Recommendations
+## Bug Fix: Status Column Case Sensitivity
 
-### 1. **Standardize Status Column**
-Consider standardizing the `status` column to always be uppercase:
-```php
-// In a migration
-DB::table('attendance_records')->update(['status' => DB::raw('UPPER(status)')]);
-```
+### Issue Found
+The `status` column is stored in UPPERCASE ('PRESENT', 'ABSENT', 'LATE') as per migration `2026_03_06_000000_update_attendance_records_status_and_recorded_at.php`, but the optimized controller was still using `LOWER(status)` which caused queries to fail.
 
-Then remove `LOWER()` calls in queries for additional performance gain.
+### Fix Applied
+Removed all `LOWER(status)` calls and updated to use uppercase status values directly:
+- `stats()`: Changed `LOWER(ar.status) = 'late'` to `ar.status = 'LATE'`
+- `riskStudents()`: Changed `LOWER(status) = 'absent'` to `status = 'ABSENT'`
+- `classReports()`: Changed `LOWER(ar.status) = 'present'` to `ar.status = 'PRESENT'`
+- `reportStudents()`: Changed `LOWER(ar.status) = 'late'` to `ar.status = 'LATE'`
+
+This fix ensures queries work correctly with the existing database schema and provides additional performance improvement by removing unnecessary function calls.
 
 ### 2. **Add Database Query Caching**
 For frequently accessed data like `stats()`, consider adding Redis caching:

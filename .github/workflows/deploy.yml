@@ -1,57 +1,89 @@
-name: CI/CD Deployment
+name: Build & Deploy 
 
-on:
-  push:
-    branches:
-      - main
+on: 
+  push: 
+    branches: [main] 
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+jobs: 
+  test: 
+    runs-on: ubuntu-latest 
+    steps: 
+      - uses: actions/checkout@v4 
 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Login Docker Hub
-        uses: docker/login-action@v2
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          php-version: '8.2'
 
-      - name: Build Backend Image
-        run: |
-          docker build -t vichet12/attendance-backend ./backend
+      - name: Run PHP Tests 
+        run: | 
+          cd backend 
+          cp .env.example .env
+          composer install 
+          php artisan key:generate
+          php artisan test 
 
-      - name: Build Frontend Image
-        run: |
-          docker build -t vichet12/attendance-frontend ./frontend
+  build-and-push: 
+    needs: test 
+    runs-on: ubuntu-latest 
+    steps: 
+      - uses: actions/checkout@v4 
 
-      - name: Push Backend Image
-        run: docker push vichet12/attendance-backend
+      - name: Login to Docker Hub 
+        uses: docker/login-action@v3 
+        with: 
+          username: ${{ secrets.DOCKER_USERNAME }} 
+          password: ${{ secrets.DOCKER_PASSWORD }} 
 
-      - name: Push Frontend Image
-        run: docker push vichet12/attendance-frontend
+      - name: Build & Push Backend 
+        uses: docker/build-push-action@v5 
+        with: 
+          context: ./backend 
+          push: true 
+          tags: | 
+            ${{ secrets.DOCKER_USERNAME }}/attendance-backend:latest 
+            ${{ secrets.DOCKER_USERNAME }}/attendance-backend:${{ github.sha }} 
 
-      - name: Deploy to AWS Server
-        uses: appleboy/ssh-action@v0.1.6
+      - name: Build & Push Frontend 
+        uses: docker/build-push-action@v5 
+        with: 
+          context: ./frontend 
+          push: true 
+          tags: | 
+            ${{ secrets.DOCKER_USERNAME }}/attendance-frontend:latest 
+
+  deploy: 
+    needs: build-and-push 
+    runs-on: ubuntu-latest 
+    steps:
+      - uses: actions/checkout@v4 # Gets the files from your GitHub repo
+
+      - name: Copy Config to EC2
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_IP }}
-          username: ubuntu
+          username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          script: |
-            sudo docker pull vichet12/attendance-backend
-            sudo docker pull vichet12/attendance-frontend
+          # Path to your files in the repo -> Path on the server
+          source: "docker-compose.yml,nginx/default.conf"
+          target: "/home/ubuntu/Attendance-System"
 
-            sudo docker stop laravel_app || true
-            sudo docker stop vue_app || true
-
-            sudo docker rm laravel_app || true
-            sudo docker rm vue_app || true
-
-            # Backend running on 9000
-            sudo docker run -d -p 9000:9000 --name laravel_app vichet12/attendance-backend
-
-            # Frontend mapping public port 80 to internal 5173
-            sudo docker run -d -p 80:5173 --name vue_app vichet12/attendance-frontend
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1 
+        with: 
+          host: ${{ secrets.SERVER_IP }} 
+          username: ${{ secrets.SERVER_USER }} 
+          key: ${{ secrets.SSH_PRIVATE_KEY }} 
+          script: | 
+            cd /home/ubuntu/Attendance-System
+            
+            # 1. Pull the images using the file we just uploaded
+            docker compose pull 
+            
+            # 2. Start everything
+            docker compose up -d --remove-orphans 
+            
+            # 3. Run Laravel commands (matching your service names)
+            sleep 5
+            docker compose exec -T backend php artisan migrate --force 
+            docker compose exec -T backend php artisan optimize

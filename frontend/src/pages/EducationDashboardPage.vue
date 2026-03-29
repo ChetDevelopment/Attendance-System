@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { UserMinus, Clock, FileText, AlertTriangle } from 'lucide-vue-next'
 import api from '../services/api'
@@ -87,21 +87,6 @@ const isModalOpen = ref(false)
 const isNotificationOpen = ref(false)
 const isSettingsOpen = ref(false)
 const isProfileOpen = ref(false)
-
-const welcomeName = computed(() => currentUser.value?.name || 'Education Team')
-const welcomeRole = computed(() => {
-  const role = currentUser.value?.role
-
-  if (typeof role === 'string' && role.trim()) {
-    return role
-  }
-
-  if (role?.name) {
-    return role.name
-  }
-
-  return 'Education Team'
-})
 
 const followUpForm = ref({
   reason: '',
@@ -425,43 +410,6 @@ watch(
 
       <div class="flex-1 overflow-y-auto p-8">
         <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-8">
-          <section class="rounded-3xl border border-slate-200 bg-white px-6 py-6 shadow-sm md:px-8">
-            <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-              <div class="space-y-2">
-                <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
-                  Education Dashboard
-                </p>
-                <h2 class="text-3xl font-black tracking-tight text-slate-900">
-                  Welcome, {{ welcomeName }}
-                </h2>
-                <p class="max-w-2xl text-sm font-medium text-slate-500">
-                  Track attendance exceptions, follow-up workload, and student risk
-                  using the same streamlined workspace style as the Teacher portal.
-                </p>
-              </div>
-
-              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:min-w-[360px]">
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">
-                    Role
-                  </p>
-                  <p class="mt-2 text-sm font-bold text-slate-900">
-                    {{ welcomeRole }}
-                  </p>
-                </div>
-
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">
-                    Pending Actions
-                  </p>
-                  <p class="mt-2 text-sm font-bold text-slate-900">
-                    {{ dashboardStats.pendingFollowUp }} cases to review
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
           <div
             v-if="errorMessage"
             class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"

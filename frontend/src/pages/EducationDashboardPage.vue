@@ -13,7 +13,14 @@ import FollowUpModal from '../components/Education/FollowUpModal.vue'
 import ReportsTable from '../components/Education/ReportsTable.vue'
 import ProfileView from '../components/Education/ProfileView.vue'
 import AccountSettingsView from '../components/Education/AccountSettingsView.vue'
-import { DashboardStats, TrendData, ClassReport } from '../components/Education/types'
+import type {
+  AcademicYearOption,
+  DashboardStats,
+  EducationClassOption,
+  EducationReportRow,
+  ReportPeriod,
+  TrendData,
+} from '../components/Education/types'
 import { getUser, setUser } from '../services/auth'
 
 const route = useRoute()
@@ -63,10 +70,18 @@ const dashboardStats = ref<DashboardStats>({
 const absentToday = ref<any[]>([])
 const allAbsent = ref<any[]>([])
 const riskStudents = ref<any[]>([])
-const classReports = ref<ClassReport[]>([])
 const trendData = ref<TrendData[]>([])
 const isLoading = ref(true)
 const errorMessage = ref('')
+const academicYears = ref<AcademicYearOption[]>([])
+const reportClasses = ref<EducationClassOption[]>([])
+const reportRows = ref<EducationReportRow[]>([])
+const reportLoading = ref(false)
+const reportInitialized = ref(false)
+const reportError = ref('')
+const selectedReportAcademicYear = ref<number | null>(null)
+const selectedReportClass = ref<number | null>(null)
+const selectedReportPeriod = ref<ReportPeriod>('today')
 const selectedAttendance = ref<any>(null)
 const isModalOpen = ref(false)
 const isNotificationOpen = ref(false)
@@ -122,11 +137,10 @@ const fetchData = async () => {
     fetchJson('/api/education/students/absent-today'),
     fetchJson('/api/education/students/all-absent'),
     fetchJson('/api/education/students/risk'),
-    fetchJson('/api/education/reports/class-summary'),
     fetchJson('/api/admin/reports/trends'),
   ])
 
-  const [stats, today, all, risk, reports, trends] = results
+  const [stats, today, all, risk, trends] = results
 
   dashboardStats.value =
     stats.status === 'fulfilled'
@@ -140,7 +154,6 @@ const fetchData = async () => {
   absentToday.value = today.status === 'fulfilled' ? today.value : []
   allAbsent.value = all.status === 'fulfilled' ? all.value : []
   riskStudents.value = risk.status === 'fulfilled' ? risk.value : []
-  classReports.value = reports.status === 'fulfilled' ? reports.value : []
   trendData.value = trends.status === 'fulfilled' ? trends.value : []
 
   if (results.some((result) => result.status === 'rejected')) {
@@ -209,20 +222,112 @@ const handleSendAlert = async () => {
   }
 }
 
+const loadReportClasses = async () => {
+  const params = selectedReportAcademicYear.value
+    ? { academic_year_id: selectedReportAcademicYear.value }
+    : {}
+
+  const { data } = await api.get('/education/reports/classes', { params })
+  const rows = Array.isArray(data?.classes) ? data.classes : []
+
+  reportClasses.value = rows
+
+  if (!rows.some((item: EducationClassOption) => item.id === selectedReportClass.value)) {
+    selectedReportClass.value = rows[0]?.id ?? null
+  }
+}
+
+const loadReportRows = async (manageLoading = true) => {
+  if (manageLoading) {
+    reportLoading.value = true
+  }
+
+  reportError.value = ''
+
+  try {
+    const params: Record<string, number | string> = {
+      period: selectedReportPeriod.value,
+    }
+
+    if (selectedReportAcademicYear.value) {
+      params.academic_year_id = selectedReportAcademicYear.value
+    }
+
+    if (selectedReportClass.value) {
+      params.class_id = selectedReportClass.value
+    }
+
+    const { data } = await api.get('/education/reports/students', { params })
+    reportRows.value = Array.isArray(data?.rows) ? data.rows : []
+  } catch (error) {
+    console.error(error)
+    reportRows.value = []
+    reportError.value = 'Failed to load attendance reports.'
+  } finally {
+    if (manageLoading) {
+      reportLoading.value = false
+    }
+  }
+}
+
+const initializeReports = async () => {
+  if (reportInitialized.value) {
+    return
+  }
+
+  reportLoading.value = true
+  reportError.value = ''
+
+  try {
+    const { data } = await api.get('/education/reports/academic-years')
+    const years = Array.isArray(data?.academic_years) ? data.academic_years : []
+
+    academicYears.value = years
+    selectedReportAcademicYear.value =
+      data?.active_academic_year_id
+      ?? years.find((year: AcademicYearOption) => year.is_active)?.id
+      ?? years[0]?.id
+      ?? null
+
+    await loadReportClasses()
+    await loadReportRows(false)
+    reportInitialized.value = true
+  } catch (error) {
+    console.error(error)
+    reportError.value = 'Failed to initialize attendance reports.'
+    reportRows.value = []
+  } finally {
+    reportLoading.value = false
+  }
+}
+
+const handleReportAcademicYearChange = async (value: number | null) => {
+  selectedReportAcademicYear.value = value
+  selectedReportClass.value = null
+  await loadReportClasses()
+  await loadReportRows()
+}
+
+const handleReportClassChange = async (value: number | null) => {
+  selectedReportClass.value = value
+  await loadReportRows()
+}
+
+const handleReportPeriodChange = async (value: ReportPeriod) => {
+  selectedReportPeriod.value = value
+  await loadReportRows()
+}
+
 const handleExportCSV = () => {
   const csv = [
-    ['Class', 'Attendance %', 'Present', 'Absent', 'Late'],
-    ...classReports.value.map((report) => {
-      const total = report.present_count + report.absent_count + report.late_count
-      const percentage = total > 0 ? Math.round((report.present_count / total) * 100) : 0
-      return [
-        report.class,
-        `${percentage}%`,
-        report.present_count,
-        report.absent_count,
-        report.late_count,
-      ]
-    }),
+    ['No', 'Student', 'Code', 'Late', 'Absent'],
+    ...reportRows.value.map((row, index) => [
+      index + 1,
+      row.name,
+      row.student_code,
+      row.late_count,
+      row.absent_count,
+    ]),
   ]
     .map((entry) => entry.join(','))
     .join('\n')
@@ -230,7 +335,7 @@ const handleExportCSV = () => {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
-  link.setAttribute('download', 'attendance_report.csv')
+  link.setAttribute('download', `education-attendance-report-${selectedReportPeriod.value}.csv`)
   link.click()
 }
 
@@ -259,6 +364,10 @@ onMounted(() => {
   const params = new URLSearchParams(window.location.search)
   const attendanceId = params.get('attendanceId')
   if (attendanceId) handleOpenDetail(parseInt(attendanceId, 10))
+
+  if (activeNav.value === 'Reports') {
+    initializeReports()
+  }
 })
 
 watch(
@@ -279,6 +388,10 @@ watch(
 
 watch(activeNav, (nav) => {
   persistActiveNav(nav)
+
+  if (nav === 'Reports') {
+    initializeReports()
+  }
 })
 
 watch(
@@ -461,11 +574,28 @@ watch(
             :showDate="true"
           />
 
-          <ReportsTable
-            v-else-if="activeNav === 'Reports'"
-            :reports="classReports"
-            @export="handleExportCSV"
-          />
+          <div v-else-if="activeNav === 'Reports'" class="space-y-4">
+            <div
+              v-if="reportError"
+              class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+            >
+              {{ reportError }}
+            </div>
+
+            <ReportsTable
+              :academicYears="academicYears"
+              :classes="reportClasses"
+              :rows="reportRows"
+              :selectedAcademicYear="selectedReportAcademicYear"
+              :selectedClass="selectedReportClass"
+              :selectedPeriod="selectedReportPeriod"
+              :isLoading="reportLoading"
+              @update:academicYear="handleReportAcademicYearChange"
+              @update:class="handleReportClassChange"
+              @update:period="handleReportPeriodChange"
+              @export="handleExportCSV"
+            />
+          </div>
 
           <div
             v-else-if="activeNav === 'Risk Monitoring'"

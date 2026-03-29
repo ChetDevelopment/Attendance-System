@@ -177,6 +177,9 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin,teacher,educatio
         Route::get('/students/all-absent', [EducationDashboardController::class, 'allAbsent']);
         Route::get('/students/risk', [EducationDashboardController::class, 'riskStudents']);
         Route::get('/reports/class-summary', [EducationDashboardController::class, 'classReports']);
+        Route::get('/reports/academic-years', [EducationDashboardController::class, 'reportAcademicYears']);
+        Route::get('/reports/classes', [EducationDashboardController::class, 'reportClasses']);
+        Route::get('/reports/students', [EducationDashboardController::class, 'reportStudents']);
         Route::get('/attendance/detail/{id}', [EducationDashboardController::class, 'attendanceDetail']);
         Route::post('/attendance/follow-up', [EducationDashboardController::class, 'submitFollowUp']);
         Route::post('/attendance/alert', [EducationDashboardController::class, 'sendAlert']);
@@ -201,6 +204,9 @@ Route::prefix('education')->middleware(['auth:sanctum', 'role:admin,teacher,educ
     Route::get('/students/all-absent', [EducationDashboardController::class, 'allAbsent']);
     Route::get('/students/risk', [EducationDashboardController::class, 'riskStudents']);
     Route::get('/reports/class-summary', [EducationDashboardController::class, 'classReports']);
+    Route::get('/reports/academic-years', [EducationDashboardController::class, 'reportAcademicYears']);
+    Route::get('/reports/classes', [EducationDashboardController::class, 'reportClasses']);
+    Route::get('/reports/students', [EducationDashboardController::class, 'reportStudents']);
     Route::get('/attendance/detail/{id}', [EducationDashboardController::class, 'attendanceDetail']);
     Route::post('/attendance/follow-up', [EducationDashboardController::class, 'submitFollowUp']);
     Route::post('/attendance/alert', [EducationDashboardController::class, 'sendAlert']);

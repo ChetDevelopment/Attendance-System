@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicYear;
 use App\Models\AbsenceNotification;
 use App\Models\AttendanceFollowUp;
 use App\Models\AttendanceRecord;
+use App\Models\SchoolClass;
 use App\Services\ActivityLogService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -203,6 +205,201 @@ class EducationDashboardController extends Controller
             ->get();
 
         return response()->json($rows);
+    }
+
+    public function reportAcademicYears()
+    {
+        $rows = AcademicYear::query()
+            ->orderByDesc('is_active')
+            ->orderByDesc(DB::raw('COALESCE(start_year, YEAR(start_date), id)'))
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (AcademicYear $year) {
+                $derivedName = $year->name;
+
+                if (!$derivedName && $year->start_year && $year->end_year) {
+                    $derivedName = "{$year->start_year}-{$year->end_year}";
+                }
+
+                if (!$derivedName && $year->start_date && $year->end_date) {
+                    $derivedName = Carbon::parse($year->start_date)->format('Y')
+                        . '-'
+                        . Carbon::parse($year->end_date)->format('Y');
+                }
+
+                return [
+                    'id' => (int) $year->id,
+                    'name' => $derivedName ?: "Academic Year {$year->id}",
+                    'is_active' => (bool) $year->is_active,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'academic_years' => $rows,
+            'active_academic_year_id' => $rows->firstWhere('is_active', true)['id'] ?? ($rows->first()['id'] ?? null),
+        ]);
+    }
+
+    public function reportClasses(Request $request)
+    {
+        $validated = $request->validate([
+            'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
+        ]);
+
+        $query = SchoolClass::query()
+            ->select('id', 'name', 'code', 'academic_year_id', 'is_active')
+            ->where('is_active', true);
+
+        if (!empty($validated['academic_year_id'])) {
+            $query->where('academic_year_id', $validated['academic_year_id']);
+        }
+
+        $rows = $this->deduplicateReportClasses(
+            $query->orderBy('name')->orderBy('code')->orderBy('id')->get()
+        )
+            ->map(function (SchoolClass $class) {
+                $name = trim((string) $class->name) ?: 'Unnamed Class';
+                $code = trim((string) ($class->code ?? ''));
+
+                return [
+                    'id' => (int) $class->id,
+                    'name' => $name,
+                    'code' => $code ?: null,
+                    'academic_year_id' => $class->academic_year_id ? (int) $class->academic_year_id : null,
+                    'label' => $code ? "{$name} ({$code})" : $name,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'classes' => $rows,
+        ]);
+    }
+
+    public function reportStudents(Request $request)
+    {
+        $validated = $request->validate([
+            'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
+            'class_id' => ['nullable', 'integer', 'exists:classes,id'],
+            'period' => ['nullable', 'in:today,weekly,monthly'],
+        ]);
+
+        $period = $validated['period'] ?? 'today';
+        [$startDate, $endDate] = $this->resolveReportDateRange($period);
+
+        $rows = DB::table('students as s')
+            ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
+            ->leftJoin('attendance_records as ar', function ($join) use ($startDate, $endDate) {
+                $join->on('ar.student_id', '=', 's.id')
+                    ->whereBetween(
+                        DB::raw('DATE(COALESCE(ar.attendance_date, ar.date))'),
+                        [$startDate->toDateString(), $endDate->toDateString()]
+                    );
+            })
+            ->when(!empty($validated['academic_year_id']), function ($query) use ($validated) {
+                $query->where(function ($filter) use ($validated) {
+                    $filter
+                        ->where('c.academic_year_id', $validated['academic_year_id'])
+                        ->orWhere('s.academic_year_id', $validated['academic_year_id']);
+                });
+            })
+            ->when(!empty($validated['class_id']), function ($query) use ($validated) {
+                $query->where('s.class_id', $validated['class_id']);
+            })
+            ->selectRaw("
+                s.id,
+                s.student_code,
+                s.fullname,
+                s.first_name,
+                s.last_name,
+                s.profile,
+                s.face_image,
+                COALESCE(c.name, s.class, 'Unknown Class') as class_name,
+                c.code as class_code,
+                SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count,
+                SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count
+            ")
+            ->groupBy(
+                's.id',
+                's.student_code',
+                's.fullname',
+                's.first_name',
+                's.last_name',
+                's.profile',
+                's.face_image',
+                'c.name',
+                's.class',
+                'c.code'
+            )
+            ->orderByRaw("COALESCE(c.name, s.class, 'Unknown Class')")
+            ->orderByRaw("COALESCE(NULLIF(s.fullname, ''), TRIM(CONCAT(COALESCE(s.first_name, ''), ' ', COALESCE(s.last_name, ''))))")
+            ->get()
+            ->map(function ($student) {
+                $name = trim((string) ($student->fullname ?? ''));
+
+                if ($name === '') {
+                    $name = trim(
+                        implode(' ', array_filter([
+                            $student->first_name ?? null,
+                            $student->last_name ?? null,
+                        ]))
+                    );
+                }
+
+                return [
+                    'id' => (int) $student->id,
+                    'name' => $name ?: 'Unknown Student',
+                    'student_code' => $student->student_code ?: '-',
+                    'photo' => $this->buildStudentPhotoUrl($student),
+                    'class_name' => $student->class_name,
+                    'class_code' => $student->class_code,
+                    'late_count' => (int) $student->late_count,
+                    'absent_count' => (int) $student->absent_count,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'period' => $period,
+            'start_date' => $startDate->toDateString(),
+            'end_date' => $endDate->toDateString(),
+            'rows' => $rows,
+        ]);
+    }
+
+    private function resolveReportDateRange(string $period): array
+    {
+        $today = Carbon::today();
+
+        return match ($period) {
+            'monthly' => [$today->copy()->startOfMonth(), $today->copy()->endOfMonth()],
+            'weekly' => [$today->copy()->startOfWeek(Carbon::MONDAY), $today->copy()->endOfWeek(Carbon::SUNDAY)],
+            default => [$today->copy(), $today->copy()],
+        };
+    }
+
+    private function deduplicateReportClasses($classes)
+    {
+        return $classes
+            ->groupBy(fn ($class) => ($class->academic_year_id ?? 'null') . ':' . trim((string) $class->name))
+            ->map(function ($group) {
+                return $group
+                    ->sort(function ($left, $right) {
+                        $lengthCompare = strlen((string) $left->code) <=> strlen((string) $right->code);
+
+                        if ($lengthCompare !== 0) {
+                            return $lengthCompare;
+                        }
+
+                        return $left->id <=> $right->id;
+                    })
+                    ->first();
+            })
+            ->sortBy([
+                ['name', 'asc'],
+                ['code', 'asc'],
+            ]);
     }
 
     public function attendanceDetail(int $id)

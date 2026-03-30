@@ -58,13 +58,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4 # Gets the files from your GitHub repo
 
+      - name: Prepare Deploy Folder
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p /home/ubuntu/Attendance-System
+            sudo chown -R $USER:$USER /home/ubuntu/Attendance-System
+
       - name: Copy Config to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          rm: true
           overwrite: true
           # Copy only deploy-time files and Laravel source, not runtime storage/cache data
           source: "docker-compose.yml,backend/app,backend/bootstrap,backend/config,backend/database,backend/public,backend/resources,backend/routes,backend/artisan,backend/composer.json,backend/composer.lock,backend/package.json,backend/phpunit.xml,backend/vite.config.js,backend/.env.example,backend/nginx"

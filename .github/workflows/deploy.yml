@@ -86,6 +86,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }} 
           key: ${{ secrets.SSH_PRIVATE_KEY }} 
           script: | 
+            sudo chown -R ${{ secrets.SERVER_USER }}:${{ secrets.SERVER_USER }} /home/ubuntu/Attendance-System
             cd /home/ubuntu/Attendance-System
 
             # 0. Create the Compose and Laravel environment files on the server
@@ -167,7 +168,7 @@ jobs:
             docker compose pull 
             
             # 2. Start everything
-            docker compose up -d --remove-orphans 
+            docker compose up -d --pull always --remove-orphans 
             
             # 3. Ensure Laravel writable paths exist and are writable
             mkdir -p backend/storage/framework/cache/data backend/storage/framework/sessions backend/storage/framework/views backend/storage/app/public backend/bootstrap/cache
@@ -183,3 +184,6 @@ jobs:
             docker compose exec -T backend php artisan migrate --force 
             docker compose exec -T backend php artisan config:cache
             docker compose exec -T backend php artisan optimize
+            
+            # 6. Return Laravel writable permissions to the web server user
+            docker compose exec -T -u root backend sh -lc "chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache"

@@ -64,8 +64,8 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # Copy the compose file and backend source so the server has the Laravel files
-          source: "docker-compose.yml,backend"
+          # Copy only deploy-time files and Laravel source, not runtime storage/cache data
+          source: "docker-compose.yml,backend/app,backend/bootstrap,backend/config,backend/database,backend/public,backend/resources,backend/routes,backend/artisan,backend/composer.json,backend/composer.lock,backend/package.json,backend/phpunit.xml,backend/vite.config.js,backend/.env.example,backend/nginx"
           target: "/home/ubuntu/Attendance-System"
 
       - name: Deploy via SSH
@@ -83,7 +83,12 @@ jobs:
             # 2. Start everything
             docker compose up -d --remove-orphans 
             
-            # 3. Run Laravel commands (matching your service names)
+            # 3. Ensure Laravel writable paths exist and are writable
+            mkdir -p backend/storage/framework/cache/data backend/storage/framework/sessions backend/storage/framework/views backend/storage/app/public backend/bootstrap/cache
+            sudo chown -R $USER:$USER backend/storage backend/bootstrap/cache
+            sudo chmod -R 775 backend/storage backend/bootstrap/cache
+
+            # 4. Run Laravel commands (matching your service names)
             sleep 5
             docker compose exec -T backend php artisan migrate --force 
             docker compose exec -T backend php artisan optimize

@@ -96,7 +96,7 @@ const onSelect = (module: string) => emit('moduleChange', module);
           <LayoutDashboard class="size-4" />
         </div>
         <div>
-          <h2 class="text-xl font-bold tracking-tight text-primary">AttendancePro</h2>
+          <h2 class="text-xl font-bold tracking-tight text-primary">Attendance</h2>
           <p class="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">
             {{ workspaceLabel }}
           </p>

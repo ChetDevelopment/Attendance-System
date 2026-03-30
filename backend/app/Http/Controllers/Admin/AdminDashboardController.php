@@ -47,19 +47,19 @@ class AdminDashboardController extends Controller
                     ->first();
             });
 
-            // Single query for all stats
+            // Single query for all stats - use date range for better index utilization
             $allStats = DB::table('attendance_records')
                 ->where('created_at', '>=', $monthStart)
                 ->selectRaw("
-                    SUM(CASE WHEN created_at >= ? AND status = 'present' THEN 1 ELSE 0 END) as today_present,
-                    SUM(CASE WHEN created_at >= ? AND status = 'absent' THEN 1 ELSE 0 END) as today_absent,
-                    SUM(CASE WHEN created_at >= ? AND status = 'late' THEN 1 ELSE 0 END) as today_late,
-                    SUM(CASE WHEN created_at >= ? AND status = 'present' THEN 1 ELSE 0 END) as week_present,
-                    SUM(CASE WHEN created_at >= ? AND status = 'absent' THEN 1 ELSE 0 END) as week_absent,
-                    SUM(CASE WHEN created_at >= ? AND status = 'late' THEN 1 ELSE 0 END) as week_late,
-                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as month_present,
-                    SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as month_absent,
-                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as month_late
+                    SUM(CASE WHEN created_at >= ? AND status = 'PRESENT' THEN 1 ELSE 0 END) as today_present,
+                    SUM(CASE WHEN created_at >= ? AND status = 'ABSENT' THEN 1 ELSE 0 END) as today_absent,
+                    SUM(CASE WHEN created_at >= ? AND status = 'LATE' THEN 1 ELSE 0 END) as today_late,
+                    SUM(CASE WHEN created_at >= ? AND status = 'PRESENT' THEN 1 ELSE 0 END) as week_present,
+                    SUM(CASE WHEN created_at >= ? AND status = 'ABSENT' THEN 1 ELSE 0 END) as week_absent,
+                    SUM(CASE WHEN created_at >= ? AND status = 'LATE' THEN 1 ELSE 0 END) as week_late,
+                    SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as month_present,
+                    SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as month_absent,
+                    SUM(CASE WHEN status = 'LATE' THEN 1 ELSE 0 END) as month_late
                 ", [$todayStart, $todayStart, $todayStart, $weekStart, $weekStart, $weekStart])
                 ->first();
 
@@ -184,13 +184,14 @@ class AdminDashboardController extends Controller
     private function getAttendanceStats(Carbon $start, Carbon $end): array
     {
         // Try to use the view first, fall back to direct table query
+        // Use uppercase status values directly to avoid UPPER() function
         try {
             $row = DB::table('v_admin_attendance_enriched as va')
                 ->whereBetween('va.created_at', [$start, $end])
                 ->selectRaw("
-                    SUM(CASE WHEN va.status = 'present' THEN 1 ELSE 0 END) as present_count,
-                    SUM(CASE WHEN va.status = 'absent' THEN 1 ELSE 0 END) as absent_count,
-                    SUM(CASE WHEN va.status = 'late' THEN 1 ELSE 0 END) as late_count
+                    SUM(CASE WHEN va.status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                    SUM(CASE WHEN va.status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                    SUM(CASE WHEN va.status = 'LATE' THEN 1 ELSE 0 END) as late_count
                 ")
                 ->first();
         } catch (\Exception $e) {
@@ -198,9 +199,9 @@ class AdminDashboardController extends Controller
             $row = DB::table('attendance_records')
                 ->whereBetween('created_at', [$start, $end])
                 ->selectRaw("
-                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count,
-                    SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_count,
-                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late_count
+                    SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
+                    SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
+                    SUM(CASE WHEN status = 'LATE' THEN 1 ELSE 0 END) as late_count
                 ")
                 ->first();
         }
@@ -294,13 +295,14 @@ class AdminDashboardController extends Controller
             $startDate = Carbon::today()->subDays($days - 1);
             $endDate = Carbon::today()->endOfDay();
 
+            // Use date range for better index utilization and avoid DATE() function
             $records = DB::table('attendance_records')
                 ->whereBetween('created_at', [$startDate, $endDate])
                 ->selectRaw("
                     DATE(created_at) as date,
-                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
-                    SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
-                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late
+                    SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present,
+                    SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent,
+                    SUM(CASE WHEN status = 'LATE' THEN 1 ELSE 0 END) as late
                 ")
                 ->groupBy('date')
                 ->orderBy('date')

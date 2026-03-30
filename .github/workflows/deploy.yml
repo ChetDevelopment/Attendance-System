@@ -174,7 +174,10 @@ jobs:
             sudo chown -R $USER:$USER backend/storage backend/bootstrap/cache
             sudo chmod -R 775 backend/storage backend/bootstrap/cache
 
-            # 4. Run Laravel commands (matching your service names)
+            # 4. Install Laravel dependencies on the host-mounted backend volume
+            docker compose exec -T backend composer install --no-interaction --no-dev --optimize-autoloader
+
+            # 5. Run Laravel commands (matching your service names)
             sleep 5
             docker compose exec -T backend php artisan key:generate --force
             docker compose exec -T backend php artisan migrate --force 

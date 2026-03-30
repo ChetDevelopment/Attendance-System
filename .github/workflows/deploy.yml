@@ -64,8 +64,8 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # Path to your files in the repo -> Path on the server
-          source: "docker-compose.yml,nginx/default.conf"
+          # Copy the compose file and backend source so the server has the Laravel files
+          source: "docker-compose.yml,backend"
           target: "/home/ubuntu/Attendance-System"
 
       - name: Deploy via SSH

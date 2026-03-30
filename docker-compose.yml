@@ -1,5 +1,4 @@
 services:
-  # 1. Database Service (MySQL)
   db:
     image: mysql:8.0
     container_name: mysql_db
@@ -17,7 +16,6 @@ services:
     networks:
       - vichet-network
 
-  # 2. Cache Service (Redis)
   redis:
     image: redis:7-alpine
     container_name: redis_cache
@@ -33,7 +31,6 @@ services:
     networks:
       - vichet-network
 
-  # 3. Backend Service (Laravel 11 / PHP-FPM)
   backend:
     image: ${DOCKER_USERNAME}/attendance-backend:latest
     container_name: laravel_backend
@@ -44,7 +41,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
     volumes:
-      - ./backend:/var/www/html             # Mount full code for PHP-FPM
+      - ./backend:/var/www/html
       - backend_storage:/var/www/html/storage
     depends_on:
       db:
@@ -54,7 +51,6 @@ services:
     networks:
       - vichet-network
 
-  # 4. Frontend Service (Vue.js / Vite)
   frontend:
     image: ${DOCKER_USERNAME}/attendance-frontend:latest
     container_name: vue_frontend
@@ -62,7 +58,6 @@ services:
     networks:
       - vichet-network
 
-  # 5. Web Server Service (Nginx Proxy)
   webserver:
     image: nginx:stable-alpine
     container_name: nginx_server
@@ -71,8 +66,10 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./backend/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./backend:/var/www/html:ro
+      # Use the specific config file we are about to create
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # ONLY mount the public folder for PHP processing
+      - ./backend/public:/var/www/html/public:ro 
       - ./certbot/conf:/etc/letsencrypt:ro 
     depends_on:
       - backend

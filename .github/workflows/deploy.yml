@@ -181,4 +181,5 @@ jobs:
             sleep 5
             docker compose exec -T backend php artisan key:generate --force
             docker compose exec -T backend php artisan migrate --force 
+            docker compose exec -T backend php artisan config:cache
             docker compose exec -T backend php artisan optimize

@@ -13,6 +13,7 @@ use App\Models\Session;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AdminDashboardController extends Controller
 {
@@ -468,13 +469,26 @@ class AdminDashboardController extends Controller
     public function getStudentAnalytics()
     {
         return Cache::remember('admin_student_analytics_v2', self::CACHE_TTL_LONG, function () {
-            // Students by class
-            $studentsByClass = Student::select('class')
-                ->selectRaw('COUNT(*) as count')
-                ->groupBy('class')
-                ->orderByDesc('count')
-                ->limit(10)
-                ->get();
+            $hasStudentClassColumn = Schema::hasColumn('students', 'class');
+
+            // Students by class (supports both legacy `students.class` and newer `students.class_id` schema)
+            if ($hasStudentClassColumn) {
+                $studentsByClass = Student::select('class')
+                    ->selectRaw('COUNT(*) as count')
+                    ->groupBy('class')
+                    ->orderByDesc('count')
+                    ->limit(10)
+                    ->get();
+            } else {
+                $studentsByClass = DB::table('students as s')
+                    ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
+                    ->selectRaw("COALESCE(c.name, c.class_name, 'Unassigned') as class")
+                    ->selectRaw('COUNT(*) as count')
+                    ->groupBy('class')
+                    ->orderByDesc('count')
+                    ->limit(10)
+                    ->get();
+            }
 
             // Students by generation
             $studentsByGeneration = Student::select('generation')

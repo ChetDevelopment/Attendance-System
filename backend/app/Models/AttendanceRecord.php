@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Schema;
 
 class AttendanceRecord extends Model
 {
@@ -46,13 +47,39 @@ class AttendanceRecord extends Model
         return $this->belongsTo(User::class, 'submitted_by');
     }
 
+    public function setSubmittedByAttribute($value): void
+    {
+        if ($value && Schema::hasColumn($this->getTable(), 'submitted_by')) {
+            $this->attributes['submitted_by'] = $value;
+        }
+
+        if ($value && Schema::hasColumn($this->getTable(), 'recorded_by')) {
+            $this->attributes['recorded_by'] = $value;
+        }
+    }
+
+    public function getSubmittedByAttribute($value)
+    {
+        return $value ?? $this->attributes['recorded_by'] ?? null;
+    }
+
     public function setRecordedByAttribute($value): void
     {
-        $this->attributes['submitted_by'] = $value;
+        if ($value && Schema::hasColumn($this->getTable(), 'recorded_by')) {
+            $this->attributes['recorded_by'] = $value;
+        }
+
+        if ($value && Schema::hasColumn($this->getTable(), 'submitted_by')) {
+            $this->attributes['submitted_by'] = $value;
+        }
     }
 
     public function getRecordedByAttribute()
     {
+        if (Schema::hasColumn($this->getTable(), 'recorded_by')) {
+            return $this->attributes['recorded_by'] ?? $this->attributes['submitted_by'] ?? null;
+        }
+
         return $this->attributes['submitted_by'] ?? null;
     }
 

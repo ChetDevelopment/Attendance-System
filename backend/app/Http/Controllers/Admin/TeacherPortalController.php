@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
+use App\Models\StudentClass;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,10 @@ class TeacherPortalController extends Controller
             $userId = $request->user()->id;
             $userName = $request->user()->name;
             $today = Carbon::today();
+            $hasStudentClassColumn = Schema::hasColumn('students', 'class');
+            $classCodeExpression = $hasStudentClassColumn
+                ? "COALESCE(c.class_name, c.name, st.class, 'Unknown')"
+                : "COALESCE(c.class_name, c.name, 'Unknown')";
 
             // Get all sessions for today (the system doesn't track which teacher teaches which session)
             // So we show sessions from attendance records submitted by this teacher
@@ -27,9 +32,10 @@ class TeacherPortalController extends Controller
                 ->leftJoin('classes as c', 'c.id', '=', 'st.class_id')
                 ->where('ar.submitted_by', $userId)
                 ->whereDate('ar.created_at', $today)
-                ->groupBy('se.id', 'se.name', 'se.start_time', 'se.end_time', 'c.class_name', 'st.class')
+                ->groupBy('se.id', 'se.name', 'se.start_time', 'se.end_time', 'c.class_name', 'c.name')
+                ->when($hasStudentClassColumn, fn ($q) => $q->groupBy('st.class'))
                 ->orderBy('se.start_time')
-                ->selectRaw("se.id, se.name as subject, COALESCE(c.class_name, st.class, 'Unknown') as classCode, se.start_time, se.end_time")
+                ->selectRaw("se.id, se.name as subject, {$classCodeExpression} as classCode, se.start_time, se.end_time")
                 ->get();
 
             // If no attendance records yet, show available sessions
@@ -131,25 +137,30 @@ class TeacherPortalController extends Controller
                 return response()->json([]);
             }
 
-            $rows = DB::table('attendance_follow_ups as af')
-                ->join('attendance_records as ar', 'ar.id', '=', 'af.attendance_record_id')
-                ->join('students as st', 'st.id', '=', 'ar.student_id')
-                ->leftJoin('sessions as se', 'se.id', '=', 'ar.session_id')
-                ->leftJoin('classes as c', 'c.id', '=', 'st.class_id')
-                ->orderByDesc('af.created_at')
-                ->limit(50)
-                ->selectRaw(
-                    "CONCAT('j-', af.id) as id,
-                    st.fullname as studentName,
-                    st.username as studentId,
-                    st.profile as studentPhoto,
-                    COALESCE(c.class_name, st.class, 'Unknown') as classCode,
-                    COALESCE(se.name, 'Session') as subject,
-                    COALESCE(af.comment, af.note, af.reason, '') as educationComment,
-                    DATE(ar.created_at) as date,
-                    DATE_FORMAT(af.created_at, '%Y-%m-%d %h:%i %p') as timestamp"
-                )
-                ->get();
+            $hasStudentClassColumn = Schema::hasColumn('students', 'class');
+            $classCodeExpression = $hasStudentClassColumn
+                ? "COALESCE(c.class_name, c.name, st.class, 'Unknown')"
+                : "COALESCE(c.class_name, c.name, 'Unknown')";
+
+	            $rows = DB::table('attendance_follow_ups as af')
+	                ->join('attendance_records as ar', 'ar.id', '=', 'af.attendance_record_id')
+	                ->join('students as st', 'st.id', '=', 'ar.student_id')
+	                ->leftJoin('sessions as se', 'se.id', '=', 'ar.session_id')
+	                ->leftJoin('classes as c', 'c.id', '=', 'st.class_id')
+	                ->orderByDesc('af.created_at')
+	                ->limit(50)
+	                ->selectRaw(
+	                    "CONCAT('j-', af.id) as id,
+	                    st.fullname as studentName,
+	                    st.username as studentId,
+	                    st.profile as studentPhoto,
+	                    {$classCodeExpression} as classCode,
+	                    COALESCE(se.name, 'Session') as subject,
+	                    COALESCE(af.comment, af.note, af.reason, '') as educationComment,
+	                    DATE(ar.created_at) as date,
+	                    DATE_FORMAT(af.created_at, '%Y-%m-%d %h:%i %p') as timestamp"
+	                )
+	                ->get();
 
             return response()->json($rows ?? []);
         } catch (\Exception $e) {
@@ -161,18 +172,24 @@ class TeacherPortalController extends Controller
     public function history(Request $request)
     {
         try {
+            $hasStudentClassColumn = Schema::hasColumn('students', 'class');
+            $classCodeExpression = $hasStudentClassColumn
+                ? "COALESCE(c.class_name, c.name, st.class, 'Unknown')"
+                : "COALESCE(c.class_name, c.name, 'Unknown')";
+
             $rows = DB::table('attendance_records as ar')
                 ->join('sessions as se', 'se.id', '=', 'ar.session_id')
                 ->join('students as st', 'st.id', '=', 'ar.student_id')
                 ->leftJoin('classes as c', 'c.id', '=', 'st.class_id')
                 ->where('ar.submitted_by', $request->user()->id)
-                ->groupBy(DB::raw('DATE(ar.created_at)'), 'se.id', 'se.name', 'se.start_time', 'se.end_time', 'c.class_name', 'st.class')
+                ->groupBy(DB::raw('DATE(ar.created_at)'), 'se.id', 'se.name', 'se.start_time', 'se.end_time', 'c.class_name', 'c.name')
+                ->when($hasStudentClassColumn, fn ($q) => $q->groupBy('st.class'))
                 ->orderByDesc(DB::raw('DATE(ar.created_at)'))
                 ->selectRaw(
                     "MIN(ar.id) as id,
                     DATE(ar.created_at) as date,
                     se.name as subject,
-                    COALESCE(c.class_name, st.class, 'Unknown') as classCode,
+                    {$classCodeExpression} as classCode,
                     DATE_FORMAT(se.start_time, '%H:%i') as startTime,
                     DATE_FORMAT(se.end_time, '%H:%i') as endTime,
                     SUM(CASE WHEN ar.status = 'Present' THEN 1 ELSE 0 END) as presentCount,
@@ -196,9 +213,16 @@ class TeacherPortalController extends Controller
         try {
             // Cache for 2 minutes to improve performance
             return Cache::remember('all_students_list', 120, function () {
+                $hasStudentClassColumn = Schema::hasColumn('students', 'class');
+
                 return response()->json(
-                    DB::table('students')
-                        ->select('id', 'fullname as name', 'username as student_code', 'email', 'profile as avatar', 'class', 'contact')
+                    DB::table('students as st')
+                        ->leftJoin('classes as c', 'c.id', '=', 'st.class_id')
+                        ->selectRaw(
+                            $hasStudentClassColumn
+                                ? "st.id, st.fullname as name, st.username as student_code, st.email, st.profile as avatar, COALESCE(c.class_name, c.name, st.class, '') as class, st.contact"
+                                : "st.id, st.fullname as name, st.username as student_code, st.email, st.profile as avatar, COALESCE(c.class_name, c.name, '') as class, st.contact"
+                        )
                         ->orderBy('fullname')
                         ->get()
                 );
@@ -272,6 +296,116 @@ class TeacherPortalController extends Controller
         } catch (\Exception $e) {
             \Log::error('Teacher notifications error: ' . $e->getMessage());
             return response()->json([]);
+        }
+    }
+
+    public function search(Request $request)
+    {
+        try {
+            $hasStudentClassColumn = Schema::hasColumn('students', 'class');
+            $studentClassColumn = $hasStudentClassColumn ? 'st.class' : 'NULL';
+            $classNameExpression = "COALESCE(c.class_name, c.name, {$studentClassColumn}, 'Unknown')";
+
+            $query = trim((string) $request->query('q', ''));
+
+            if (mb_strlen($query) < 2) {
+                return response()->json([
+                    'query' => $query,
+                    'students' => [],
+                    'classes' => [],
+                    'attendance_records' => [],
+                ]);
+            }
+
+            $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $query) . '%';
+
+	            $students = DB::table('students as st')
+	                ->leftJoin('classes as c', 'c.id', '=', 'st.class_id')
+                ->where(function ($builder) use ($like) {
+                    $builder->where('st.fullname', 'like', $like)
+                        ->orWhere('st.username', 'like', $like)
+                        ->orWhere('st.student_code', 'like', $like)
+                        ->orWhere('st.email', 'like', $like)
+                        ->orWhere('c.name', 'like', $like)
+                        ->orWhere('c.class_name', 'like', $like)
+                        ->orWhere('c.code', 'like', $like);
+                })
+	                ->selectRaw(
+	                    "st.id,
+	                    st.fullname as name,
+	                    st.username as student_code,
+	                    st.email,
+	                    st.profile as avatar,
+	                    {$classNameExpression} as class_name"
+	                )
+	                ->orderBy('st.fullname')
+	                ->limit(8)
+	                ->get();
+
+            $classes = StudentClass::query()
+                ->leftJoin('academic_years as ay', 'ay.id', '=', 'classes.academic_year_id')
+                ->where(function ($builder) use ($like) {
+                    $builder->where('classes.name', 'like', $like)
+                        ->orWhere('classes.class_name', 'like', $like)
+                        ->orWhere('classes.code', 'like', $like)
+                        ->orWhere('ay.name', 'like', $like);
+                })
+                ->groupBy('classes.id', 'classes.name', 'classes.class_name', 'classes.code', 'ay.name')
+                ->selectRaw(
+                    "classes.id,
+                    COALESCE(classes.class_name, classes.name) as name,
+                    classes.code,
+                    ay.name as academic_year,
+                    COUNT(DISTINCT students.id) as student_count"
+                )
+                ->leftJoin('students', 'students.class_id', '=', 'classes.id')
+                ->orderBy('name')
+                ->limit(8)
+                ->get();
+
+	            $attendanceRecords = DB::table('attendance_records as ar')
+	                ->join('students as st', 'st.id', '=', 'ar.student_id')
+                ->join('sessions as se', 'se.id', '=', 'ar.session_id')
+                ->leftJoin('classes as c', 'c.id', '=', 'st.class_id')
+                ->where(function ($builder) use ($like) {
+                    $builder->where('st.fullname', 'like', $like)
+                        ->orWhere('st.username', 'like', $like)
+                        ->orWhere('st.student_code', 'like', $like)
+                        ->orWhere('c.name', 'like', $like)
+                        ->orWhere('c.class_name', 'like', $like)
+                        ->orWhere('se.name', 'like', $like)
+                        ->orWhere('ar.status', 'like', $like);
+                })
+	                ->selectRaw(
+	                    "ar.id,
+	                    ar.attendance_date,
+	                    ar.status,
+	                    se.name as session_name,
+	                    st.fullname as student_name,
+	                    {$classNameExpression} as class_name"
+	                )
+	                ->orderByDesc('ar.attendance_date')
+	                ->limit(8)
+	                ->get();
+
+            return response()->json([
+                'query' => $query,
+                'students' => $students,
+                'classes' => $classes,
+                'attendance_records' => $attendanceRecords,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Teacher search error: ' . $e->getMessage(), [
+                'query' => $request->query('q'),
+            ]);
+
+            return response()->json([
+                'query' => (string) $request->query('q', ''),
+                'students' => [],
+                'classes' => [],
+                'attendance_records' => [],
+                'message' => 'Failed to search teacher data.',
+            ], 500);
         }
     }
 }

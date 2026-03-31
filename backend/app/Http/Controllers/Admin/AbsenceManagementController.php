@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\Response;
 
 class AbsenceManagementController extends Controller
@@ -32,6 +33,9 @@ class AbsenceManagementController extends Controller
         ]);
 
         try {
+            $studentClassColumn = Schema::hasColumn('students', 'class') ? 's.class' : 'NULL';
+            $classNameExpression = "COALESCE(c.name, c.class_name, {$studentClassColumn}, 'Unknown')";
+
             $query = DB::table('absence_notifications as an')
                 ->join('students as s', 's.id', '=', 'an.student_id')
                 ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
@@ -43,7 +47,7 @@ class AbsenceManagementController extends Controller
                     an.student_id,
                     s.fullname as student_name,
                     s.username as student_code,
-                    COALESCE(c.name, c.class_name, s.class, 'Unknown') as class_name,
+                    {$classNameExpression} as class_name,
                     s.class_id,
                     DATE(an.created_at) as absence_date,
                     sess.name as session_name,
@@ -479,6 +483,9 @@ class AbsenceManagementController extends Controller
             $startDate = $request->input('start_date', Carbon::today()->subDays(30)->toDateString());
             $endDate = $request->input('end_date', Carbon::today()->toDateString());
 
+            $studentClassColumn = Schema::hasColumn('students', 'class') ? 's.class' : 'NULL';
+            $classNameExpression = "COALESCE(c.name, c.class_name, {$studentClassColumn}, 'Unknown')";
+
             $summary = AbsenceNotification::whereBetween('created_at', [$startDate, $endDate])
                 ->where('status', 'active')
                 ->selectRaw(
@@ -507,9 +514,10 @@ class AbsenceManagementController extends Controller
                 ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
                 ->where('an.status', 'active')
                 ->whereBetween('an.created_at', [$startDate, $endDate])
-                ->groupBy('c.name', 'c.class_name', 's.class')
+                ->groupBy('c.name', 'c.class_name')
+                ->when(Schema::hasColumn('students', 'class'), fn ($q) => $q->groupBy('s.class'))
                 ->selectRaw("
-                    COALESCE(c.name, c.class_name, s.class, 'Unknown') as class_name,
+                    {$classNameExpression} as class_name,
                     COUNT(*) as total,
                     SUM(CASE WHEN an.absence_status = 'PENDING' THEN 1 ELSE 0 END) as pending,
                     SUM(CASE WHEN an.absence_status = 'EXCUSED' THEN 1 ELSE 0 END) as excused,
@@ -614,4 +622,3 @@ class AbsenceManagementController extends Controller
         return "{$existingText}\n\n{$entry}";
     }
 }
-

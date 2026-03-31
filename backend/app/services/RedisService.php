@@ -42,7 +42,7 @@ class RedisService
             
             Log::debug('Session cached', ['session_id' => $sessionId, 'ttl' => $ttl]);
             return true;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to cache session', [
                 'session_id' => $sessionId,
                 'error' => $e->getMessage(),
@@ -70,7 +70,7 @@ class RedisService
             
             Log::debug('Session cache miss', ['session_id' => $sessionId]);
             return null;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to get cached session', [
                 'session_id' => $sessionId,
                 'error' => $e->getMessage(),
@@ -121,7 +121,7 @@ class RedisService
                 'session_id' => $sessionId,
             ]);
             return false;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to track check-in', [
                 'student_id' => $studentId,
                 'session_id' => $sessionId,
@@ -144,7 +144,7 @@ class RedisService
         try {
             $key = $this->getCheckInKey($sessionId, $studentId);
             return Redis::exists($key) > 0;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to check if student checked in', [
                 'student_id' => $studentId,
                 'session_id' => $sessionId,
@@ -176,7 +176,7 @@ class RedisService
             }
             
             return $checkIns;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to get active check-ins', [
                 'session_id' => $sessionId,
                 'error' => $e->getMessage(),
@@ -196,7 +196,7 @@ class RedisService
         try {
             $activeKey = $this->getActiveCheckInsKey($sessionId);
             return (int) Redis::scard($activeKey);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to get active check-in count', [
                 'session_id' => $sessionId,
                 'error' => $e->getMessage(),
@@ -226,7 +226,7 @@ class RedisService
                 'session_id' => $sessionId,
             ]);
             return true;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to remove check-in', [
                 'student_id' => $studentId,
                 'session_id' => $sessionId,
@@ -257,7 +257,7 @@ class RedisService
             
             Log::debug('Session check-ins cleared', ['session_id' => $sessionId]);
             return true;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to clear session check-ins', [
                 'session_id' => $sessionId,
                 'error' => $e->getMessage(),
@@ -279,7 +279,7 @@ class RedisService
             $key = $this->getSessionConfigKey($sessionId);
             Redis::setex($key, self::CACHE_TTL_SESSION_CONFIG, json_encode($config));
             return true;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to cache session config', [
                 'session_id' => $sessionId,
                 'error' => $e->getMessage(),
@@ -300,7 +300,7 @@ class RedisService
             $key = $this->getSessionConfigKey($sessionId);
             $data = Redis::get($key);
             return $data ? json_decode($data, true) : null;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to get cached session config', [
                 'session_id' => $sessionId,
                 'error' => $e->getMessage(),
@@ -319,7 +319,7 @@ class RedisService
         try {
             Redis::ping();
             return true;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::warning('Redis is not available', ['error' => $e->getMessage()]);
             return false;
         }

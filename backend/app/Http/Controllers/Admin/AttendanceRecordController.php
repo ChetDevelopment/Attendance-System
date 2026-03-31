@@ -11,6 +11,7 @@ use App\Services\AttendanceIntegrationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AttendanceRecordController extends Controller
 {
@@ -21,8 +22,14 @@ class AttendanceRecordController extends Controller
 
     public function index(Request $request)
     {
+        $hasStudentClassColumn = Schema::hasColumn('students', 'class');
+        $classNameExpression = $hasStudentClassColumn
+            ? "COALESCE(c.name, c.class_name, s.class)"
+            : "COALESCE(c.name, c.class_name, 'Unknown')";
+
         $query = DB::table('attendance_records as ar')
             ->join('students as s', 's.id', '=', 'ar.student_id')
+            ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
             ->join('sessions as ses', 'ses.id', '=', 'ar.session_id')
             ->leftJoin('users as u', 'u.id', '=', 'ar.submitted_by')
             ->select([
@@ -36,7 +43,7 @@ class AttendanceRecordController extends Controller
                 's.id as student_ref_id',
                 's.fullname as student_name',
                 's.username as student_code',
-                's.class as class_name',
+                DB::raw("{$classNameExpression} as class_name"),
                 'ses.name as session_name',
                 'u.name as submitted_by_name',
             ])
@@ -52,10 +59,11 @@ class AttendanceRecordController extends Controller
 
         if ($request->filled('q')) {
             $q = '%' . strtolower((string) $request->string('q')) . '%';
-            $query->where(function ($inner) use ($q) {
+            $query->where(function ($inner) use ($q, $hasStudentClassColumn) {
                 $inner->whereRaw('LOWER(s.fullname) LIKE ?', [$q])
                     ->orWhereRaw('LOWER(s.username) LIKE ?', [$q])
-                    ->orWhereRaw('LOWER(s.class) LIKE ?', [$q])
+                    ->when($hasStudentClassColumn, fn ($w) => $w->orWhereRaw('LOWER(s.class) LIKE ?', [$q]))
+                    ->orWhereRaw('LOWER(COALESCE(c.name, c.class_name, \'\')) LIKE ?', [$q])
                     ->orWhereRaw('LOWER(ses.name) LIKE ?', [$q]);
             });
         }
@@ -154,6 +162,7 @@ class AttendanceRecordController extends Controller
 
         $record = DB::table('attendance_records as ar')
             ->join('students as s', 's.id', '=', 'ar.student_id')
+            ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
             ->join('sessions as ses', 'ses.id', '=', 'ar.session_id')
             ->leftJoin('users as u', 'u.id', '=', 'ar.submitted_by')
             ->select([
@@ -167,7 +176,7 @@ class AttendanceRecordController extends Controller
                 's.id as student_ref_id',
                 's.fullname as student_name',
                 's.username as student_code',
-                's.class as class_name',
+                DB::raw("{$classNameExpression} as class_name"),
                 'ses.name as session_name',
                 'u.name as submitted_by_name',
             ])
@@ -205,4 +214,3 @@ class AttendanceRecordController extends Controller
         ];
     }
 }
-

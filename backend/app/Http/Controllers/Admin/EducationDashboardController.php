@@ -3,19 +3,20 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AcademicYear;
 use App\Models\AbsenceNotification;
 use App\Models\AttendanceFollowUp;
 use App\Models\AttendanceRecord;
-use App\Models\SchoolClass;
 use App\Services\ActivityLogService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class EducationDashboardController extends Controller
 {
-    public function __construct(private readonly ActivityLogService $activityLogService) {}
+    public function __construct(private readonly ActivityLogService $activityLogService)
+    {
+    }
 
     private function buildStudentPhotoUrl($student): ?string
     {
@@ -39,49 +40,60 @@ class EducationDashboardController extends Controller
     public function stats()
     {
         $today = Carbon::today()->toDateString();
-        $todayStart = Carbon::today()->startOfDay();
-        $todayEnd = Carbon::today()->endOfDay();
 
-        // OPTIMIZED: Single query to get all stats using conditional aggregation
-        // Use date range for better index utilization and avoid whereDate() function
-        $stats = DB::table('attendance_records as ar')
-            ->leftJoin('absence_notifications as an', 'an.attendance_record_id', '=', 'ar.id')
-            ->selectRaw("
-                COUNT(DISTINCT CASE WHEN an.status = 'active' AND an.absence_status = 'PENDING' THEN an.id END) as absent_today,
-                COUNT(DISTINCT CASE WHEN ar.status = 'LATE' THEN ar.id END) as late_today,
-                COUNT(DISTINCT CASE WHEN ar.status = 'ABSENT' AND ar.attendance_date >= ? THEN ar.student_id END) as high_risk_students
-            ", [now()->subDays(30)->toDateString()])
-            ->where(function ($query) use ($todayStart, $todayEnd) {
-                $query->whereBetween('ar.attendance_date', [$todayStart, $todayEnd])
-                    ->orWhere(function ($fallback) use ($todayStart, $todayEnd) {
-                        $fallback->whereNull('ar.attendance_date')
-                            ->whereBetween('ar.date', [$todayStart, $todayEnd]);
+        $absentToday = AbsenceNotification::query()
+            ->where('status', 'active')
+            ->where('absence_status', AbsenceNotification::STATUS_PENDING)
+            ->whereHas('attendanceRecord', function ($query) use ($today) {
+                $query->whereDate('attendance_date', $today)
+                    ->orWhere(function ($fallback) use ($today) {
+                        $fallback->whereNull('attendance_date')
+                            ->whereDate('date', $today);
                     });
             })
-            ->first();
+            ->count();
 
-        // OPTIMIZED: Separate query for pending follow-ups (simpler and faster)
+        $lateToday = AttendanceRecord::query()
+            ->where(function ($query) use ($today) {
+                $query->whereDate('attendance_date', $today)
+                    ->orWhere(function ($fallback) use ($today) {
+                        $fallback->whereNull('attendance_date')
+                            ->whereDate('date', $today);
+                    });
+            })
+            ->whereRaw('LOWER(status) = ?', ['late'])
+            ->count();
+
+        $highRisk = AttendanceRecord::query()
+            ->select('student_id')
+            ->where(function ($query) {
+                $query->whereDate('attendance_date', '>=', now()->subDays(30)->toDateString())
+                    ->orWhere(function ($fallback) {
+                        $fallback->whereNull('attendance_date')
+                            ->whereDate('date', '>=', now()->subDays(30)->toDateString());
+                    });
+            })
+            ->whereRaw('LOWER(status) = ?', ['absent'])
+            ->groupBy('student_id')
+            ->havingRaw('COUNT(*) >= 3')
+            ->get()
+            ->count();
+
         $pendingFollowUp = AbsenceNotification::query()
             ->where('status', 'active')
             ->where('absence_status', AbsenceNotification::STATUS_PENDING)
             ->count();
 
         return response()->json([
-            'absentToday' => (int) $stats->absent_today,
-            'lateToday' => (int) $stats->late_today,
-            'highRisk' => (int) $stats->high_risk_students,
+            'absentToday' => $absentToday,
+            'lateToday' => $lateToday,
+            'highRisk' => $highRisk,
             'pendingFollowUp' => $pendingFollowUp,
         ]);
     }
 
     public function absentToday()
     {
-        $today = Carbon::today()->toDateString();
-        $todayStart = Carbon::today()->startOfDay();
-        $todayEnd = Carbon::today()->endOfDay();
-
-        // OPTIMIZED: Use direct query instead of whereHas with OR conditions
-        // Use date range for better index utilization and avoid whereDate() function
         $rows = AbsenceNotification::query()
             ->with([
                 'student:id,fullname,class,class_id,profile,face_image',
@@ -89,8 +101,12 @@ class EducationDashboardController extends Controller
                 'attendanceRecord:id,attendance_date,date,status,submitted_by,session_id',
             ])
             ->where('status', 'active')
-            ->whereHas('attendanceRecord', function ($query) use ($todayStart, $todayEnd) {
-                $query->whereBetween('attendance_date', [$todayStart, $todayEnd]);
+            ->whereHas('attendanceRecord', function ($query) {
+                $query->whereDate('attendance_date', today())
+                    ->orWhere(function ($fallback) {
+                        $fallback->whereNull('attendance_date')
+                            ->whereDate('date', today());
+                    });
             })
             ->latest()
             ->get()
@@ -141,24 +157,18 @@ class EducationDashboardController extends Controller
 
     public function riskStudents()
     {
-        // OPTIMIZED: Use subquery to get high-risk students first, then join with students
-        // Use date range for better index utilization and avoid whereDate() function
-        $thirtyDaysAgo = now()->subDays(30)->toDateString();
-
-        $highRiskStudentIds = AttendanceRecord::query()
-            ->select('student_id')
-            ->where('attendance_date', '>=', $thirtyDaysAgo)
-            ->where('status', 'ABSENT')
-            ->groupBy('student_id')
-            ->havingRaw('COUNT(*) >= 3')
-            ->pluck('student_id');
-
         $rows = AttendanceRecord::query()
             ->select('student_id', DB::raw('COUNT(*) as absence_count'), DB::raw('MAX(id) as latest_attendance_id'))
-            ->whereIn('student_id', $highRiskStudentIds)
-            ->where('attendance_date', '>=', $thirtyDaysAgo)
-            ->where('status', 'ABSENT')
+            ->where(function ($query) {
+                $query->whereDate('attendance_date', '>=', now()->subDays(30)->toDateString())
+                    ->orWhere(function ($fallback) {
+                        $fallback->whereNull('attendance_date')
+                            ->whereDate('date', '>=', now()->subDays(30)->toDateString());
+                    });
+            })
+            ->whereRaw('LOWER(status) = ?', ['absent'])
             ->groupBy('student_id')
+            ->havingRaw('COUNT(*) >= 3')
             ->with('student:id,fullname,class,class_id')
             ->with('student.schoolClass:id,name')
             ->orderByDesc('absence_count')
@@ -178,218 +188,66 @@ class EducationDashboardController extends Controller
 
     public function classReports()
     {
-        // OPTIMIZED: Add date filtering to reduce data scanned
-        // Use date range for better index utilization and avoid whereDate() function
-        $thirtyDaysAgo = now()->subDays(30)->toDateString();
+        $studentClassColumn = Schema::hasColumn('students', 'class') ? 's.class' : 'NULL';
+        $classExpression = "COALESCE(c.name, c.class_name, {$studentClassColumn}, 'Unknown Class')";
 
         $rows = DB::table('attendance_records as ar')
             ->join('students as s', 's.id', '=', 'ar.student_id')
             ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
             ->selectRaw("
-                COALESCE(c.name, c.class_name, s.class, 'Unknown Class') as class,
-                SUM(CASE WHEN ar.status = 'PRESENT' THEN 1 ELSE 0 END) as present_count,
-                SUM(CASE WHEN ar.status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count,
-                SUM(CASE WHEN ar.status = 'LATE' THEN 1 ELSE 0 END) as late_count
+                {$classExpression} as class,
+                SUM(CASE WHEN LOWER(ar.status) = 'present' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count
             ")
-            ->where('ar.attendance_date', '>=', $thirtyDaysAgo)
-            ->groupByRaw("COALESCE(c.name, c.class_name, s.class, 'Unknown Class')")
-            ->orderByRaw("COALESCE(c.name, c.class_name, s.class, 'Unknown Class')")
+            ->groupByRaw($classExpression)
+            ->orderByRaw($classExpression)
             ->get();
 
         return response()->json($rows);
     }
 
-    public function reportAcademicYears()
+    public function exportClassReports()
     {
-        $rows = AcademicYear::query()
-            ->orderByDesc('is_active')
-            ->orderByDesc(DB::raw('COALESCE(start_year, YEAR(start_date), id)'))
-            ->orderByDesc('id')
-            ->get()
-            ->map(function (AcademicYear $year) {
-                $derivedName = $year->name;
+        $studentClassColumn = Schema::hasColumn('students', 'class') ? 's.class' : 'NULL';
+        $classLabel = "COALESCE(c.class_name, {$studentClassColumn}, 'Unknown Class')";
 
-                if (!$derivedName && $year->start_year && $year->end_year) {
-                    $derivedName = "{$year->start_year}-{$year->end_year}";
-                }
-
-                if (!$derivedName && $year->start_date && $year->end_date) {
-                    $derivedName = Carbon::parse($year->start_date)->format('Y')
-                        . '-'
-                        . Carbon::parse($year->end_date)->format('Y');
-                }
-
-                return [
-                    'id' => (int) $year->id,
-                    'name' => $derivedName ?: "Academic Year {$year->id}",
-                    'is_active' => (bool) $year->is_active,
-                ];
-            })
-            ->values();
-
-        return response()->json([
-            'academic_years' => $rows,
-            'active_academic_year_id' => $rows->firstWhere('is_active', true)['id'] ?? ($rows->first()['id'] ?? null),
-        ]);
-    }
-
-    public function reportClasses(Request $request)
-    {
-        $validated = $request->validate([
-            'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
-        ]);
-
-        $query = SchoolClass::query()
-            ->select('id', 'name', 'code', 'academic_year_id', 'is_active')
-            ->where('is_active', true);
-
-        if (!empty($validated['academic_year_id'])) {
-            $query->where('academic_year_id', $validated['academic_year_id']);
-        }
-
-        $rows = $this->deduplicateReportClasses(
-            $query->orderBy('name')->orderBy('code')->orderBy('id')->get()
-        )
-            ->map(function (SchoolClass $class) {
-                $name = trim((string) $class->name) ?: 'Unnamed Class';
-                $code = trim((string) ($class->code ?? ''));
-
-                return [
-                    'id' => (int) $class->id,
-                    'name' => $name,
-                    'code' => $code ?: null,
-                    'academic_year_id' => $class->academic_year_id ? (int) $class->academic_year_id : null,
-                    'label' => $code ? "{$name} ({$code})" : $name,
-                ];
-            })
-            ->values();
-
-        return response()->json([
-            'classes' => $rows,
-        ]);
-    }
-
-    public function reportStudents(Request $request)
-    {
-        $validated = $request->validate([
-            'academic_year_id' => ['nullable', 'integer', 'exists:academic_years,id'],
-            'class_id' => ['nullable', 'integer', 'exists:classes,id'],
-            'period' => ['nullable', 'in:today,weekly,monthly'],
-        ]);
-
-        $period = $validated['period'] ?? 'today';
-        [$startDate, $endDate] = $this->resolveReportDateRange($period);
-
-        // OPTIMIZED: Use attendance_date directly instead of COALESCE
-        $rows = DB::table('students as s')
+        $rows = DB::table('attendance_records as ar')
+            ->join('students as s', 's.id', '=', 'ar.student_id')
             ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
-            ->leftJoin('attendance_records as ar', function ($join) use ($startDate, $endDate) {
-                $join->on('ar.student_id', '=', 's.id')
-                    ->whereBetween('ar.attendance_date', [$startDate->toDateString(), $endDate->toDateString()]);
-            })
-            ->when(!empty($validated['academic_year_id']), function ($query) use ($validated) {
-                $query->where(function ($filter) use ($validated) {
-                    $filter
-                        ->where('c.academic_year_id', $validated['academic_year_id'])
-                        ->orWhere('s.academic_year_id', $validated['academic_year_id']);
-                });
-            })
-            ->when(!empty($validated['class_id']), function ($query) use ($validated) {
-                $query->where('s.class_id', $validated['class_id']);
-            })
             ->selectRaw("
-                s.id,
-                s.student_code,
-                s.fullname,
-                s.first_name,
-                s.last_name,
-                s.profile,
-                s.face_image,
-                COALESCE(c.name, s.class, 'Unknown Class') as class_name,
-                c.code as class_code,
-                SUM(CASE WHEN ar.status = 'LATE' THEN 1 ELSE 0 END) as late_count,
-                SUM(CASE WHEN ar.status = 'ABSENT' THEN 1 ELSE 0 END) as absent_count
+                {$classLabel} as class,
+                SUM(CASE WHEN LOWER(ar.status) = 'present' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count
             ")
-            ->groupBy(
-                's.id',
-                's.student_code',
-                's.fullname',
-                's.first_name',
-                's.last_name',
-                's.profile',
-                's.face_image',
-                'c.name',
-                's.class',
-                'c.code'
-            )
-            ->orderByRaw("COALESCE(c.name, s.class, 'Unknown Class')")
-            ->orderByRaw("COALESCE(NULLIF(s.fullname, ''), TRIM(CONCAT(COALESCE(s.first_name, ''), ' ', COALESCE(s.last_name, ''))))")
-            ->get()
-            ->map(function ($student) {
-                $name = trim((string) ($student->fullname ?? ''));
+            ->groupByRaw($classLabel)
+            ->orderByRaw($classLabel)
+            ->get();
 
-                if ($name === '') {
-                    $name = trim(
-                        implode(' ', array_filter([
-                            $student->first_name ?? null,
-                            $student->last_name ?? null,
-                        ]))
-                    );
-                }
+        $fileName = 'education_class_summary_' . now()->format('Y-m-d_His') . '.csv';
 
-                return [
-                    'id' => (int) $student->id,
-                    'name' => $name ?: 'Unknown Student',
-                    'student_code' => $student->student_code ?: '-',
-                    'photo' => $this->buildStudentPhotoUrl($student),
-                    'class_name' => $student->class_name,
-                    'class_code' => $student->class_code,
-                    'late_count' => (int) $student->late_count,
-                    'absent_count' => (int) $student->absent_count,
-                ];
-            })
-            ->values();
+        return response()->streamDownload(function () use ($rows) {
+            $output = fopen('php://output', 'w');
+            fputcsv($output, ['Class', 'Present', 'Absent', 'Late', 'Attendance %']);
 
-        return response()->json([
-            'period' => $period,
-            'start_date' => $startDate->toDateString(),
-            'end_date' => $endDate->toDateString(),
-            'rows' => $rows,
+            foreach ($rows as $row) {
+                $total = (int) $row->present_count + (int) $row->absent_count + (int) $row->late_count;
+                $percentage = $total > 0 ? round(((int) $row->present_count / $total) * 100) : 0;
+
+                fputcsv($output, [
+                    $row->class,
+                    (int) $row->present_count,
+                    (int) $row->absent_count,
+                    (int) $row->late_count,
+                    $percentage . '%',
+                ]);
+            }
+
+            fclose($output);
+        }, $fileName, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
-    }
-
-    private function resolveReportDateRange(string $period): array
-    {
-        $today = Carbon::today();
-
-        return match ($period) {
-            'monthly' => [$today->copy()->startOfMonth(), $today->copy()->endOfMonth()],
-            'weekly' => [$today->copy()->startOfWeek(Carbon::MONDAY), $today->copy()->endOfWeek(Carbon::SUNDAY)],
-            default => [$today->copy(), $today->copy()],
-        };
-    }
-
-    private function deduplicateReportClasses($classes)
-    {
-        return $classes
-            ->groupBy(fn($class) => ($class->academic_year_id ?? 'null') . ':' . trim((string) $class->name))
-            ->map(function ($group) {
-                return $group
-                    ->sort(function ($left, $right) {
-                        $lengthCompare = strlen((string) $left->code) <=> strlen((string) $right->code);
-
-                        if ($lengthCompare !== 0) {
-                            return $lengthCompare;
-                        }
-
-                        return $left->id <=> $right->id;
-                    })
-                    ->first();
-            })
-            ->sortBy([
-                ['name', 'asc'],
-                ['code', 'asc'],
-            ]);
     }
 
     public function attendanceDetail(int $id)
@@ -420,7 +278,7 @@ class EducationDashboardController extends Controller
             ->where('attendance_record_id', $absence->attendance_record_id)
             ->latest()
             ->get()
-            ->map(fn(AttendanceFollowUp $followUp) => [
+            ->map(fn (AttendanceFollowUp $followUp) => [
                 'updated_by' => optional($followUp->updatedBy)->name ?? 'System',
                 'status' => $followUp->status,
                 'resolved' => (bool) $followUp->resolved,
@@ -515,9 +373,9 @@ class EducationDashboardController extends Controller
             'Request: escalation',
             trim(
                 'Education escalation for attendance record #' . $validated['attendanceId']
-                    . ($validated['studentName'] ? ' - ' . $validated['studentName'] : '')
-                    . ($validated['className'] ? ' (' . $validated['className'] . ')' : '')
-                    . ($validated['date'] ? ' on ' . $validated['date'] : '')
+                . ($validated['studentName'] ? ' - ' . $validated['studentName'] : '')
+                . ($validated['className'] ? ' (' . $validated['className'] . ')' : '')
+                . ($validated['date'] ? ' on ' . $validated['date'] : '')
             )
         );
 

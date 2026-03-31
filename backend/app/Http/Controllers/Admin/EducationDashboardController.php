@@ -212,7 +212,8 @@ class EducationDashboardController extends Controller
         $studentClassColumn = Schema::hasColumn('students', 'class') ? 's.class' : 'NULL';
         $classLabel = "COALESCE(c.class_name, {$studentClassColumn}, 'Unknown Class')";
 
-        $rows = DB::table('attendance_records as ar')
+        // Get all attendance data grouped by class
+        $classSummary = DB::table('attendance_records as ar')
             ->join('students as s', 's.id', '=', 'ar.student_id')
             ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
             ->selectRaw("
@@ -225,22 +226,65 @@ class EducationDashboardController extends Controller
             ->orderByRaw($classLabel)
             ->get();
 
-        $fileName = 'education_class_summary_' . now()->format('Y-m-d_His') . '.csv';
+        // Get student details
+        $studentDetails = DB::table('attendance_records as ar')
+            ->join('students as s', 's.id', '=', 'ar.student_id')
+            ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
+            ->selectRaw("
+                {$classLabel} as class,
+                COALESCE(s.fullname, CONCAT(s.first_name, ' ', s.last_name)) as student_name,
+                s.username as student_code,
+                ar.status,
+                COUNT(*) as total_records,
+                SUM(CASE WHEN LOWER(ar.status) = 'present' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count,
+                SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count
+            ")
+            ->groupByRaw("{$classLabel}, s.id, s.fullname, s.first_name, s.last_name, s.username, ar.status")
+            ->orderByRaw("{$classLabel}, student_name")
+            ->limit(500)
+            ->get();
 
-        return response()->streamDownload(function () use ($rows) {
+        // Generate CSV with multiple sections
+        $fileName = 'education_attendance_report_' . now()->format('Y-m-d_His') . '.csv';
+
+        return response()->streamDownload(function () use ($classSummary, $studentDetails) {
             $output = fopen('php://output', 'w');
-            fputcsv($output, ['Class', 'Present', 'Absent', 'Late', 'Attendance %']);
 
-            foreach ($rows as $row) {
+            // Section 1: Class Summary
+            fputcsv($output, ['CLASS SUMMARY']);
+            fputcsv($output, ['Generated:', now()->format('Y-m-d H:i:s')]);
+            fputcsv($output, []);
+            fputcsv($output, ['Class', 'Present', 'Absent', 'Late', 'Total', 'Attendance %']);
+
+            foreach ($classSummary as $row) {
                 $total = (int) $row->present_count + (int) $row->absent_count + (int) $row->late_count;
                 $percentage = $total > 0 ? round(((int) $row->present_count / $total) * 100) : 0;
-
                 fputcsv($output, [
                     $row->class,
                     (int) $row->present_count,
                     (int) $row->absent_count,
                     (int) $row->late_count,
+                    $total,
                     $percentage . '%',
+                ]);
+            }
+
+            // Section 2: Student Details
+            fputcsv($output, []);
+            fputcsv($output, ['STUDENT DETAILS']);
+            fputcsv($output, []);
+            fputcsv($output, ['Class', 'Student Name', 'Student Code', 'Present', 'Absent', 'Late', 'Total']);
+
+            foreach ($studentDetails as $row) {
+                fputcsv($output, [
+                    $row->class,
+                    $row->student_name,
+                    $row->student_code,
+                    (int) $row->present_count,
+                    (int) $row->absent_count,
+                    (int) $row->late_count,
+                    (int) $row->total_records,
                 ]);
             }
 

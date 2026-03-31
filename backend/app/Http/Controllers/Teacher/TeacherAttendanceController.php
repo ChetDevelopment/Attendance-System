@@ -54,24 +54,22 @@ class TeacherAttendanceController extends Controller
             ->get()
             ->map(function ($student) use ($className) {
                 // Build photo URL - check both face_image and profile fields
+                // Use the profile accessor which properly transforms relative paths to URLs
                 $photoUrl = null;
                 
-                // First try face_image
-                $imagePath = $student->face_image;
-                
-                // If no face_image, try profile field
-                if (!$imagePath && $student->profile) {
-                    $imagePath = $student->profile;
+                // First try face_image - check if it's a full URL or relative path
+                $faceImage = $student->face_image;
+                if ($faceImage) {
+                    if (str_starts_with($faceImage, 'http')) {
+                        $photoUrl = $faceImage;
+                    } else {
+                        $photoUrl = url($faceImage);
+                    }
                 }
                 
-                if ($imagePath) {
-                    // Check if it's a full URL or just a path
-                    if (str_starts_with($imagePath, 'http')) {
-                        $photoUrl = $imagePath;
-                    } else {
-                        // It's a path, prepend the frontend URL
-                        $photoUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $imagePath;
-                    }
+                // If no face_image, use profile field (accessor handles URL transformation)
+                if (!$photoUrl && $student->profile) {
+                    $photoUrl = $student->profile;
                 }
 
                 return [

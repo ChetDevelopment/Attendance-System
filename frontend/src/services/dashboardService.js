@@ -110,5 +110,23 @@ export const dashboardService = {
       throw new Error(toError(error))
     }
   },
+
+  /**
+   * Export class summary report for education dashboard
+   */
+  async exportClassSummary() {
+    if (!ensureDashboardAccess('admin', 'teacher', 'education')) {
+      throw new Error('Unauthorized')
+    }
+
+    try {
+      const response = await api.get('/education/reports/export/class-summary', {
+        responseType: 'blob',
+      })
+      return response.data
+    } catch (error) {
+      throw new Error(toError(error))
+    }
+  },
 }
   

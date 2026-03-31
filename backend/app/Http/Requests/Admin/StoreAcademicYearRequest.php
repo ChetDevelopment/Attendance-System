@@ -15,6 +15,8 @@ class StoreAcademicYearRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255', 'unique:academic_years,name'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'current_term' => ['required', 'in:Term1,Term2,Term3,Term4'],
             'status' => ['required', 'in:Current,Close'],
         ];

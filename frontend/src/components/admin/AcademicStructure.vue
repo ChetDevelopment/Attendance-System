@@ -8,6 +8,8 @@ import { adminAcademicService } from '../../services/adminAcademicService'
 type AcademicYear = {
   id: number
   name: string
+  start_date?: string
+  end_date?: string
   current_term: 'Term1' | 'Term2' | 'Term3' | 'Term4'
   status: 'Current' | 'Close'
   classes_count?: number
@@ -48,6 +50,8 @@ const classToDelete = ref<SchoolClass | null>(null)
 
 const yearForm = ref({
   name: '',
+  start_date: '',
+  end_date: '',
   current_term: 'Term1' as AcademicYear['current_term'],
   status: 'Current' as AcademicYear['status'],
 })
@@ -80,11 +84,25 @@ const filteredClasses = computed(() => {
 const activeYear = computed(() => years.value.find((y) => y.status === 'Current') || null)
 
 const resetForms = () => {
-  yearForm.value = { name: '', current_term: 'Term1', status: 'Current' }
+  yearForm.value = { name: '', start_date: '', end_date: '', current_term: 'Term1', status: 'Current' }
   classForm.value = { name: '', code: '', description: '', academic_year_id: '' }
   editingYearId.value = null
   editingClassId.value = null
   validationErrors.value = {}
+}
+
+const maybeAutofillYearDates = () => {
+  if (editingYearId.value) return
+  if (yearForm.value.start_date || yearForm.value.end_date) return
+
+  const match = String(yearForm.value.name || '')
+    .trim()
+    .match(/^(\d{4})\s*-\s*(\d{4})$/)
+
+  if (!match) return
+
+  yearForm.value.start_date = `${match[1]}-09-01`
+  yearForm.value.end_date = `${match[2]}-06-30`
 }
 
 const loadData = async () => {
@@ -113,6 +131,8 @@ const openCreateYear = () => {
 const openEditYear = (year: AcademicYear) => {
   yearForm.value = {
     name: year.name,
+    start_date: year.start_date || '',
+    end_date: year.end_date || '',
     current_term: year.current_term,
     status: year.status,
   }
@@ -403,8 +423,26 @@ onMounted(loadData)
       <div class="space-y-4">
         <div>
           <label class="text-xs font-bold text-slate-500 uppercase">Name</label>
-          <input v-model="yearForm.name" type="text" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded" />
+          <input
+            v-model="yearForm.name"
+            type="text"
+            placeholder="2025-2026"
+            class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded"
+            @blur="maybeAutofillYearDates"
+          />
           <p v-if="validationErrors.name" class="text-xs text-red-500 mt-1">{{ validationErrors.name[0] }}</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-bold text-slate-500 uppercase">Start Date</label>
+            <input v-model="yearForm.start_date" type="date" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded" />
+            <p v-if="validationErrors.start_date" class="text-xs text-red-500 mt-1">{{ validationErrors.start_date[0] }}</p>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-500 uppercase">End Date</label>
+            <input v-model="yearForm.end_date" type="date" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded" />
+            <p v-if="validationErrors.end_date" class="text-xs text-red-500 mt-1">{{ validationErrors.end_date[0] }}</p>
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>

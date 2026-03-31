@@ -11,8 +11,13 @@ class AcademicYear extends Model
     use HasFactory;
     protected $fillable = [
         'name',
+        'start_date',
+        'end_date',
+        'start_year',
+        'end_year',
         'current_term',
         'status',
+        'is_active',
     ];
 
      public function classes()

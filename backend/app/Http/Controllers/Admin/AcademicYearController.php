@@ -21,12 +21,16 @@ class AcademicYearController extends Controller
     {
         $year = AcademicYear::create($request->validated());
 
-        // Keep only one "Current" academic year at a time.
+        // Keep only one "Current" / active academic year at a time.
         if ($year->status === 'Current') {
+            $year->update(['is_active' => true]);
+
             AcademicYear::query()
                 ->whereKeyNot($year->id)
                 ->where('status', 'Current')
-                ->update(['status' => 'Close']);
+                ->update(['status' => 'Close', 'is_active' => false]);
+        } else {
+            $year->update(['is_active' => false]);
         }
         return response()->json($year, 201);
     }
@@ -40,12 +44,16 @@ class AcademicYearController extends Controller
     {
         $academicYear->update($request->validated());
 
-        // Keep only one "Current" academic year at a time.
+        // Keep only one "Current" / active academic year at a time.
         if ($academicYear->status === 'Current') {
+            $academicYear->update(['is_active' => true]);
+
             AcademicYear::query()
                 ->whereKeyNot($academicYear->id)
                 ->where('status', 'Current')
-                ->update(['status' => 'Close']);
+                ->update(['status' => 'Close', 'is_active' => false]);
+        } else {
+            $academicYear->update(['is_active' => false]);
         }
         return response()->json($academicYear);
     }
@@ -56,4 +64,3 @@ class AcademicYearController extends Controller
         return response()->json(['message' => 'Academic year deleted']);
     }
 }
-

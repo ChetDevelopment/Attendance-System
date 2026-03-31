@@ -6,7 +6,7 @@ const predictionService = {
    * @param {number} threshold - Risk threshold (attendance % below this = at risk)
    */
   getAtRiskStudents(threshold = 30) {
-    return api.get('/predictions/at-risk', {
+    return api.get('/admin/predictions/at-risk', {
       params: { threshold }
     });
   },
@@ -16,14 +16,14 @@ const predictionService = {
    * @param {number} studentId - Student ID
    */
   getStudentPrediction(studentId) {
-    return api.get(`/predictions/student/${studentId}`);
+    return api.get(`/admin/predictions/student/${studentId}`);
   },
 
   /**
    * Get overall system insights
    */
   getInsights() {
-    return api.get('/predictions/insights');
+    return api.get('/admin/predictions/insights');
   },
 
   /**
@@ -31,7 +31,7 @@ const predictionService = {
    * @param {number} weekOffset - Week offset (0 = current week, 1 = next week, etc.)
    */
   getWeeklyPrediction(weekOffset = 0) {
-    return api.get('/predictions/weekly', {
+    return api.get('/admin/predictions/weekly', {
       params: { week_offset: weekOffset }
     });
   },
@@ -41,7 +41,7 @@ const predictionService = {
    * @param {number} days - Number of days to analyze (7-90)
    */
   getHistoricalData(days = 30) {
-    return api.get('/predictions/historical', {
+    return api.get('/admin/predictions/historical', {
       params: { days }
     });
   },
@@ -50,7 +50,7 @@ const predictionService = {
    * Clear prediction cache
    */
   clearCache() {
-    return api.post('/predictions/clear-cache');
+    return api.post('/admin/predictions/clear-cache');
   }
 };
 

@@ -10,6 +10,8 @@ import {
   ClipboardList,
   User,
   UserCircle,
+  Handshake,
+  Sparkles,
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { getUser, getUserRole } from '../services/auth';
@@ -59,8 +61,11 @@ const navItems = computed(() => {
     { id: 'academic', icon: Network, label: 'Academic Structure' },
     { id: 'students', icon: Users, label: 'Student Management' },
     { id: 'attendance', icon: Calendar, label: 'Attendance Control' },
+    { id: 'sessions', icon: Calendar, label: 'Session Management' },
     { id: 'biometric', icon: Fingerprint, label: 'Biometric Management' },
     { id: 'absences', icon: ClipboardList, label: 'Absence Management' },
+    { id: 'collaboration', icon: Handshake, label: 'Collaboration' },
+    { id: 'predictions', icon: Sparkles, label: 'Predictions' },
     { id: 'settings', icon: Settings, label: 'System Settings' },
     { id: 'profile', icon: User, label: 'My Profile' },
   ];

@@ -33,6 +33,15 @@ export const userService = {
     }
   },
 
+  async resetPassword(id) {
+    try {
+      const response = await api.post(`/admin/users/${id}/reset-password`)
+      return response.data
+    } catch (error) {
+      throw formatError(error)
+    }
+  },
+
   async createUser(payload) {
     try {
       const response = await api.post('/admin/users', payload)

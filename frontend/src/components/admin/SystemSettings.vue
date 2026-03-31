@@ -253,17 +253,17 @@ const restoreBackup = async (name: string) => {
   }
 };
 
-const testTelegramConnection = async () => {
-  if (testingTelegram.value) return;
-  testingTelegram.value = true;
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const response = await api.post('/test/telegram');
+  const testTelegramConnection = async () => {
+    if (testingTelegram.value) return;
+    testingTelegram.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+    try {
+      const response = await api.post('/telegram/test');
 
-    if (response?.data?.success || response?.status === 200) {
-      successMessage.value = 'Telegram test request sent successfully.';
-    } else {
+      if (response?.data?.success || response?.status === 200) {
+        successMessage.value = 'Telegram test request sent successfully.';
+      } else {
       throw new Error(response?.data?.message || 'Telegram test failed.');
     }
   } catch (error: any) {

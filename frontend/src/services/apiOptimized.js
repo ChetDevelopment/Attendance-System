@@ -172,9 +172,9 @@ export const clearCache = (url = null) => {
  */
 export const loadDashboardData = async () => {
   return batch([
-    ['/education-dashboard/stats', { cache: true, cacheTTL: 300000 }],
-    ['/education-dashboard/absent-today', { cache: true, cacheTTL: 60000 }],
-    ['/sessions/active', { cache: true, cacheTTL: 30000 }],
+    ['/education/dashboard/stats', { cache: true, cacheTTL: 300000 }],
+    ['/education/students/absent-today', { cache: true, cacheTTL: 60000 }],
+    // Note: active-session endpoint is role-specific; keep this list minimal.
   ]);
 };
 

@@ -22,7 +22,7 @@ export const getDashboardData = async (options = {}) => {
     cacheTTL = 30000 // 30 seconds - matches backend cache
   } = options
 
-  return getOptimized(BASE_URL, {
+  return getOptimized(`${BASE_URL}/data`, {
     cache: !bypassCache,
     cacheTTL
   })

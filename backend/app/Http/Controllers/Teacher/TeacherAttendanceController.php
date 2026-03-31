@@ -718,6 +718,7 @@ class TeacherAttendanceController extends Controller
                 ar.id,
                 s.student_code,
                 s.face_image,
+                s.profile as profile_image,
                 COALESCE(NULLIF(s.fullname, ''), TRIM(CONCAT(COALESCE(s.first_name, ''), ' ', COALESCE(s.last_name, '')))) as student_name,
                 COALESCE(c.code, s.class, '') as class_code,
                 COALESCE(c.name, s.class, 'Unknown Class') as class_name,
@@ -732,13 +733,22 @@ class TeacherAttendanceController extends Controller
             ->limit(50)
             ->get()
             ->map(function ($record) {
-                // Build photo URL
+                // Build photo URL - check both face_image and profile
                 $photoUrl = null;
-                if ($record->face_image) {
-                    if (str_starts_with($record->face_image, 'http')) {
-                        $photoUrl = $record->face_image;
+                
+                // First try face_image
+                $imagePath = $record->face_image;
+                
+                // If no face_image, try profile field
+                if (!$imagePath && $record->profile_image) {
+                    $imagePath = $record->profile_image;
+                }
+                
+                if ($imagePath) {
+                    if (str_starts_with($imagePath, 'http')) {
+                        $photoUrl = $imagePath;
                     } else {
-                        $photoUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $record->face_image;
+                        $photoUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $imagePath;
                     }
                 }
 

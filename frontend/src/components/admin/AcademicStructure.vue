@@ -335,7 +335,7 @@ onMounted(loadData)
         <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
           <tr>
             <th class="px-6 py-4">Class</th>
-            <th class="px-6 py-4">Code</th>
+            <th class="px-6 py-4">Room</th>
             <th class="px-6 py-4">Academic Year</th>
             <th class="px-6 py-4">Students</th>
             <th class="px-6 py-4 text-right">Actions</th>
@@ -484,7 +484,7 @@ onMounted(loadData)
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-xs font-bold text-slate-500 uppercase">Code</label>
+            <label class="text-xs font-bold text-slate-500 uppercase">Room</label>
             <input v-model="classForm.code" type="text" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded" />
             <p v-if="validationErrors.code" class="text-xs text-red-500 mt-1">{{ validationErrors.code[0] }}</p>
           </div>

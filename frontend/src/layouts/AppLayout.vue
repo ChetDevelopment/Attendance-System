@@ -36,8 +36,6 @@ import AttendanceControl from '../components/admin/AttendanceControl.vue';
 import SystemSettings from '../components/admin/SystemSettings.vue';
 import SessionManagement from '../components/admin/SessionManagement.vue';
 import BiometricManagement from '../components/admin/BiometricManagement.vue';
-import CollaborationPanel from '../components/admin/CollaborationPanel.vue';
-import PredictionDashboard from '../components/admin/PredictionDashboard.vue';
 import { getUserRole } from '../services/auth';
 
 const route = useRoute();
@@ -81,8 +79,6 @@ const moduleMap = computed(() => {
       sessions: SessionManagement,
       biometric: BiometricManagement,
       absences: AbsenceManagement,
-      collaboration: CollaborationPanel,
-      predictions: PredictionDashboard,
       settings: SystemSettings,
       profile: Profile,
     } as const;

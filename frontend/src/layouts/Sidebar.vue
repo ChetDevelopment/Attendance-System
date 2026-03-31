@@ -64,8 +64,6 @@ const navItems = computed(() => {
     { id: 'sessions', icon: Calendar, label: 'Session Management' },
     { id: 'biometric', icon: Fingerprint, label: 'Biometric Management' },
     { id: 'absences', icon: ClipboardList, label: 'Absence Management' },
-    { id: 'collaboration', icon: Handshake, label: 'Collaboration' },
-    { id: 'predictions', icon: Sparkles, label: 'Predictions' },
     { id: 'settings', icon: Settings, label: 'System Settings' },
     { id: 'profile', icon: User, label: 'My Profile' },
   ];

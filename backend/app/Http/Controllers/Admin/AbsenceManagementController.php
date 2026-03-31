@@ -16,6 +16,22 @@ use Symfony\Component\HttpFoundation\Response;
 class AbsenceManagementController extends Controller
 {
     /**
+     * Build profile URL from profile field
+     */
+    private function buildProfileUrl(?string $profile): ?string
+    {
+        if (!$profile) {
+            return null;
+        }
+        
+        if (str_starts_with($profile, 'http')) {
+            return $profile;
+        }
+        
+        return config('app.frontend_url', 'http://localhost:5173') . '/' . $profile;
+    }
+
+    /**
      * List all absences with filters.
      * GET /api/admin/absences
      */
@@ -172,6 +188,8 @@ class AbsenceManagementController extends Controller
                 'class' => $absence->student->class,
                 'class_id' => $absence->student->class_id,
                 'parent_number' => $absence->student->parent_number,
+                'profile' => $absence->student->profile,
+                'avatar' => $this->buildProfileUrl($absence->student->profile),
             ],
             'session' => $absence->session ? [
                 'id' => $absence->session->id,

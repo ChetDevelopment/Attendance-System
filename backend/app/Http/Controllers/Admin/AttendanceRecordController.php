@@ -43,6 +43,7 @@ class AttendanceRecordController extends Controller
                 's.id as student_ref_id',
                 's.fullname as student_name',
                 's.username as student_code',
+                's.profile as student_profile',
                 DB::raw("{$classNameExpression} as class_name"),
                 'ses.name as session_name',
                 'u.name as submitted_by_name',
@@ -191,6 +192,17 @@ class AttendanceRecordController extends Controller
 
     private function mapRecord(object $row): array
     {
+        // Build profile URL
+        $avatar = null;
+        $profileField = $row->student_profile ?? null;
+        if ($profileField) {
+            if (str_starts_with($profileField, 'http')) {
+                $avatar = $profileField;
+            } else {
+                $avatar = config('app.frontend_url', 'http://localhost:5173') . '/' . $profileField;
+            }
+        }
+        
         return [
             'id' => (int) $row->id,
             'student_id' => (int) $row->student_id,
@@ -204,6 +216,8 @@ class AttendanceRecordController extends Controller
                 'name' => (string) ($row->student_name ?? 'Unknown'),
                 'code' => (string) ($row->student_code ?? ''),
                 'class_name' => (string) ($row->class_name ?? ''),
+                'avatar' => $avatar,
+                'profile' => $profileField,
             ],
             'session' => [
                 'name' => (string) ($row->session_name ?? ''),

@@ -104,6 +104,17 @@ class BiometricManagementController extends Controller
         $students = $query->paginate((int) ($validated['per_page'] ?? 15));
 
         $students->getCollection()->transform(function (Student $student) {
+            // Build profile URL
+            $profileUrl = null;
+            $profileField = $student->profile;
+            if ($profileField) {
+                if (str_starts_with($profileField, 'http')) {
+                    $profileUrl = $profileField;
+                } else {
+                    $profileUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $profileField;
+                }
+            }
+            
             return [
                 'id' => $student->id,
                 'name' => $student->fullname ?: trim($student->first_name . ' ' . $student->last_name),
@@ -114,6 +125,7 @@ class BiometricManagementController extends Controller
                 'fingerprint_enrolled' => (bool) $student->fingerprint_enrolled,
                 'last_biometric_scan' => optional($student->last_biometric_scan)->toDateTimeString(),
                 'profile' => $student->profile,
+                'avatar' => $profileUrl,
                 'is_active' => (bool) $student->is_active,
             ];
         });

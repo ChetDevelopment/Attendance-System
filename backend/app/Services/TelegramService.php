@@ -23,7 +23,9 @@ class TelegramService
      */
     public function isConfigured(): bool
     {
-        return $this->isConfigured;
+        // Also check if Telegram is enabled in settings
+        $enabled = config('services.telegram.enabled', true);
+        return $this->isConfigured && $enabled;
     }
 
     /**

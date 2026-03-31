@@ -50,18 +50,27 @@ class TeacherAttendanceController extends Controller
         $className = $class ? $class->name : null;
 
         $students = Student::where('class_id', $classId)
-            ->select('id', 'first_name', 'last_name', 'student_code', 'class_id', 'face_image')
+            ->select('id', 'first_name', 'last_name', 'student_code', 'class_id', 'face_image', 'profile')
             ->get()
             ->map(function ($student) use ($className) {
-                // Build photo URL
+                // Build photo URL - check both face_image and profile fields
                 $photoUrl = null;
-                if ($student->face_image) {
+                
+                // First try face_image
+                $imagePath = $student->face_image;
+                
+                // If no face_image, try profile field
+                if (!$imagePath && $student->profile) {
+                    $imagePath = $student->profile;
+                }
+                
+                if ($imagePath) {
                     // Check if it's a full URL or just a path
-                    if (str_starts_with($student->face_image, 'http')) {
-                        $photoUrl = $student->face_image;
+                    if (str_starts_with($imagePath, 'http')) {
+                        $photoUrl = $imagePath;
                     } else {
                         // It's a path, prepend the frontend URL
-                        $photoUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $student->face_image;
+                        $photoUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $imagePath;
                     }
                 }
 
@@ -250,12 +259,38 @@ class TeacherAttendanceController extends Controller
                         'student_id' => $s->student_code,
                         'class' => $class?->name ?? null,
                     ];
+                    
+                    // Send individual Telegram alert for each absent/late student
+                    if ($this->telegramService->isConfigured()) {
+                        $alertResult = $this->telegramService->sendAbsenceAlert(
+                            trim(($s->first_name ?? '') . ' ' . ($s->last_name ?? '')) ?: ($s->fullname ?? 'Unknown Student'),
+                            $s->student_code ?? (string) $s->id,
+                            $class?->name ?? 'N/A',
+                            $attendanceDate->format('Y-m-d'),
+                            $this->formatSessionTimeRange($session),
+                            $record->id
+                        );
+                        
+                        if (!$alertResult['success']) {
+                            Log::warning('Telegram alert for student failed', [
+                                'student_id' => $s->id,
+                                'status' => $status->value,
+                                'error' => $alertResult['error'] ?? 'Unknown error',
+                            ]);
+                        }
+                    }
                 }
             }
 
             DB::commit();
 
             if ($this->telegramService->isConfigured()) {
+                Log::info('TelegramService: Attempting to send attendance summary notification', [
+                    'attendance_id' => $attendance->id,
+                    'late_count' => count($attendanceSummary['late_students'] ?? []),
+                    'absent_count' => count($attendanceSummary['absent_students'] ?? []),
+                ]);
+                
                 $telegramResult = $this->telegramService->sendAttendanceSubmissionSummary($attendanceSummary);
 
                 if (!$telegramResult['success']) {
@@ -263,7 +298,17 @@ class TeacherAttendanceController extends Controller
                         'attendance_id' => $attendance->id,
                         'error' => $telegramResult['error'] ?? 'Unknown error',
                     ]);
+                } else {
+                    Log::info('Telegram attendance summary sent successfully', [
+                        'attendance_id' => $attendance->id,
+                        'message_id' => $telegramResult['message_id'] ?? null,
+                    ]);
                 }
+            } else {
+                Log::info('Telegram notifications skipped - not configured or disabled', [
+                    'attendance_id' => $attendance->id,
+                    'is_configured' => $this->telegramService->isConfigured(),
+                ]);
             }
 
             // Log teacher activity (CREATE)
@@ -313,7 +358,7 @@ class TeacherAttendanceController extends Controller
 
         $academicYearId = $request->input('academic_year_id');
 
-        $students = Student::select('id', 'first_name', 'last_name', 'student_code', 'class_id', 'face_image', 'contact', 'parent_number')
+        $students = Student::select('id', 'first_name', 'last_name', 'student_code', 'class_id', 'face_image', 'profile', 'contact', 'parent_number')
             ->with('class:id,name,code,academic_year_id')
             ->when($academicYearId, function ($query) use ($academicYearId) {
                 $query->whereHas('class', function ($classQuery) use ($academicYearId) {
@@ -322,13 +367,22 @@ class TeacherAttendanceController extends Controller
             })
             ->get()
             ->map(function ($student) {
-                // Build photo URL
+                // Build photo URL - check both face_image and profile fields
                 $photoUrl = null;
-                if ($student->face_image) {
-                    if (str_starts_with($student->face_image, 'http')) {
-                        $photoUrl = $student->face_image;
+                
+                // First try face_image
+                $imagePath = $student->face_image;
+                
+                // If no face_image, try profile field
+                if (!$imagePath && $student->profile) {
+                    $imagePath = $student->profile;
+                }
+                
+                if ($imagePath) {
+                    if (str_starts_with($imagePath, 'http')) {
+                        $photoUrl = $imagePath;
                     } else {
-                        $photoUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $student->face_image;
+                        $photoUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $imagePath;
                     }
                 }
 

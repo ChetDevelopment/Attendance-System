@@ -100,10 +100,36 @@ class StudentController extends Controller
                 });
             }
 
-            return $query->paginate($perPage)->toArray();
+            $paginated = $query->paginate($perPage)->toArray();
+            
+            // Transform data to include avatar field for frontend compatibility
+            if (isset($paginated['data'])) {
+                $paginated['data'] = collect($paginated['data'])->map(function ($student) {
+                    $student['avatar'] = $this->buildProfileUrl($student['profile'] ?? null);
+                    return $student;
+                })->all();
+            }
+            
+            return $paginated;
         });
 
         return response()->json($payload);
+    }
+    
+    /**
+     * Build profile URL from profile field
+     */
+    private function buildProfileUrl(?string $profile): ?string
+    {
+        if (!$profile) {
+            return null;
+        }
+        
+        if (str_starts_with($profile, 'http')) {
+            return $profile;
+        }
+        
+        return config('app.frontend_url', 'http://localhost:5173') . '/' . $profile;
     }
 
     public function store(StoreStudentRequest $request)
@@ -243,7 +269,23 @@ class StudentController extends Controller
 
     public function show(Student $student)
     {
-        return $student->load('class');
+        $student->load('class');
+        
+        // Build profile URL
+        $profileUrl = null;
+        $profileField = $student->profile;
+        if ($profileField) {
+            if (str_starts_with($profileField, 'http')) {
+                $profileUrl = $profileField;
+            } else {
+                $profileUrl = config('app.frontend_url', 'http://localhost:5173') . '/' . $profileField;
+            }
+        }
+        
+        $data = $student->toArray();
+        $data['avatar'] = $profileUrl;
+        
+        return response()->json($data);
     }
 
     public function update(UpdateStudentRequest $request, Student $student)

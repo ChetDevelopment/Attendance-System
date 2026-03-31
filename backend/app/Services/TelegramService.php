@@ -74,14 +74,29 @@ class TelegramService
                 ];
             }
 
+            // Provide more helpful error messages for common issues
+            $errorDescription = $result['description'] ?? 'Unknown error';
+            $errorMessage = $errorDescription;
+            
+            // Map common errors to helpful messages
+            if (str_contains($errorDescription, "Forbidden: bots can't send messages to bots")) {
+                $errorMessage = "Cannot send to bot - TELEGRAM_CHAT_ID must be your personal user ID (e.g., 123456789), not the bot ID or username. Get your user ID at @userinfobot on Telegram.";
+            } elseif (str_contains($errorDescription, "Forbidden: bot is not a member of the group")) {
+                $errorMessage = "Bot is not a member of the group. Add the bot to your Telegram group first.";
+            } elseif (str_contains($errorDescription, "Chat not found")) {
+                $errorMessage = "Chat not found - Verify TELEGRAM_CHAT_ID is correct. For groups, use the negative group ID (e.g., -1001234567890).";
+            } elseif ($response->status() === 401) {
+                $errorMessage = "Invalid bot token - Verify TELEGRAM_BOT_TOKEN in .env is correct.";
+            }
+
             Log::error('Telegram API error', [
-                'error' => $result['description'] ?? 'Unknown error',
+                'error' => $errorDescription,
                 'response' => $result,
             ]);
 
             return [
                 'success' => false,
-                'error' => $result['description'] ?? 'Failed to send message',
+                'error' => $errorMessage,
             ];
         } catch (\Exception $e) {
             Log::error('Telegram notification failed exception', [

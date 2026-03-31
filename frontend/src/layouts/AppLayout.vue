@@ -34,7 +34,6 @@ import Profile from '../components/admin/Profile.vue';
 import AbsenceManagement from '../components/admin/AbsenceManagement.vue';
 import AttendanceControl from '../components/admin/AttendanceControl.vue';
 import SystemSettings from '../components/admin/SystemSettings.vue';
-import SessionManagement from '../components/admin/SessionManagement.vue';
 import BiometricManagement from '../components/admin/BiometricManagement.vue';
 import { getUserRole } from '../services/auth';
 
@@ -52,7 +51,6 @@ const moduleMap = computed(() => {
     return {
       dashboard: Dashboard,
       attendance: AttendanceControl,
-      sessions: SessionManagement,
       biometric: BiometricManagement,
       absences: AbsenceManagement,
     } as const;
@@ -63,7 +61,6 @@ const moduleMap = computed(() => {
       academic: AcademicStructure,
       students: StudentManagement,
       attendance: AttendanceControl,
-      sessions: SessionManagement,
       biometric: BiometricManagement,
       absences: AbsenceManagement,
       settings: SystemSettings,
@@ -76,7 +73,6 @@ const moduleMap = computed(() => {
       academic: AcademicStructure,
       students: StudentManagement,
       attendance: AttendanceControl,
-      sessions: SessionManagement,
       biometric: BiometricManagement,
       absences: AbsenceManagement,
       settings: SystemSettings,

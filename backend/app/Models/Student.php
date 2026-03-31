@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class Student extends Model
 {
@@ -94,5 +95,23 @@ class Student extends Model
         if ($value) {
             $this->attributes['password'] = Hash::needsRehash($value) ? Hash::make($value) : $value;
         }
+    }
+
+    public function getProfileAttribute($value)
+    {
+        $raw = (string) ($value ?? '');
+        if ($raw === '') {
+            return $value;
+        }
+
+        if (Str::startsWith($raw, ['http://', 'https://', 'data:'])) {
+            return $raw;
+        }
+
+        if (Str::startsWith($raw, '/')) {
+            return url($raw);
+        }
+
+        return $raw;
     }
 }

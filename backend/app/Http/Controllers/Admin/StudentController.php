@@ -249,6 +249,12 @@ class StudentController extends Controller
     public function update(UpdateStudentRequest $request, Student $student)
     {
         $student->update($request->validated());
+
+        if ($student->wasChanged('profile') && $student->user) {
+            $student->user->update([
+                'avatar_url' => $student->profile,
+            ]);
+        }
         $this->bumpStudentIndexCacheVersion();
         return response()->json($student);
     }
@@ -267,11 +273,17 @@ class StudentController extends Controller
         ]);
 
         $path = $validated['photo']->store('student-profiles', 'public');
-        $url = Storage::url($path);
+        $url = url(Storage::url($path));
 
         $student->update([
             'profile' => $url,
         ]);
+
+        if ($student->user) {
+            $student->user->update([
+                'avatar_url' => $url,
+            ]);
+        }
 
         $this->bumpStudentIndexCacheVersion();
 
@@ -287,5 +299,4 @@ class StudentController extends Controller
         Cache::forever(self::INDEX_CACHE_VERSION_KEY, $next);
     }
 }
-
 

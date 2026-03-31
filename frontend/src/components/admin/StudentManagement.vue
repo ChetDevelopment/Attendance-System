@@ -622,10 +622,12 @@ const handleEditStudent = async () => {
     }
 
     const response = await studentService.updateStudent(editingStudent.value.dbId, payload);
-    
-    // Update with server data
-    if (optimisticIndex > -1 && response.student) {
-      students.value[optimisticIndex] = toUiStudent(response.student);
+
+    // Backend returns the student object directly (not wrapped).
+    const updatedStudent = response?.student ?? response;
+
+    if (optimisticIndex > -1 && updatedStudent) {
+      students.value[optimisticIndex] = toUiStudent(updatedStudent);
     }
 
     isEditModalOpen.value = false;

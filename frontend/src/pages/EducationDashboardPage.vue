@@ -21,7 +21,7 @@ import type {
   ReportPeriod,
   TrendData,
 } from '../components/Education/types'
-import { getUser, setUser } from '../services/auth'
+import { getUser, setUser, logout as authLogout } from '../services/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -391,11 +391,16 @@ watch(
   },
   { immediate: true },
 )
+
+const handleLogout = async () => {
+  await authLogout()
+  router.push({ name: 'login' })
+}
 </script>
 
 <template>
   <div class="flex min-h-screen bg-slate-50">
-    <Sidebar v-model:activeNav="activeNav" :user="currentUser" />
+    <Sidebar v-model:activeNav="activeNav" :user="currentUser" @logout="handleLogout" />
 
     <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
       <Header

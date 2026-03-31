@@ -20,6 +20,14 @@ class AcademicYearController extends Controller
     public function store(StoreAcademicYearRequest $request)
     {
         $year = AcademicYear::create($request->validated());
+
+        // Keep only one "Current" academic year at a time.
+        if ($year->status === 'Current') {
+            AcademicYear::query()
+                ->whereKeyNot($year->id)
+                ->where('status', 'Current')
+                ->update(['status' => 'Close']);
+        }
         return response()->json($year, 201);
     }
 
@@ -31,6 +39,14 @@ class AcademicYearController extends Controller
     public function update(UpdateAcademicYearRequest $request, AcademicYear $academicYear)
     {
         $academicYear->update($request->validated());
+
+        // Keep only one "Current" academic year at a time.
+        if ($academicYear->status === 'Current') {
+            AcademicYear::query()
+                ->whereKeyNot($academicYear->id)
+                ->where('status', 'Current')
+                ->update(['status' => 'Close']);
+        }
         return response()->json($academicYear);
     }
 
@@ -40,5 +56,4 @@ class AcademicYearController extends Controller
         return response()->json(['message' => 'Academic year deleted']);
     }
 }
-
 

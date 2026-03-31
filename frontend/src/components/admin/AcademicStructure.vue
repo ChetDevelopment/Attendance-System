@@ -15,8 +15,10 @@ type AcademicYear = {
 
 type SchoolClass = {
   id: number
-  class_name: string
-  room_number: string
+  name?: string
+  class_name?: string
+  code?: string
+  description?: string | null
   academic_year_id: number | null
   academic_year?: { id: number; name: string } | null
   students_count?: number
@@ -51,8 +53,9 @@ const yearForm = ref({
 })
 
 const classForm = ref({
-  class_name: '',
-  room_number: '',
+  name: '',
+  code: '',
+  description: '',
   academic_year_id: '',
 })
 
@@ -62,9 +65,13 @@ const filteredClasses = computed(() => {
 
   return classes.value.filter((c) => {
     const yearName = c.academic_year?.name || ''
+    const className = c.name || c.class_name || ''
+    const classCode = c.code || ''
+    const classDescription = c.description || ''
     return (
-      c.class_name.toLowerCase().includes(q) ||
-      c.room_number.toLowerCase().includes(q) ||
+      className.toLowerCase().includes(q) ||
+      classCode.toLowerCase().includes(q) ||
+      classDescription.toLowerCase().includes(q) ||
       yearName.toLowerCase().includes(q)
     )
   })
@@ -74,7 +81,7 @@ const activeYear = computed(() => years.value.find((y) => y.status === 'Current'
 
 const resetForms = () => {
   yearForm.value = { name: '', current_term: 'Term1', status: 'Current' }
-  classForm.value = { class_name: '', room_number: '', academic_year_id: '' }
+  classForm.value = { name: '', code: '', description: '', academic_year_id: '' }
   editingYearId.value = null
   editingClassId.value = null
   validationErrors.value = {}
@@ -164,8 +171,9 @@ const confirmDeleteYear = async () => {
 
 const openCreateClass = () => {
   classForm.value = {
-    class_name: '',
-    room_number: '',
+    name: '',
+    code: '',
+    description: '',
     academic_year_id: activeYear.value ? String(activeYear.value.id) : '',
   }
   editingClassId.value = null
@@ -175,8 +183,9 @@ const openCreateClass = () => {
 
 const openEditClass = (item: SchoolClass) => {
   classForm.value = {
-    class_name: item.class_name,
-    room_number: item.room_number,
+    name: item.name || item.class_name || '',
+    code: item.code || '',
+    description: item.description || '',
     academic_year_id: item.academic_year_id ? String(item.academic_year_id) : '',
   }
   editingClassId.value = item.id
@@ -191,8 +200,9 @@ const saveClass = async () => {
   validationErrors.value = {}
 
   const payload = {
-    class_name: classForm.value.class_name,
-    room_number: classForm.value.room_number,
+    name: classForm.value.name,
+    code: classForm.value.code,
+    description: classForm.value.description || null,
     academic_year_id: classForm.value.academic_year_id
       ? Number(classForm.value.academic_year_id)
       : null,
@@ -305,7 +315,7 @@ onMounted(loadData)
         <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
           <tr>
             <th class="px-6 py-4">Class</th>
-            <th class="px-6 py-4">Room</th>
+            <th class="px-6 py-4">Code</th>
             <th class="px-6 py-4">Academic Year</th>
             <th class="px-6 py-4">Students</th>
             <th class="px-6 py-4 text-right">Actions</th>
@@ -316,8 +326,8 @@ onMounted(loadData)
             <td :colspan="5" class="px-6 py-10 text-center text-slate-400 italic">Loading classes...</td>
           </tr>
           <tr v-for="item in filteredClasses" :key="item.id" class="hover:bg-slate-50">
-            <td class="px-6 py-4 font-bold text-slate-900">{{ item.class_name }}</td>
-            <td class="px-6 py-4 text-slate-600">{{ item.room_number }}</td>
+            <td class="px-6 py-4 font-bold text-slate-900">{{ item.name || item.class_name }}</td>
+            <td class="px-6 py-4 font-mono text-xs text-slate-600">{{ item.code || '-' }}</td>
             <td class="px-6 py-4 text-slate-600">{{ item.academic_year?.name || '-' }}</td>
             <td class="px-6 py-4 font-bold">{{ item.students_count ?? 0 }}</td>
             <td class="px-6 py-4 text-right">
@@ -431,21 +441,28 @@ onMounted(loadData)
       <div class="space-y-4">
         <div>
           <label class="text-xs font-bold text-slate-500 uppercase">Class Name</label>
-          <input v-model="classForm.class_name" type="text" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded" />
-          <p v-if="validationErrors.class_name" class="text-xs text-red-500 mt-1">{{ validationErrors.class_name[0] }}</p>
+          <input v-model="classForm.name" type="text" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded" />
+          <p v-if="validationErrors.name" class="text-xs text-red-500 mt-1">{{ validationErrors.name[0] }}</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-bold text-slate-500 uppercase">Code</label>
+            <input v-model="classForm.code" type="text" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded" />
+            <p v-if="validationErrors.code" class="text-xs text-red-500 mt-1">{{ validationErrors.code[0] }}</p>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-500 uppercase">Academic Year</label>
+            <select v-model="classForm.academic_year_id" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded">
+              <option value="">None</option>
+              <option v-for="year in years" :key="year.id" :value="String(year.id)">{{ year.name }}</option>
+            </select>
+            <p v-if="validationErrors.academic_year_id" class="text-xs text-red-500 mt-1">{{ validationErrors.academic_year_id[0] }}</p>
+          </div>
         </div>
         <div>
-          <label class="text-xs font-bold text-slate-500 uppercase">Room Number</label>
-          <input v-model="classForm.room_number" type="text" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded" />
-          <p v-if="validationErrors.room_number" class="text-xs text-red-500 mt-1">{{ validationErrors.room_number[0] }}</p>
-        </div>
-        <div>
-          <label class="text-xs font-bold text-slate-500 uppercase">Academic Year</label>
-          <select v-model="classForm.academic_year_id" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded">
-            <option value="">None</option>
-            <option v-for="year in years" :key="year.id" :value="String(year.id)">{{ year.name }}</option>
-          </select>
-          <p v-if="validationErrors.academic_year_id" class="text-xs text-red-500 mt-1">{{ validationErrors.academic_year_id[0] }}</p>
+          <label class="text-xs font-bold text-slate-500 uppercase">Description</label>
+          <input v-model="classForm.description" type="text" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded" />
+          <p v-if="validationErrors.description" class="text-xs text-red-500 mt-1">{{ validationErrors.description[0] }}</p>
         </div>
         <div class="flex justify-end gap-2 pt-2">
           <button class="px-4 py-2 rounded bg-slate-100 text-slate-700 text-sm font-bold" @click="isClassModalOpen = false">Cancel</button>

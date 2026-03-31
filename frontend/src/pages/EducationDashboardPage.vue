@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { UserMinus, Clock, FileText, AlertTriangle } from 'lucide-vue-next'
 import api from '../services/api'
+import { dashboardService } from '../services/dashboardService'
 import Sidebar from '../components/Education/Sidebar.vue'
 import Header from '../components/Education/Header.vue'
 import StatsCard from '../components/Education/StatsCard.vue'
@@ -13,15 +14,8 @@ import FollowUpModal from '../components/Education/FollowUpModal.vue'
 import ReportsTable from '../components/Education/ReportsTable.vue'
 import ProfileView from '../components/Education/ProfileView.vue'
 import AccountSettingsView from '../components/Education/AccountSettingsView.vue'
-import type {
-  AcademicYearOption,
-  DashboardStats,
-  EducationClassOption,
-  EducationReportRow,
-  ReportPeriod,
-  TrendData,
-} from '../components/Education/types'
-import { getUser, setUser, logout as authLogout } from '../services/auth'
+import { DashboardStats, TrendData, ClassReport } from '../components/Education/types'
+import { getUser, setUser } from '../services/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,23 +64,32 @@ const dashboardStats = ref<DashboardStats>({
 const absentToday = ref<any[]>([])
 const allAbsent = ref<any[]>([])
 const riskStudents = ref<any[]>([])
+const classReports = ref<ClassReport[]>([])
 const trendData = ref<TrendData[]>([])
 const isLoading = ref(true)
 const errorMessage = ref('')
-const academicYears = ref<AcademicYearOption[]>([])
-const reportClasses = ref<EducationClassOption[]>([])
-const reportRows = ref<EducationReportRow[]>([])
-const reportLoading = ref(false)
-const reportInitialized = ref(false)
-const reportError = ref('')
-const selectedReportAcademicYear = ref<number | null>(null)
-const selectedReportClass = ref<number | null>(null)
-const selectedReportPeriod = ref<ReportPeriod>('today')
 const selectedAttendance = ref<any>(null)
 const isModalOpen = ref(false)
 const isNotificationOpen = ref(false)
 const isSettingsOpen = ref(false)
 const isProfileOpen = ref(false)
+const searchQuery = ref('')
+const isExportingReports = ref(false)
+
+const welcomeName = computed(() => currentUser.value?.name || 'Education Team')
+const welcomeRole = computed(() => {
+  const role = currentUser.value?.role
+
+  if (typeof role === 'string' && role.trim()) {
+    return role
+  }
+
+  if (role?.name) {
+    return role.name
+  }
+
+  return 'Education Team'
+})
 
 const followUpForm = ref({
   reason: '',
@@ -98,10 +101,53 @@ const followUpForm = ref({
   status: 'Not Contacted',
 })
 
+const normalizeApiPath = (url: string) => {
+  if (/^https?:\/\//i.test(url)) return url
+  if (url.startsWith('/api')) return url.slice(4) || '/'
+  return url.startsWith('/') ? url : `/${url}`
+}
+
 const fetchJson = async (url: string) => {
-  const { data } = await api.get(url.replace('/api', ''))
+  const { data } = await api.get(normalizeApiPath(url))
   return data
 }
+
+const isAccessError = (error: any) =>
+  error?.response?.status === 401 ||
+  error?.response?.status === 403 ||
+  /unauthorized|forbidden|permission/i.test(String(error?.message || ''))
+
+const toSearchableText = (value: any) => String(value ?? '').toLowerCase()
+
+const matchesSearch = (row: any, fields: any[]) => {
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) return true
+  return fields.some((field) => toSearchableText(field).includes(query))
+}
+
+const filteredAbsentToday = computed(() =>
+  absentToday.value.filter((row) =>
+    matchesSearch(row, [row.name, row.class, row.reason, row.date, row.attendance_id]),
+  ),
+)
+
+const filteredAllAbsent = computed(() =>
+  allAbsent.value.filter((row) =>
+    matchesSearch(row, [row.name, row.class, row.reason, row.date, row.attendance_id]),
+  ),
+)
+
+const filteredRiskStudents = computed(() =>
+  riskStudents.value.filter((row) =>
+    matchesSearch(row, [row.name, row.class, row.absence_count, row.latest_attendance_id]),
+  ),
+)
+
+const filteredClassReports = computed(() =>
+  classReports.value.filter((row) =>
+    matchesSearch(row, [row.class, row.present_count, row.absent_count, row.late_count]),
+  ),
+)
 
 const fetchUserProfile = async () => {
   try {
@@ -122,10 +168,11 @@ const fetchData = async () => {
     fetchJson('/api/education/students/absent-today'),
     fetchJson('/api/education/students/all-absent'),
     fetchJson('/api/education/students/risk'),
+    fetchJson('/api/education/reports/class-summary'),
     fetchJson('/api/admin/reports/trends'),
   ])
 
-  const [stats, today, all, risk, trends] = results
+  const [stats, today, all, risk, reports, trends] = results
 
   dashboardStats.value =
     stats.status === 'fulfilled'
@@ -139,11 +186,15 @@ const fetchData = async () => {
   absentToday.value = today.status === 'fulfilled' ? today.value : []
   allAbsent.value = all.status === 'fulfilled' ? all.value : []
   riskStudents.value = risk.status === 'fulfilled' ? risk.value : []
+  classReports.value = reports.status === 'fulfilled' ? reports.value : []
   trendData.value = trends.status === 'fulfilled' ? trends.value : []
 
-  if (results.some((result) => result.status === 'rejected')) {
-    errorMessage.value =
-      'Some data could not be loaded from server. Showing available data only.'
+  const failed = results.some((r) => r.status === 'rejected')
+  if (failed) {
+    const accessDenied = results.find((r) => r.status === 'rejected' && isAccessError((r as PromiseRejectedResult).reason))
+    errorMessage.value = accessDenied
+      ? 'You do not have permission to view one or more sections of this dashboard.'
+      : 'Some data could not be loaded from server. Showing available data only.'
   }
 
   isLoading.value = false
@@ -165,8 +216,10 @@ const handleOpenDetail = async (attendanceId: number) => {
       status: latestFollowUp?.status || data.status || 'Not Contacted',
     }
     isModalOpen.value = true
-  } catch {
-    errorMessage.value = 'Failed to load attendance detail from server.'
+  } catch (error: any) {
+    errorMessage.value = isAccessError(error)
+      ? 'You do not have permission to view this attendance detail.'
+      : 'Failed to load attendance detail from server.'
   }
 }
 
@@ -181,9 +234,9 @@ const handleSubmitFollowUp = async () => {
 
     alert('Follow-up saved successfully!')
     isModalOpen.value = false
-    await fetchData()
-  } catch {
-    alert('Failed to save follow-up.')
+    fetchData()
+  } catch (error: any) {
+    alert(isAccessError(error) ? 'You do not have permission to update follow-ups.' : 'Failed to save follow-up.')
   }
 }
 
@@ -202,126 +255,33 @@ const handleSendAlert = async () => {
     }
 
     throw new Error('Alert failed')
-  } catch {
-    alert('Error sending alert.')
+  } catch (error: any) {
+    alert(isAccessError(error) ? 'You do not have permission to send alerts.' : 'Error sending alert.')
   }
 }
 
-const loadReportClasses = async () => {
-  const params = selectedReportAcademicYear.value
-    ? { academic_year_id: selectedReportAcademicYear.value }
-    : {}
-
-  const { data } = await api.get('/education/reports/classes', { params })
-  const rows = Array.isArray(data?.classes) ? data.classes : []
-
-  reportClasses.value = rows
-
-  if (!rows.some((item: EducationClassOption) => item.id === selectedReportClass.value)) {
-    selectedReportClass.value = rows[0]?.id ?? null
-  }
-}
-
-const loadReportRows = async (manageLoading = true) => {
-  if (manageLoading) {
-    reportLoading.value = true
-  }
-
-  reportError.value = ''
-
-  try {
-    const params: Record<string, number | string> = {
-      period: selectedReportPeriod.value,
-    }
-
-    if (selectedReportAcademicYear.value) {
-      params.academic_year_id = selectedReportAcademicYear.value
-    }
-
-    if (selectedReportClass.value) {
-      params.class_id = selectedReportClass.value
-    }
-
-    const { data } = await api.get('/education/reports/students', { params })
-    reportRows.value = Array.isArray(data?.rows) ? data.rows : []
-  } catch (error) {
-    console.error(error)
-    reportRows.value = []
-    reportError.value = 'Failed to load attendance reports.'
-  } finally {
-    if (manageLoading) {
-      reportLoading.value = false
-    }
-  }
-}
-
-const initializeReports = async () => {
-  if (reportInitialized.value) {
-    return
-  }
-
-  reportLoading.value = true
-  reportError.value = ''
-
-  try {
-    const { data } = await api.get('/education/reports/academic-years')
-    const years = Array.isArray(data?.academic_years) ? data.academic_years : []
-
-    academicYears.value = years
-    selectedReportAcademicYear.value =
-      data?.active_academic_year_id
-      ?? years.find((year: AcademicYearOption) => year.is_active)?.id
-      ?? years[0]?.id
-      ?? null
-
-    await loadReportClasses()
-    await loadReportRows(false)
-    reportInitialized.value = true
-  } catch (error) {
-    console.error(error)
-    reportError.value = 'Failed to initialize attendance reports.'
-    reportRows.value = []
-  } finally {
-    reportLoading.value = false
-  }
-}
-
-const handleReportAcademicYearChange = async (value: number | null) => {
-  selectedReportAcademicYear.value = value
-  selectedReportClass.value = null
-  await loadReportClasses()
-  await loadReportRows()
-}
-
-const handleReportClassChange = async (value: number | null) => {
-  selectedReportClass.value = value
-  await loadReportRows()
-}
-
-const handleReportPeriodChange = async (value: ReportPeriod) => {
-  selectedReportPeriod.value = value
-  await loadReportRows()
-}
-
-const handleExportCSV = () => {
-  const csv = [
-    ['No', 'Student', 'Code', 'Late', 'Absent'],
-    ...reportRows.value.map((row, index) => [
-      index + 1,
-      row.name,
-      row.student_code,
-      row.late_count,
-      row.absent_count,
-    ]),
-  ]
-    .map((entry) => entry.join(','))
-    .join('\n')
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+const downloadBlob = (blob: Blob, filename: string) => {
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
-  link.setAttribute('download', `education-attendance-report-${selectedReportPeriod.value}.csv`)
+  link.download = filename
   link.click()
+  URL.revokeObjectURL(link.href)
+}
+
+const handleExportReports = async () => {
+  errorMessage.value = ''
+  isExportingReports.value = true
+
+  try {
+    const blob = await dashboardService.exportClassSummary()
+    downloadBlob(blob, `education_class_summary_${new Date().toISOString().slice(0, 10)}.csv`)
+  } catch (error: any) {
+    errorMessage.value = isAccessError(error)
+      ? 'You do not have permission to export this report.'
+      : error?.message || 'Failed to export report.'
+  } finally {
+    isExportingReports.value = false
+  }
 }
 
 const persistActiveNav = (nav: string) => {
@@ -349,10 +309,6 @@ onMounted(() => {
   const params = new URLSearchParams(window.location.search)
   const attendanceId = params.get('attendanceId')
   if (attendanceId) handleOpenDetail(parseInt(attendanceId, 10))
-
-  if (activeNav.value === 'Reports') {
-    initializeReports()
-  }
 })
 
 watch(
@@ -373,10 +329,6 @@ watch(
 
 watch(activeNav, (nav) => {
   persistActiveNav(nav)
-
-  if (nav === 'Reports') {
-    initializeReports()
-  }
 })
 
 watch(
@@ -391,16 +343,11 @@ watch(
   },
   { immediate: true },
 )
-
-const handleLogout = async () => {
-  await authLogout()
-  router.push({ name: 'login' })
-}
 </script>
 
 <template>
   <div class="flex min-h-screen bg-slate-50">
-    <Sidebar v-model:activeNav="activeNav" :user="currentUser" @logout="handleLogout" />
+    <Sidebar v-model:activeNav="activeNav" :user="currentUser" />
 
     <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
       <Header
@@ -410,11 +357,49 @@ const handleLogout = async () => {
         v-model:isNotificationOpen="isNotificationOpen"
         v-model:isSettingsOpen="isSettingsOpen"
         v-model:isProfileOpen="isProfileOpen"
+        v-model:searchQuery="searchQuery"
         @setActiveNav="(val) => (activeNav = val)"
       />
 
       <div class="flex-1 overflow-y-auto p-8">
         <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-8">
+          <section class="rounded-3xl border border-slate-200 bg-white px-6 py-6 shadow-sm md:px-8">
+            <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div class="space-y-2">
+                <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
+                  Education Dashboard
+                </p>
+                <h2 class="text-3xl font-black tracking-tight text-slate-900">
+                  Welcome, {{ welcomeName }}
+                </h2>
+                <p class="max-w-2xl text-sm font-medium text-slate-500">
+                  Track attendance exceptions, follow-up workload, and student risk
+                  using the same streamlined workspace style as the Teacher portal.
+                </p>
+              </div>
+
+	          <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+	            <div class="xl:col-span-2 space-y-8">
+	              <TrendsChart :data="trendData" />
+              <AttendanceTable
+                title="Today's Absent Students"
+                :data="filteredAbsentToday"
+                :isLoading="isLoading"
+                @openDetail="handleOpenDetail"
+                @viewAll="activeNav = 'Absence Follow-up'"
+              />
+            </div>
+            <div>
+              <RiskStudents
+                :students="filteredRiskStudents"
+                @viewAll="activeNav = 'Risk Monitoring'"
+                @quickFollowUp="handleOpenDetail"
+              />
+	            </div>
+	          </div>
+	        </div>
+	      </section>
+
           <div
             v-if="errorMessage"
             class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
@@ -527,28 +512,11 @@ const handleLogout = async () => {
             :showDate="true"
           />
 
-          <div v-else-if="activeNav === 'Reports'" class="space-y-4">
-            <div
-              v-if="reportError"
-              class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
-            >
-              {{ reportError }}
-            </div>
-
-            <ReportsTable
-              :academicYears="academicYears"
-              :classes="reportClasses"
-              :rows="reportRows"
-              :selectedAcademicYear="selectedReportAcademicYear"
-              :selectedClass="selectedReportClass"
-              :selectedPeriod="selectedReportPeriod"
-              :isLoading="reportLoading"
-              @update:academicYear="handleReportAcademicYearChange"
-              @update:class="handleReportClassChange"
-              @update:period="handleReportPeriodChange"
-              @export="handleExportCSV"
-            />
-          </div>
+          <ReportsTable
+            v-else-if="activeNav === 'Reports'"
+            :reports="classReports"
+            @export="handleExportReports"
+          />
 
           <div
             v-else-if="activeNav === 'Risk Monitoring'"

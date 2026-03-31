@@ -29,11 +29,12 @@ return [
 
     'path' => '/',
 
-    'domain' => env('SESSION_DOMAIN', '.attendance-system-pnc.site'),
+    'domain' => env('SESSION_DOMAIN'),
 
-    'secure' => env('SESSION_SECURE_COOKIE', true),
+    'secure' => env('SESSION_SECURE_COOKIE'),
 
     'http_only' => true,
 
     'same_site' => 'lax',
+
 ];

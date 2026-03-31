@@ -15,21 +15,11 @@ return [
     |
     */
 
-    'stateful' => array_values(array_unique(array_filter([
-        ...explode(',', env('SANCTUM_STATEFUL_DOMAINS', '')),
-        'localhost',
-        'localhost:3000',
-        'localhost:4173',
-        'localhost:5173',
-        '127.0.0.1',
-        '127.0.0.1:4173',
-        '127.0.0.1:5173',
-        '127.0.0.1:8000',
-        '::1',
-        'attendance-system-pnc.site',
-        'https://attendance-system-pnc.site',
-        Sanctum::currentApplicationUrlWithPort(),
-    ]))),
+    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
+        '%s%s',
+        'localhost,localhost:3000,localhost:4173,localhost:5173,127.0.0.1,127.0.0.1:4173,127.0.0.1:5173,127.0.0.1:8000,::1',
+        Sanctum::currentApplicationUrlWithPort()
+    ))),
 
     /*
     |--------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import Modal from './Modal.vue'
 import ConfirmationModal from '../common/ConfirmationModal.vue'
-import { Search, Key, Power, UserPlus, CheckCircle } from 'lucide-vue-next'
+import { Search, Key, Pencil, Trash2, UserPlus, CheckCircle } from 'lucide-vue-next'
 import { userService } from '../../services/userService'
 import { setImageFallback } from '../../utils/imageFallback'
 
@@ -290,17 +290,17 @@ onMounted(loadData)
                 </button>
                 <button
                   @click="openEdit(user)"
-                  class="p-2 rounded-lg transition-all text-sky-500 hover:bg-sky-50"
+                  class="p-2 rounded-lg hover:bg-sky-50 text-sky-600"
                   title="Edit"
                 >
-                  <Power class="size-4" />
+                  <Pencil class="size-4" />
                 </button>
                 <button
                   @click="openDeleteModal(user)"
-                  class="p-2 rounded-lg transition-all text-red-500 hover:bg-red-50"
+                  class="p-2 rounded-lg hover:bg-rose-50 text-rose-600"
                   title="Delete"
                 >
-                  <Power class="size-4" />
+                  <Trash2 class="size-4" />
                 </button>
               </div>
             </td>

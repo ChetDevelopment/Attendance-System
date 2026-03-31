@@ -6,12 +6,10 @@ import {
   AlertTriangle,
   UserCircle,
   LogOut,
+  ChevronDown,
 } from 'lucide-vue-next'
-import { ref } from 'vue'
 import { cn } from '../../utils/cn'
-import { logout } from '../../services/auth'
 import { setImageFallback } from '../../utils/imageFallback'
-import LogoutModal from './LogoutModal.vue'
 
 defineProps<{
   activeNav: string
@@ -20,9 +18,8 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:activeNav', name: string): void
+  (e: 'logout'): void
 }>()
-
-const isLogoutModalOpen = ref(false)
 
 const navItems = [
   { name: 'Dashboard', icon: LayoutDashboard },
@@ -65,8 +62,8 @@ const navItems = [
     </nav>
 
     <div class="border-t border-slate-200 p-4">
-      <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-        <div class="flex items-center gap-3">
+      <div class="group relative">
+        <button class="flex w-full items-center gap-3 rounded-lg p-2 transition-all hover:bg-slate-50">
           <div class="flex size-10 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-slate-400">
             <img
               v-if="user?.avatar_url || user?.profile_image"
@@ -78,7 +75,7 @@ const navItems = [
             />
             <UserCircle v-else :size="20" />
           </div>
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 flex-1 text-left">
             <p class="truncate text-sm font-bold text-slate-900">
               {{ user?.name || 'Education Team' }}
             </p>
@@ -86,22 +83,20 @@ const navItems = [
               {{ user?.department || user?.role?.name || user?.role || 'Attendance Management' }}
             </p>
           </div>
+          <ChevronDown :size="14" class="text-slate-400" />
+        </button>
+
+        <!-- Dropdown Menu -->
+        <div class="absolute bottom-full left-0 z-50 mb-2 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl opacity-0 invisible transition-all group-hover:opacity-100 group-hover:visible">
+          <button
+            @click="emit('logout')"
+            class="flex w-full items-center gap-3 rounded-lg p-2 text-left text-rose-600 transition-colors hover:bg-rose-50"
+          >
+            <LogOut :size="16" />
+            <span class="text-xs font-bold">Logout</span>
+          </button>
         </div>
       </div>
-
-      <button
-        @click="isLogoutModalOpen = true"
-        class="mt-3 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50"
-      >
-        <LogOut :size="16" />
-        Logout
-      </button>
     </div>
-
-    <LogoutModal
-      :isOpen="isLogoutModalOpen"
-      @close="isLogoutModalOpen = false"
-      @confirm="logout"
-    />
   </aside>
 </template>

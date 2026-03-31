@@ -59,9 +59,9 @@
   </script>
 
   <template>
-    <div class="login-page flex min-h-[100dvh] w-full flex-col lg:flex-row bg-gradient-to-br from-blue-900 via-[#101922] to-slate-900 text-slate-100">
+    <div class="login-page flex min-h-screen w-full flex-col lg:flex-row bg-gradient-to-br from-blue-900 via-[#101922] to-slate-900 text-slate-100">
       <div
-        class="relative hidden lg:flex lg:w-1/2 xl:w-3/5 bg-cover bg-center overflow-hidden lg:min-h-[100dvh]"
+        class="relative hidden lg:flex lg:w-1/2 xl:w-3/5 bg-cover bg-center overflow-hidden lg:min-h-screen"
         style="background-image: url('/PictureUseInPageLogin.png')"
       >
         <div class="absolute inset-0 bg-gradient-to-t from-[#101922]/95 via-[#101922]/45 to-[#101922]/20"></div>
@@ -97,10 +97,9 @@
       </div>
 
       <div class="login-panel relative flex flex-1 flex-col items-center justify-center p-5 md:p-8 lg:p-8 xl:p-10 bg-gradient-to-br from-slate-800 via-[#101922] to-blue-950 overflow-hidden">
-        <div class="absolute inset-0 lg:hidden bg-cover bg-center opacity-30" style="background-image: url('/PictureUseInPageLogin.png')"></div>
-        <div class="absolute inset-0 lg:hidden bg-[#101922]/75"></div>
+        <div class="absolute inset-0 lg:hidden bg-cover bg-center bg-[#101922]/80" style="background-image: url('/PictureUseInPageLogin.png')"></div>
 
-        <div class="login-card relative z-10 w-full max-w-[440px] space-y-6 py-4 lg:py-6">
+        <div class="login-card relative z-20 w-full max-w-[440px] space-y-6 py-4 lg:py-6">
           <div class="lg:hidden flex flex-col items-center text-center mb-6">
             <div class="h-16 w-auto bg-white/10 p-3 rounded-2xl mb-4 flex items-center justify-center">
               <img
@@ -134,7 +133,7 @@
                   type="email"
                   required
                   placeholder="you@example.com"
-                  class="form-input block w-full pl-11 pr-4 py-3.5 bg-[#1c2127] border border-[#3b4754] rounded-xl text-white placeholder:text-[#9dabb9] focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+                  class="form-input block w-full pl-11 pr-4 py-3.5 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
                 />
               </div>
             </div>
@@ -153,7 +152,7 @@
                   :type="showPassword ? 'text' : 'password'"
                   required
                   placeholder="********"
-                  class="form-input block w-full pl-11 pr-12 py-3.5 bg-[#1c2127] border border-[#3b4754] rounded-xl text-white placeholder:text-[#9dabb9] focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+                  class="form-input block w-full pl-11 pr-12 py-3.5 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
                 />
                 <button
                   type="button"
@@ -171,7 +170,7 @@
                 id="remember"
                 v-model="form.remember"
                 type="checkbox"
-                class="size-5 rounded border-slate-700 text-primary focus:ring-primary focus:ring-offset-[#101922] bg-[#1c2127]"
+                class="size-5 rounded border-slate-700 text-primary focus:ring-primary focus:ring-offset-slate-900 bg-slate-800"
               />
               <label class="text-sm font-medium text-slate-400 cursor-pointer" for="remember">
                 Keep me logged in for 30 days
@@ -195,7 +194,7 @@
               <div class="w-full border-t border-slate-800"></div>
             </div>
             <div class="relative flex justify-center text-xs uppercase">
-              <span class="bg-[#101922] px-4 text-slate-500 font-semibold tracking-widest">Help &amp; Support</span>
+              <span class="bg-slate-900 px-4 text-slate-500 font-semibold tracking-widest">Help &amp; Support</span>
             </div>
           </div>
 
@@ -204,7 +203,7 @@
               href="https://t.me/Sopheak_CHIM"
               target="_blank"
               rel="noopener noreferrer"
-              class="flex items-center justify-center gap-3 w-full py-3 px-4 border border-slate-800 rounded-xl bg-[#1c2127] hover:bg-slate-800/50 transition-colors text-slate-300 font-medium"
+              class="flex items-center justify-center gap-3 w-full py-3 px-4 border border-slate-800 rounded-xl bg-slate-800 hover:bg-slate-700/50 transition-colors text-slate-300 font-medium"
             >
               <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.696.064-1.225-.46-1.901-.903-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.751-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
@@ -228,53 +227,4 @@
     </div>
   </template>
 
-  <style scoped>
-  @media (min-width: 1024px) and (max-height: 860px) {
-    .login-card {
-      max-width: 410px;
-      gap: 0.85rem;
-      padding-top: 0.5rem;
-      padding-bottom: 0.5rem;
-    }
 
-    .login-head h2 {
-      font-size: 1.35rem;
-      line-height: 1.3;
-    }
-
-    .login-head p {
-      font-size: 0.85rem;
-    }
-
-    .login-form {
-      gap: 0.8rem;
-    }
-
-    .form-input {
-      padding-top: 0.6rem;
-      padding-bottom: 0.6rem;
-    }
-
-    .login-submit {
-      padding-top: 0.75rem;
-      padding-bottom: 0.75rem;
-    }
-
-    .support-section {
-      padding-top: 0.35rem;
-      padding-bottom: 0.35rem;
-    }
-
-    .login-footer {
-      padding-top: 0.2rem;
-      padding-bottom: 0.2rem;
-      gap: 0.45rem;
-    }
-
-    .login-footer p,
-    .login-footer a,
-    .login-footer span {
-      font-size: 0.65rem;
-    }
-  }
-  </style>

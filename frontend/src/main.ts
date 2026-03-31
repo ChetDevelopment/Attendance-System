@@ -13,4 +13,4 @@ const initDarkMode = () => {
 
 initDarkMode();
 
-createApp(App).use(router).mount('#root');
+createApp(App).use(router).mount('#app');

@@ -9,7 +9,7 @@ import {
   Upload,
   QrCode,
   Printer,
-  Edit3,
+  Pencil,
   Trash2,
   LayoutGrid,
   List,
@@ -107,7 +107,6 @@ const searchQuery = ref('');
 const academicYearFilter = ref('All Years');
 const classFilter = ref('All Classes');
 const subjectFilter = ref('All Subjects');
-const sectionFilter = ref('All Sections');
 const viewMode = ref<'table' | 'grid'>('table');
 const studentsPerPage = 12;
 const currentPage = ref(1);
@@ -135,6 +134,16 @@ const classOptions = computed(() =>
     academicYearId: item.academic_year_id,
   }))
 );
+
+// Filtered class options based on selected academic year
+const filteredClassOptions = computed(() => {
+  if (academicYearFilter.value === 'All Years') {
+    return classOptions.value;
+  }
+  
+  const selectedYearId = Number(academicYearFilter.value);
+  return classOptions.value.filter(item => item.academicYearId === selectedYearId);
+});
 
 const academicYearOptions = computed(() => [
   { id: 'All Years', name: 'All Years' },
@@ -180,15 +189,6 @@ const subjectOptions = computed(() => {
       .filter(Boolean)
   );
   return ['All Subjects', ...Array.from(set).sort()];
-});
-
-const sectionOptions = computed(() => {
-  const set = new Set(
-    classOptions.value
-      .map((item) => String(item.name || '').trim())
-      .filter(Boolean)
-  );
-  return ['All Sections', ...Array.from(set).sort()];
 });
 
 const toUiStudent = (student: BackendStudent): Student => {
@@ -249,10 +249,6 @@ const buildStudentFilters = () => {
     filters.generation = subjectFilter.value;
   }
 
-  if (sectionFilter.value !== 'All Sections') {
-    filters.section = sectionFilter.value;
-  }
-
   if (classFilter.value !== 'All Classes') {
     const selected = classOptions.value.find((item) => item.name === classFilter.value);
     if (selected) {
@@ -264,19 +260,32 @@ const buildStudentFilters = () => {
 };
 
 const loadStudents = async () => {
-  const response = await studentService.getStudents(
-    currentPage.value,
-    studentsPerPage,
-    buildStudentFilters()
-  );
-  const batch = normalizeStudentData(response);
+  loading.value = true;
+  errorMessage.value = '';
+  
+  try {
+    const response = await studentService.getStudents(
+      currentPage.value,
+      studentsPerPage,
+      buildStudentFilters()
+    );
+    const batch = normalizeStudentData(response);
 
-  students.value = batch.map(toUiStudent);
-  totalStudents.value = Number(response?.total || batch.length || 0);
-  totalPages.value = Math.max(Number(response?.last_page || 1), 1);
+    students.value = batch.map(toUiStudent);
+    totalStudents.value = Number(response?.total || batch.length || 0);
+    totalPages.value = Math.max(Number(response?.last_page || 1), 1);
 
-  if (batch.length === 0 && totalStudents.value > 0 && currentPage.value > totalPages.value) {
-    currentPage.value = totalPages.value;
+    if (batch.length === 0 && totalStudents.value > 0 && currentPage.value > totalPages.value) {
+      currentPage.value = totalPages.value;
+    }
+  } catch (error) {
+    console.error('Failed to load students:', error);
+    errorMessage.value = error?.message || 'Failed to load students from backend.';
+    students.value = [];
+    totalStudents.value = 0;
+    totalPages.value = 1;
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -299,12 +308,14 @@ const loadData = async () => {
   loading.value = true;
   errorMessage.value = '';
   try {
-    await Promise.all([loadStudents(), loadClasses(), loadAcademicYears()]);
+    await Promise.all([loadClasses(), loadAcademicYears()]);
+    await loadStudents();
     if (!newStudent.value.class && classOptions.value.length > 0) {
       newStudent.value.class = classOptions.value[0].name;
       newStudent.value.classId = String(classOptions.value[0].id);
     }
   } catch (error: any) {
+    console.error('Failed to load data:', error);
     errorMessage.value = error?.message || 'Failed to load students from backend.';
   } finally {
     loading.value = false;
@@ -699,12 +710,17 @@ const paginatedStudents = computed(() => students.value);
 let studentReloadDebounce: ReturnType<typeof setTimeout> | null = null;
 
 // Removed manual debounce - global API loading + reactivity handles this
-watch([searchQuery, academicYearFilter, classFilter, subjectFilter, sectionFilter], async () => {
+watch([searchQuery, academicYearFilter, classFilter, subjectFilter], async () => {
   if (currentPage.value !== 1) {
     currentPage.value = 1;
     return;
   }
   await loadStudents();
+});
+
+// Reset class filter when academic year changes
+watch(academicYearFilter, () => {
+  classFilter.value = 'All Classes';
 });
 
 watch(currentPage, () => {
@@ -790,6 +806,16 @@ onMounted(async () => {
 
     <p v-if="errorMessage" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ errorMessage }}</p>
 
+    <!-- Debug Info (remove after fixing) -->
+    <div v-if="!loading" class="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-700">
+      <strong>Debug Info:</strong> 
+      Students loaded: {{ students.length }} | 
+      Total: {{ totalStudents }} | 
+      Academic Year Filter: {{ academicYearFilter }} | 
+      Class Filter: {{ classFilter }} |
+      Filtered Classes Available: {{ filteredClassOptions.length }}
+    </div>
+
     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden relative">
       <!-- Loading Progress Bar -->
       <div v-if="loading" class="absolute top-0 left-0 right-0 h-0.5 bg-primary/10 overflow-hidden z-10">
@@ -818,13 +844,10 @@ onMounted(async () => {
             class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 min-w-[140px]"
           >
             <option>All Classes</option>
-            <option v-for="item in classOptions" :key="item.id" :value="item.name">{{ item.name }}</option>
+            <option v-for="item in filteredClassOptions" :key="item.id" :value="item.name">{{ item.name }}</option>
           </select>
           <select v-model="subjectFilter" class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 min-w-[140px]">
             <option v-for="subject in subjectOptions" :key="subject" :value="subject">{{ subject }}</option>
-          </select>
-          <select v-model="sectionFilter" class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 min-w-[140px]">
-            <option v-for="section in sectionOptions" :key="section" :value="section">{{ section }}</option>
           </select>
           <button @click="handlePrint" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-all" title="Print List">
             <Printer class="size-4 text-slate-500" />
@@ -866,7 +889,10 @@ onMounted(async () => {
           <tr v-if="loading && students.length === 0">
             <td :colspan="5" class="px-6 py-10 text-center text-slate-400 italic">Loading students...</td>
           </tr>
-          <tr v-for="s in paginatedStudents" :key="s.dbId || s.id" class="hover:bg-slate-50 transition-colors" :class="{ 'opacity-50 pointer-events-none': loading }">
+          <tr v-else-if="!loading && students.length === 0">
+            <td :colspan="5" class="px-6 py-10 text-center text-slate-400 italic">No students found matching your criteria.</td>
+          </tr>
+          <tr v-else v-for="s in paginatedStudents" :key="s.dbId || s.id" class="hover:bg-slate-50 transition-colors" :class="{ 'opacity-50 pointer-events-none': loading }">
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
                 <div class="size-8 rounded-full bg-slate-100 overflow-hidden">
@@ -904,14 +930,14 @@ onMounted(async () => {
                 </button>
                 <button
                   @click="openEditStudent(s)"
-                  class="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg"
+                  class="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg"
                   title="Edit"
                 >
-                  <Edit3 class="size-4" />
+                  <Pencil class="size-4" />
                 </button>
                 <button
                   @click="openDeleteModal(s)"
-                  class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                  class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
                   title="Delete"
                 >
                   <Trash2 class="size-4" />
@@ -925,10 +951,10 @@ onMounted(async () => {
       <div v-else class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 bg-slate-50/30">
         <div v-for="s in paginatedStudents" :key="s.dbId || s.id" class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
           <div class="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-            <button @click="openEditStudent(s)" class="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-primary shadow-sm">
-              <Edit3 class="size-3.5" />
+            <button @click="openEditStudent(s)" class="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-sky-600 shadow-sm">
+              <Pencil class="size-3.5" />
             </button>
-            <button @click="openDeleteModal(s)" class="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-red-500 shadow-sm">
+            <button @click="openDeleteModal(s)" class="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-rose-600 shadow-sm">
               <Trash2 class="size-3.5" />
             </button>
           </div>

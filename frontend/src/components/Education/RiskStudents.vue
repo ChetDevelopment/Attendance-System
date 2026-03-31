@@ -22,7 +22,11 @@ const emit = defineEmits<{
         VIEW ALL
       </button>
     </div>
-    <div class="space-y-3">
+    <div v-if="students.length === 0" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-10 text-center">
+      <p class="text-sm font-semibold text-slate-600">No high-risk students found.</p>
+      <p class="mt-1 text-xs font-medium text-slate-500">You're all caught up.</p>
+    </div>
+    <div v-else class="space-y-3">
       <div 
         v-for="(student, i) in students" 
         :key="i" 
@@ -45,6 +49,7 @@ const emit = defineEmits<{
     </div>
     <button 
       @click="emit('viewAll')"
+      v-if="students.length > 0"
       class="group mt-6 flex w-full items-center justify-center gap-2 py-3 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500 transition-all hover:text-primary"
     >
       VIEW DETAILED ANALYSIS 

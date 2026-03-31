@@ -91,6 +91,39 @@ const welcomeRole = computed(() => {
   return 'Education Team'
 })
 
+const pageTitle = computed(() => {
+  if (activeNav.value === 'Dashboard') return `Welcome, ${welcomeName.value}`
+  return activeNav.value
+})
+
+const pageDescription = computed(() => {
+  if (activeNav.value === 'Dashboard') {
+    return 'Monitor attendance exceptions, follow-up workload, and student risk in one place.'
+  }
+
+  if (activeNav.value === 'Absence Follow-up') {
+    return 'Review absences, open a case, and keep follow-up notes up to date.'
+  }
+
+  if (activeNav.value === 'Reports') {
+    return 'Class-level attendance summary and export tools.'
+  }
+
+  if (activeNav.value === 'Risk Monitoring') {
+    return 'Identify high-risk students and start follow-ups quickly.'
+  }
+
+  if (activeNav.value === 'My Profile') {
+    return 'Manage your profile information.'
+  }
+
+  if (activeNav.value === 'Account Settings') {
+    return 'Update account preferences and security.'
+  }
+
+  return ''
+})
+
 const followUpForm = ref({
   reason: '',
   comment: '',
@@ -346,7 +379,7 @@ watch(
 </script>
 
 <template>
-  <div class="flex min-h-screen bg-slate-50">
+  <div class="flex min-h-screen bg-background-light">
     <Sidebar v-model:activeNav="activeNav" :user="currentUser" />
 
     <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -361,44 +394,42 @@ watch(
         @setActiveNav="(val) => (activeNav = val)"
       />
 
-      <div class="flex-1 overflow-y-auto p-8">
-        <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-8">
-          <section class="rounded-3xl border border-slate-200 bg-white px-6 py-6 shadow-sm md:px-8">
-            <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+      <div class="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+        <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
+          <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/7 via-transparent to-emerald-500/10" />
+            <div class="relative flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div class="space-y-2">
-                <p class="text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
-                  Education Dashboard
+                <p class="inline-flex w-fit items-center rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.28em] text-primary">
+                  Education Workspace
                 </p>
                 <h2 class="text-3xl font-black tracking-tight text-slate-900">
-                  Welcome, {{ welcomeName }}
+                  {{ pageTitle }}
                 </h2>
                 <p class="max-w-2xl text-sm font-medium text-slate-500">
-                  Track attendance exceptions, follow-up workload, and student risk
-                  using the same streamlined workspace style as the Teacher portal.
+                  {{ pageDescription }}
+                </p>
+                <p class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                  Signed in as {{ welcomeRole }}
                 </p>
               </div>
 
-	          <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
-	            <div class="xl:col-span-2 space-y-8">
-	              <TrendsChart :data="trendData" />
-              <AttendanceTable
-                title="Today's Absent Students"
-                :data="filteredAbsentToday"
-                :isLoading="isLoading"
-                @openDetail="handleOpenDetail"
-                @viewAll="activeNav = 'Absence Follow-up'"
-              />
+              <div v-if="activeNav === 'Dashboard'" class="flex flex-wrap items-center gap-3">
+                <button
+                  @click="fetchData"
+                  class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50"
+                >
+                  Refresh dashboard
+                </button>
+                <button
+                  @click="activeNav = 'Absence Follow-up'"
+                  class="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-lg shadow-primary/15 transition-all hover:-translate-y-0.5 hover:bg-primary/95"
+                >
+                  Open follow-ups
+                </button>
+              </div>
             </div>
-            <div>
-              <RiskStudents
-                :students="filteredRiskStudents"
-                @viewAll="activeNav = 'Risk Monitoring'"
-                @quickFollowUp="handleOpenDetail"
-              />
-	            </div>
-	          </div>
-	        </div>
-	      </section>
+          </section>
 
           <div
             v-if="errorMessage"
@@ -407,8 +438,8 @@ watch(
             {{ errorMessage }}
           </div>
 
-          <div v-if="activeNav === 'Dashboard'" class="space-y-8">
-            <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div v-if="activeNav === 'Dashboard'" class="space-y-6">
+            <div class="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-4">
               <StatsCard
                 label="Today Absent"
                 :value="dashboardStats.absentToday"
@@ -445,12 +476,12 @@ watch(
               />
             </div>
 
-            <div class="grid grid-cols-1 gap-8 xl:grid-cols-3">
-              <div class="space-y-8 xl:col-span-2">
+            <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+              <div class="space-y-6 xl:col-span-2">
                 <TrendsChart :data="trendData" />
                 <AttendanceTable
                   title="Today's Absent Students"
-                  :data="absentToday"
+                  :data="filteredAbsentToday"
                   :isLoading="isLoading"
                   @openDetail="handleOpenDetail"
                   @viewAll="activeNav = 'Absence Follow-up'"
@@ -458,44 +489,35 @@ watch(
               </div>
 
               <div class="space-y-6">
-                <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h3 class="text-lg font-black text-slate-900">Operations Snapshot</h3>
-                  <p class="mt-2 text-sm text-slate-500">
-                    A quick summary of today's workload for the education team.
-                  </p>
+                <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-slate-50" />
+                  <div class="relative">
+                    <h3 class="text-lg font-black text-slate-900">Operations Snapshot</h3>
+                    <p class="mt-2 text-sm font-medium text-slate-500">
+                      Quick numbers for today’s team workload.
+                    </p>
 
-                  <div class="mt-6 space-y-4">
-                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <span class="text-sm font-semibold text-slate-600">
-                        New absence cases
-                      </span>
-                      <span class="text-lg font-black text-slate-900">
-                        {{ dashboardStats.absentToday }}
-                      </span>
-                    </div>
+                    <div class="mt-6 space-y-3">
+                      <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                        <span class="text-sm font-semibold text-slate-600">New absence cases</span>
+                        <span class="text-lg font-black text-slate-900">{{ dashboardStats.absentToday }}</span>
+                      </div>
 
-                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <span class="text-sm font-semibold text-slate-600">
-                        Cases waiting follow-up
-                      </span>
-                      <span class="text-lg font-black text-slate-900">
-                        {{ dashboardStats.pendingFollowUp }}
-                      </span>
-                    </div>
+                      <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                        <span class="text-sm font-semibold text-slate-600">Waiting follow-up</span>
+                        <span class="text-lg font-black text-slate-900">{{ dashboardStats.pendingFollowUp }}</span>
+                      </div>
 
-                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <span class="text-sm font-semibold text-slate-600">
-                        High-risk students
-                      </span>
-                      <span class="text-lg font-black text-rose-600">
-                        {{ dashboardStats.highRisk }}
-                      </span>
+                      <div class="flex items-center justify-between rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                        <span class="text-sm font-semibold text-rose-700">High-risk students</span>
+                        <span class="text-lg font-black text-rose-700">{{ dashboardStats.highRisk }}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </section>
 
                 <RiskStudents
-                  :students="riskStudents"
+                  :students="filteredRiskStudents"
                   @viewAll="activeNav = 'Risk Monitoring'"
                   @quickFollowUp="handleOpenDetail"
                 />
@@ -506,7 +528,7 @@ watch(
           <AttendanceTable
             v-else-if="activeNav === 'Absence Follow-up'"
             title="Absence Follow-up Module"
-            :data="allAbsent"
+            :data="filteredAllAbsent"
             :isLoading="isLoading"
             @openDetail="handleOpenDetail"
             :showDate="true"
@@ -514,7 +536,8 @@ watch(
 
           <ReportsTable
             v-else-if="activeNav === 'Reports'"
-            :reports="classReports"
+            :reports="filteredClassReports"
+            :isExporting="isExportingReports"
             @export="handleExportReports"
           />
 
@@ -525,7 +548,7 @@ watch(
             <h3 class="mb-6 text-lg font-black text-slate-900">Risk Students Monitoring</h3>
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
               <div
-                v-for="(student, index) in riskStudents"
+                v-for="(student, index) in filteredRiskStudents"
                 :key="index"
                 class="space-y-4 rounded-3xl border border-rose-100 bg-rose-50/70 p-6"
               >

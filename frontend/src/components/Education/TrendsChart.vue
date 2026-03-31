@@ -21,7 +21,12 @@ const maxValue = computed(() => Math.max(...props.data.map((item) => item.value)
       </select>
     </div>
 
-    <div class="flex h-[240px] items-end gap-3 border-t border-slate-100 pt-6">
+    <div v-if="data.length === 0" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-12 text-center">
+      <p class="text-sm font-semibold text-slate-600">No trend data available.</p>
+      <p class="mt-1 text-xs font-medium text-slate-500">Try refreshing or check permissions.</p>
+    </div>
+
+    <div v-else class="flex h-[240px] items-end gap-3 border-t border-slate-100 pt-6">
       <div
         v-for="(item, index) in data"
         :key="`${item.name}-${index}`"
@@ -29,7 +34,7 @@ const maxValue = computed(() => Math.max(...props.data.map((item) => item.value)
       >
         <span class="text-[10px] font-semibold text-primary">{{ item.value }}</span>
         <div
-          class="w-full rounded-t-md bg-primary transition-all"
+          class="w-full rounded-t-md bg-gradient-to-t from-primary to-pnc-blue transition-all"
           :style="{ height: `${Math.max((item.value / maxValue) * 180, 8)}px` }"
         />
         <span class="text-[11px] font-semibold text-slate-600">{{ item.name }}</span>

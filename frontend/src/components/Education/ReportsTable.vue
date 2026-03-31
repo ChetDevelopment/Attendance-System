@@ -24,7 +24,7 @@ const calculatePercentage = (report: ClassReport) => {
       <button 
         @click="emit('export')"
         :disabled="isExporting"
-        class="px-4 py-2 bg-[#135bec] text-white text-xs font-bold rounded-xl hover:bg-[#135bec]/90 transition-all flex items-center gap-2"
+        class="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-lg shadow-primary/15 transition-all hover:bg-primary/95 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <FileText :size="16" />
         {{ isExporting ? 'Exporting...' : 'Export CSV' }}
@@ -42,6 +42,11 @@ const calculatePercentage = (report: ClassReport) => {
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
+          <tr v-if="reports.length === 0">
+            <td colspan="5" class="px-6 py-12 text-center text-sm font-medium text-slate-400">
+              No report data available.
+            </td>
+          </tr>
           <tr v-for="(report, i) in reports" :key="i" class="transition-colors hover:bg-slate-50/60">
             <td class="px-6 py-4 font-bold text-slate-900">{{ report.class }}</td>
             <td class="px-6 py-4">

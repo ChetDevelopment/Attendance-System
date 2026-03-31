@@ -8,6 +8,7 @@ import {
   LogOut,
 } from 'lucide-vue-next'
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { cn } from '../../utils/cn'
 import { logout } from '../../services/auth'
 import { setImageFallback } from '../../utils/imageFallback'
@@ -22,7 +23,22 @@ const emit = defineEmits<{
   (e: 'update:activeNav', name: string): void
 }>()
 
+const router = useRouter()
 const isLogoutModalOpen = ref(false)
+const isLoggingOut = ref(false)
+
+const handleLogout = async () => {
+  if (isLoggingOut.value) return
+
+  isLoggingOut.value = true
+  try {
+    await logout()
+    isLogoutModalOpen.value = false
+    await router.replace({ name: 'login' })
+  } finally {
+    isLoggingOut.value = false
+  }
+}
 
 const navItems = [
   { name: 'Dashboard', icon: LayoutDashboard },
@@ -100,8 +116,9 @@ const navItems = [
 
     <LogoutModal
       :isOpen="isLogoutModalOpen"
+      :isLoading="isLoggingOut"
       @close="isLogoutModalOpen = false"
-      @confirm="logout"
+      @confirm="handleLogout"
     />
   </aside>
 </template>

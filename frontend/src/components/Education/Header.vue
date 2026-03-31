@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   Search,
   Bell,
@@ -34,7 +35,9 @@ const emit = defineEmits<{
   (e: 'setActiveNav', val: string): void;
 }>();
 
+const router = useRouter();
 const isLogoutModalOpen = ref(false);
+const isLoggingOut = ref(false);
 const user = ref<any>(props.user ?? null);
 const notifications = ref<any[]>([]);
 const unreadCount = ref(0);
@@ -90,6 +93,19 @@ watch(
     }
   },
 );
+
+const handleLogout = async () => {
+  if (isLoggingOut.value) return;
+
+  isLoggingOut.value = true;
+  try {
+    await logout();
+    isLogoutModalOpen.value = false;
+    await router.replace({ name: 'login' });
+  } finally {
+    isLoggingOut.value = false;
+  }
+};
 </script>
 
 <template>
@@ -318,8 +334,9 @@ watch(
 
     <LogoutModal
       :isOpen="isLogoutModalOpen"
+      :isLoading="isLoggingOut"
       @close="isLogoutModalOpen = false"
-      @confirm="logout"
+      @confirm="handleLogout"
     />
   </header>
 </template>

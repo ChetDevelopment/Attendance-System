@@ -21,6 +21,7 @@ return [
 
     'allowed_origins' => array_values(array_unique(array_filter([
         env('FRONTEND_URL', 'http://127.0.0.1:5173'),
+        'https://attendance-system-pnc.site',
         'http://localhost:3000',
         'http://127.0.0.1:3000',
         'http://localhost:5173',
@@ -37,6 +38,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    'supports_credentials' => true,
 
 ];

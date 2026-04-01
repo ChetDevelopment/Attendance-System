@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AbsenceNotification;
 use App\Models\AttendanceFollowUp;
 use App\Models\AttendanceRecord;
+use App\Models\Student;
 use App\Services\ActivityLogService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -35,6 +36,72 @@ class EducationDashboardController extends Controller
         }
 
         return rtrim(config('app.frontend_url', 'http://localhost:3000'), '/') . '/' . ltrim($photo, '/');
+    }
+
+    public function classAttendanceReport(Request $request)
+    {
+        $period = $request->input('period', 'today');
+        $academicYearId = $request->input('academic_year_id');
+        $classId = $request->input('class_id');
+        
+        $startDate = match($period) {
+            'weekly' => now()->subDays(7)->toDateString(),
+            'monthly' => now()->subDays(30)->toDateString(),
+            default => now()->toDateString(),
+        };
+        
+        $query = DB::table('attendance_records as ar')
+            ->join('students as s', 's.id', '=', 'ar.student_id')
+            ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
+            ->where(function ($q) use ($startDate, $period) {
+                if ($period === 'today') {
+                    $q->whereDate('ar.attendance_date', now()->toDateString())
+                        ->orWhere(function ($fallback) {
+                            $fallback->whereNull('ar.attendance_date')
+                                ->whereDate('ar.date', now()->toDateString());
+                        });
+                } else {
+                    $q->whereDate('ar.attendance_date', '>=', $startDate)
+                        ->orWhere(function ($fallback) use ($startDate) {
+                            $fallback->whereNull('ar.attendance_date')
+                                ->whereDate('ar.date', '>=', $startDate);
+                        });
+                }
+            });
+        
+        if ($classId) {
+            $query->where('s.class_id', $classId);
+        }
+        
+        if ($academicYearId) {
+            $query->where('s.academic_year_id', $academicYearId);
+        }
+        
+        $students = $query
+            ->selectRaw("
+                s.id as student_id,
+                COALESCE(s.fullname, CONCAT(s.first_name, ' ', s.last_name)) as name,
+                s.username as code,
+                s.profile as photo,
+                c.class_name as class_name,
+                SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count,
+                SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count
+            ")
+            ->groupBy('s.id', 's.fullname', 's.first_name', 's.last_name', 's.username', 's.profile', 'c.class_name')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($student, $index) {
+                return [
+                    'no' => $index + 1,
+                    'name' => $student->name,
+                    'code' => $student->code,
+                    'photo' => $this->buildStudentPhotoUrl((object) ['profile' => $student->photo]),
+                    'late_count' => (int) $student->late_count,
+                    'absent_count' => (int) $student->absent_count,
+                ];
+            });
+        
+        return response()->json($students);
     }
 
     public function stats()
@@ -186,25 +253,122 @@ class EducationDashboardController extends Controller
         return response()->json($rows);
     }
 
-    public function classReports()
+    public function classReports(Request $request)
     {
-        $studentClassColumn = Schema::hasColumn('students', 'class') ? 's.class' : 'NULL';
-        $classExpression = "COALESCE(c.name, c.class_name, {$studentClassColumn}, 'Unknown Class')";
-
-        $rows = DB::table('attendance_records as ar')
+        $period = $request->input('period', 'today');
+        $academicYearId = $request->input('academic_year_id');
+        $classId = $request->input('class_id');
+        
+        $startDate = match($period) {
+            'weekly' => now()->subDays(7)->toDateString(),
+            'monthly' => now()->subDays(30)->toDateString(),
+            default => now()->toDateString(),
+        };
+        
+        $query = DB::table('attendance_records as ar')
             ->join('students as s', 's.id', '=', 'ar.student_id')
             ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
+            ->where(function ($q) use ($startDate, $period) {
+                if ($period === 'today') {
+                    $q->whereDate('ar.attendance_date', now()->toDateString())
+                        ->orWhere(function ($fallback) {
+                            $fallback->whereNull('ar.attendance_date')
+                                ->whereDate('ar.date', now()->toDateString());
+                        });
+                } else {
+                    $q->whereDate('ar.attendance_date', '>=', $startDate)
+                        ->orWhere(function ($fallback) use ($startDate) {
+                            $fallback->whereNull('ar.attendance_date')
+                                ->whereDate('ar.date', '>=', $startDate);
+                        });
+                }
+            });
+        
+        if ($classId) {
+            $query->where('s.class_id', $classId);
+        }
+        
+        if ($academicYearId) {
+            $query->where('s.academic_year_id', $academicYearId);
+        }
+        
+        $rows = $query
             ->selectRaw("
-                {$classExpression} as class,
+                COALESCE(c.class_name, s.class, 'Unknown Class') as class,
                 SUM(CASE WHEN LOWER(ar.status) = 'present' THEN 1 ELSE 0 END) as present_count,
                 SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count,
                 SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count
             ")
-            ->groupByRaw($classExpression)
-            ->orderByRaw($classExpression)
-            ->get();
-
+            ->groupByRaw("COALESCE(c.class_name, s.class, 'Unknown Class')")
+            ->orderByRaw("COALESCE(c.class_name, s.class, 'Unknown Class')")
+            ->get()
+            ->map(function ($row) {
+                $total = (int) $row->present_count + (int) $row->absent_count + (int) $row->late_count;
+                return [
+                    'class' => $row->class,
+                    'present_count' => (int) $row->present_count,
+                    'absent_count' => (int) $row->absent_count,
+                    'late_count' => (int) $row->late_count,
+                    'total' => $total,
+                ];
+            });
+        
         return response()->json($rows);
+    }
+
+    public function reportAcademicYears()
+    {
+        $years = DB::table('academic_years')
+            ->select('id', 'name')
+            ->orderBy('start_date', 'desc')
+            ->get()
+            ->map(fn($y) => ['id' => (string) $y->id, 'name' => $y->name]);
+        
+        return response()->json($years);
+    }
+
+    public function reportClasses()
+    {
+        $classes = DB::table('classes')
+            ->select('id', 'name', 'class_name')
+            ->orderBy('name')
+            ->get()
+            ->map(fn($c) => ['id' => (string) ($c->id ?? $c->name), 'name' => $c->class_name ?? $c->name]);
+        
+        return response()->json($classes);
+    }
+
+    public function reportStudents(Request $request)
+    {
+        $classId = $request->input('class_id');
+        $academicYearId = $request->input('academic_year_id');
+        
+        $query = Student::query()
+            ->with('schoolClass:id,name,class_name');
+        
+        if ($classId) {
+            $query->where('class_id', $classId);
+        }
+        
+        if ($academicYearId) {
+            $query->where('academic_year_id', $academicYearId);
+        }
+        
+        $students = $query
+            ->select('id', 'fullname', 'first_name', 'last_name', 'username', 'class_id')
+            ->orderBy('fullname')
+            ->limit(100)
+            ->get()
+            ->map(function ($s) {
+                return [
+                    'id' => $s->id,
+                    'name' => $s->fullname ?? trim(($s->first_name ?? '') . ' ' . ($s->last_name ?? '')),
+                    'code' => $s->username,
+                    'class' => $s->schoolClass?->class_name ?? $s->schoolClass?->name ?? 'Unknown',
+                ];
+            });
+        
+        return response()->json($students);
     }
 
     public function exportClassReports()

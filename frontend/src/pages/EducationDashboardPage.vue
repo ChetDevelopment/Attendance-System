@@ -12,6 +12,7 @@ import AttendanceTable from '../components/Education/AttendanceTable.vue'
 import RiskStudents from '../components/Education/RiskStudents.vue'
 import FollowUpModal from '../components/Education/FollowUpModal.vue'
 import ReportsTable from '../components/Education/ReportsTable.vue'
+import ClassAttendanceReport from '../components/Education/ClassAttendanceReport.vue'
 import ProfileView from '../components/Education/ProfileView.vue'
 import AccountSettingsView from '../components/Education/AccountSettingsView.vue'
 import { DashboardStats, TrendData, ClassReport } from '../components/Education/types'
@@ -65,6 +66,7 @@ const absentToday = ref<any[]>([])
 const allAbsent = ref<any[]>([])
 const riskStudents = ref<any[]>([])
 const classReports = ref<ClassReport[]>([])
+const classAttendanceStudents = ref<any[]>([])
 const trendData = ref<TrendData[]>([])
 const isLoading = ref(true)
 const errorMessage = ref('')
@@ -75,6 +77,10 @@ const isSettingsOpen = ref(false)
 const isProfileOpen = ref(false)
 const searchQuery = ref('')
 const isExportingReports = ref(false)
+
+// Dropdown options for Class Attendance Report
+const reportAcademicYears = ref<{ id: string; name: string }[]>([])
+const reportClasses = ref<{ id: string; name: string }[]>([])
 
 const welcomeName = computed(() => currentUser.value?.name || 'Education Team')
 const welcomeRole = computed(() => {
@@ -205,6 +211,29 @@ const fetchData = async () => {
     fetchJson('/api/admin/reports/trends'),
   ])
 
+  // Fetch class attendance report data
+  try {
+    const reportData = await fetchJson('/api/education/attendance/report?period=today')
+    classAttendanceStudents.value = reportData
+  } catch (e) {
+    console.error('Failed to fetch class attendance report:', e)
+    classAttendanceStudents.value = []
+  }
+
+  // Fetch academic years and classes for Class Attendance Report
+  try {
+    const [yearsData, classesData] = await Promise.all([
+      fetchJson('/api/education/reports/academic-years'),
+      fetchJson('/api/education/reports/classes'),
+    ])
+    reportAcademicYears.value = yearsData || []
+    reportClasses.value = classesData || []
+  } catch (e) {
+    console.error('Failed to fetch filter options:', e)
+    reportAcademicYears.value = []
+    reportClasses.value = []
+  }
+
   const [stats, today, all, risk, reports, trends] = results
 
   dashboardStats.value =
@@ -315,6 +344,40 @@ const handleExportReports = async () => {
   } finally {
     isExportingReports.value = false
   }
+}
+
+// Fetch class attendance report with filters
+const fetchClassAttendanceReport = async (period: string = 'today', academicYearId?: string, classId?: string) => {
+  try {
+    const params = new URLSearchParams({ period })
+    if (academicYearId && academicYearId !== 'all') params.append('academic_year_id', academicYearId)
+    if (classId && classId !== 'all') params.append('class_id', classId)
+    const reportData = await fetchJson(`/api/education/attendance/report?${params.toString()}`)
+    classAttendanceStudents.value = reportData || []
+  } catch (e: any) {
+    console.error('Failed to fetch class attendance report:', e)
+    errorMessage.value = 'Failed to load class attendance report data.'
+    classAttendanceStudents.value = []
+  }
+}
+
+const handlePeriodChange = (period: string) => {
+  // Convert 'Today' -> 'today', 'Weekly' -> 'weekly', 'Monthly' -> 'monthly'
+  const periodMap: Record<string, string> = {
+    'Today': 'today',
+    'Weekly': 'weekly',
+    'Monthly': 'monthly',
+  }
+  const apiPeriod = periodMap[period] || 'today'
+  fetchClassAttendanceReport(apiPeriod)
+}
+
+const handleAcademicYearChange = (academicYear: string) => {
+  fetchClassAttendanceReport('today', academicYear)
+}
+
+const handleClassIdChange = (classId: string) => {
+  fetchClassAttendanceReport('today', undefined, classId)
 }
 
 const persistActiveNav = (nav: string) => {
@@ -534,11 +597,17 @@ watch(
             :showDate="true"
           />
 
-          <ReportsTable
+          <ClassAttendanceReport
             v-else-if="activeNav === 'Reports'"
-            :reports="filteredClassReports"
+            :students="classAttendanceStudents"
+            :isLoading="isLoading"
             :isExporting="isExportingReports"
+            :academicYears="reportAcademicYears"
+            :classes="reportClasses"
             @export="handleExportReports"
+            @update:period="handlePeriodChange"
+            @update:academicYear="handleAcademicYearChange"
+            @update:classId="handleClassIdChange"
           />
 
           <div

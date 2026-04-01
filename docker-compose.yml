@@ -66,11 +66,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      # Use the specific config file we are about to create
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      # ONLY mount the public folder for PHP processing
       - ./backend/public:/var/www/html/public:ro 
-      - ./certbot/conf:/etc/letsencrypt:ro 
+      - /etc/letsencrypt:/etc/letsencrypt:ro 
     depends_on:
       - backend
       - frontend

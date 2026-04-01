@@ -26,6 +26,10 @@ class StudentClass extends Model
     // Accessor for class_name alias (frontend compatibility)
     public function getClassNameAttribute(): string
     {
+        // Prefer class_name column if it exists, otherwise fall back to name
+        if (isset($this->attributes['class_name']) && $this->attributes['class_name']) {
+            return $this->attributes['class_name'];
+        }
         return $this->attributes['name'] ?? '';
     }
 

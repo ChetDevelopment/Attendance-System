@@ -124,6 +124,11 @@ class AttendanceRecordController extends Controller
      */
     public function manualCorrection(Request $request)
     {
+        $hasStudentClassColumn = Schema::hasColumn('students', 'class');
+        $classNameExpressionForCorrection = $hasStudentClassColumn
+            ? "COALESCE(c.name, c.class_name, s.class)"
+            : "COALESCE(c.name, c.class_name, 'Unknown')";
+
         $validated = $request->validate([
             'student_id' => 'required|exists:students,id',
             'session_id' => 'required|exists:sessions,id',
@@ -177,7 +182,7 @@ class AttendanceRecordController extends Controller
                 's.id as student_ref_id',
                 's.fullname as student_name',
                 's.username as student_code',
-                DB::raw("{$classNameExpression} as class_name"),
+                DB::raw("{$classNameExpressionForCorrection} as class_name"),
                 'ses.name as session_name',
                 'u.name as submitted_by_name',
             ])

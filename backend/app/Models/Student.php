@@ -48,6 +48,10 @@ class Student extends Model
         'last_biometric_scan' => 'datetime',
     ];
 
+    protected $hidden = [
+        'class',
+    ];
+
     protected static function boot()
     {
         parent::boot();

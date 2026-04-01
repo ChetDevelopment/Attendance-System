@@ -231,7 +231,7 @@ onMounted(() => loadData(1))
             <th class="px-6 py-4">Session</th>
             <th class="px-6 py-4">Status</th>
             <th class="px-6 py-4">Submitted By</th>
-            <th class="px-6 py-4">Location</th>
+            <th class="px-6 py-4">Class</th>
             <th class="px-6 py-4 text-right">Actions</th>
           </tr>
         </thead>
@@ -263,7 +263,7 @@ onMounted(() => loadData(1))
               <span v-if="record.is_locked" class="ml-2 text-[10px] font-bold text-rose-600 uppercase">Locked</span>
             </td>
             <td class="px-6 py-4 text-slate-600">{{ record.submitted_by.name }}</td>
-            <td class="px-6 py-4 text-slate-600">{{ record.location || '-' }}</td>
+            <td class="px-6 py-4 text-slate-600">{{ record.student.class_name || '-' }}</td>
             <td class="px-6 py-4 text-right">
               <div class="flex justify-end gap-2">
                 <button class="p-2 rounded-lg hover:bg-sky-50 text-sky-600" @click="openEditModal(record)">

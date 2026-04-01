@@ -52,25 +52,26 @@ class StudentController extends Controller
         ) {
             $query = Student::query()
                 ->select([
-                    'id',
-                    'fullname',
-                    'username',
-                    'class',
-                    'class_id',
-                    'academic_year_id',
-                    'parent_number',
-                    'contact',
-                    'gender',
-                    'date_of_birth',
-                    'profile',
-                    'generation',
-                    'email',
-                    'card_id',
-                    'fingerprint_enrolled',
-                    'last_biometric_scan',
+                    'students.id',
+                    'students.fullname',
+                    'students.username',
+                    'students.class',
+                    'students.class_id',
+                    'students.academic_year_id',
+                    'students.parent_number',
+                    'students.contact',
+                    'students.gender',
+                    'students.date_of_birth',
+                    'students.profile',
+                    'students.generation',
+                    'students.email',
+                    'students.card_id',
+                    'students.fingerprint_enrolled',
+                    'students.last_biometric_scan',
                 ])
-                ->with('class:id,class_name')
-                ->orderByDesc('id');
+                ->leftJoin('classes', 'students.class_id', '=', 'classes.id')
+                ->addSelect(DB::raw('COALESCE(classes.class_name, classes.name, students.class) as class_name'))
+                ->orderByDesc('students.id');
 
             if ($search !== '') {
                 $query->where(function ($builder) use ($search): void {
@@ -107,6 +108,11 @@ class StudentController extends Controller
             if (isset($paginated['data'])) {
                 $paginated['data'] = collect($paginated['data'])->map(function ($student) {
                     $student['avatar'] = $this->buildProfileUrl($student['profile'] ?? null);
+                    // Build class object for frontend compatibility
+                    $student['class'] = [
+                        'id' => $student['class_id'],
+                        'class_name' => $student['class_name'] ?? null,
+                    ];
                     return $student;
                 })->all();
             }

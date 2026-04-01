@@ -12,9 +12,10 @@ class ClassController extends Controller
     public function index()
     {
         return StudentClass::query()
+            ->select('classes.id', 'classes.name', 'classes.class_name', 'classes.code', 'classes.description', 'classes.academic_year_id', 'classes.teacher_id', 'classes.is_active', 'classes.created_at', 'classes.updated_at')
             ->with('academicYear:id,name')
             ->withCount('students')
-            ->orderBy('name')
+            ->orderBy('class_name')
             ->get();
     }
 

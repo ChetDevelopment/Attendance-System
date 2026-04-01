@@ -26,6 +26,7 @@ type Student = {
   parent: string;
   contact: string;
   gender: 'Male' | 'Female';
+  dateOfBirth?: string;
   classId: number | null;
   academicYearId: number | null;
   email: string;
@@ -47,6 +48,7 @@ type StudentForm = {
   classId: string;
   generation: string;
   photo: string;
+  dateOfBirth: string;
   // Biometric fields
   cardId: string;
   fingerprintEnrolled: boolean;
@@ -62,6 +64,7 @@ type BackendStudent = {
   parent_number?: string;
   contact?: string;
   gender?: 'Male' | 'Female';
+  date_of_birth?: string | null;
   profile?: string | null;
   generation?: string;
   email?: string;
@@ -123,6 +126,7 @@ const newStudent = ref<StudentForm>({
   classId: '',
   generation: 'PNC2026',
   photo: '',
+  dateOfBirth: '',
   cardId: '',
   fingerprintEnrolled: false,
 });
@@ -210,6 +214,7 @@ const toUiStudent = (student: BackendStudent): Student => {
     parent: String(student?.parent_number || ''),
     contact: String(student?.contact || ''),
     gender: student?.gender === 'Female' ? 'Female' : 'Male',
+    dateOfBirth: student?.date_of_birth || '',
     classId:
       typeof student?.class === 'object' && student?.class?.id
         ? Number(student.class.id)
@@ -435,6 +440,7 @@ const resetNewStudent = () => {
     classId: defaultClass ? String(defaultClass.id) : '',
     generation: generationOptions.value[0] || `PNC${new Date().getFullYear()}`,
     photo: '',
+    dateOfBirth: '',
     cardId: '',
     fingerprintEnrolled: false,
   };
@@ -495,6 +501,7 @@ const handleAddStudent = async () => {
       academic_year_id: classSelection.academicYearId,
       profile: normalizeProfileValue(newStudent.value.photo),
       gender: newStudent.value.gender,
+      date_of_birth: newStudent.value.dateOfBirth || null,
       parent_number: newStudent.value.parent,
       contact: newStudent.value.contact,
       card_id: newStudent.value.cardId || null,
@@ -610,6 +617,7 @@ const handleEditStudent = async () => {
       academic_year_id: selected?.academicYearId || editingStudent.value.academicYearId || null,
       profile: normalizeProfileValue(editingStudent.value.photo),
       gender: editingStudent.value.gender || 'Male',
+      date_of_birth: editingStudent.value.dateOfBirth || null,
       parent_number: editingStudent.value.parent,
       contact: editingStudent.value.contact || editingStudent.value.parent,
       card_id: editingStudent.value.cardId || null,
@@ -1056,6 +1064,10 @@ onMounted(async () => {
                   <option value="Female">Female</option>
                 </select>
               </div>
+              <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-500 uppercase">Date of Birth</label>
+                <input v-model="newStudent.dateOfBirth" type="date" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+              </div>
             </div>
             <div class="space-y-1">
               <label class="text-[10px] font-bold text-slate-500 uppercase">Parent Name</label>
@@ -1252,6 +1264,13 @@ onMounted(async () => {
               <option v-for="item in classOptions" :key="item.id" :value="item.id">{{ item.name }}</option>
             </select>
           </div>
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-slate-500 uppercase">Date of Birth</label>
+            <input v-model="editingStudent.dateOfBirth" type="date" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
           <div class="space-y-1">
             <label class="text-[10px] font-bold text-slate-500 uppercase">Parent Contact</label>
             <input v-model="editingStudent.parent" type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20" />

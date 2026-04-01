@@ -27,6 +27,7 @@ class UpdateStudentRequest extends FormRequest
             'academic_year_id' => ['nullable', 'exists:academic_years,id'],
             'profile' => ['nullable', 'string', 'max:255'],
             'gender' => ['sometimes', 'in:Male,Female'],
+            'date_of_birth' => ['sometimes', 'nullable', 'date'],
             'parent_number' => ['sometimes', 'string', 'max:30'],
             'contact' => ['sometimes', 'string', 'max:30'],
             // Biometric fields

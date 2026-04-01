@@ -61,6 +61,7 @@ class StudentController extends Controller
                     'parent_number',
                     'contact',
                     'gender',
+                    'date_of_birth',
                     'profile',
                     'generation',
                     'email',

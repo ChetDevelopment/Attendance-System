@@ -33,6 +33,7 @@ class StoreStudentRequest extends FormRequest
             'academic_year_id' => ['nullable', 'exists:academic_years,id'],
             'profile' => ['nullable', 'string', 'max:255'],
             'gender' => ['required', 'in:Male,Female'],
+            'date_of_birth' => ['nullable', 'date'],
             'parent_number' => ['required', 'string', 'max:30'],
             'contact' => ['required', 'string', 'max:30'],
             'password' => ['nullable', 'string', 'min:6'],

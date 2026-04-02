@@ -1,68 +1,57 @@
-# Vue 3 + Vite
+# Frontend
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Vue 3 + Vite frontend for the Attendance System.
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+## Responsibilities
 
+- Login flow and role-based routing
+- Admin dashboard and operations workspace
+- Teacher dashboard and attendance workflow
+- Education dashboard and follow-up views
+- Student self-service dashboard, attendance history, settings, and biometric scan flow
 
-Student dashboard frontend export
+## Quick Start
 
-This folder now contains the full student frontend section from the project.
+```powershell
+npm install
+npm run dev
+```
 
-Copied student files:
-- `src/components/Student/AttendancePage.vue`
-- `src/components/Student/AttendanceStudent.vue`
-- `src/components/Student/BiometricScan.vue`
-- `src/components/Student/DashboardPage.vue`
-- `src/components/Student/DashboardStudent.vue`
-- `src/components/Student/HistoryStudent.vue`
-- `src/components/Student/SettingsStudent.vue`
-- `src/components/Student/StudentLayout.vue`
-- `src/pages/StudentDashboardPage.vue`
+Build for production:
 
-Copied support files:
-- `src/components/types.ts`
-- `src/services/api.js`
-- `src/services/auth.js`
-- `src/services/biometricService.js`
-- `src/services/profileService.js`
-- `src/services/storage.js`
+```powershell
+npm run build
+```
 
-What you likely need in your real project:
-- Vue 3
-- Vue Router
-- Axios
-- `lucide-vue-next`
-- `jsqr`
-- Tailwind CSS classes, or replace the utility classes with your own CSS
+Type-check:
 
-Student routes used in the original project:
-- `/student/dashboard`
-- `/student/attendance`
-- `/student/biometric-scan`
-- `/student/history`
-- `/student/settings`
+```powershell
+npm run lint
+```
 
-Expected API endpoints from these student screens:
-- `GET /student/dashboard/stats`
-- `GET /student/attendance/history`
-- `POST /student/attendance/check-in`
-- `POST /student/attendance/request`
-- `POST /student/attendance/card-scan`
-- `POST /student/attendance/fingerprint-scan`
-- `POST /student/attendance/validate-biometric`
-- `GET /student/attendance/biometric-history`
-- `GET /student/attendance/biometric-status`
-- `POST /student/attendance/student-info`
-- `GET /user/profile`
-- `POST /user/profile`
-- `POST /user/settings`
-- `POST /user/profile/avatar`
+## Environment
 
-Environment variable used by `src/services/api.js`:
+The frontend reads API and build metadata from Vite env variables.
+
+Example `frontend/.env`:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000/api
+VITE_APP_VERSION=local
+```
+
+Optional variables:
+
 - `VITE_API_BASE_URL`
+- `VITE_APP_VERSION`
+- `VITE_GOOGLE_API_KEY`
 
-Notes:
-- `StudentLayout.vue` depends on Vue Router because it uses `router-link` and `router-view`.
-- `auth.js` and `storage.js` use `localStorage`.
-- `DashboardPage.vue` contains merge conflict markers in the source project, so it was copied as-is.
+## Important Paths
+
+- [src/router/index.js](/c:/Users/USER/Desktop/Attendance-System/frontend/src/router/index.js)
+- [src/layouts/AppLayout.vue](/c:/Users/USER/Desktop/Attendance-System/frontend/src/layouts/AppLayout.vue)
+- [src/pages](/c:/Users/USER/Desktop/Attendance-System/frontend/src/pages)
+- [src/components](/c:/Users/USER/Desktop/Attendance-System/frontend/src/components)
+- [src/services](/c:/Users/USER/Desktop/Attendance-System/frontend/src/services)
+
+See the full project guide at [README.md](/c:/Users/USER/Desktop/Attendance-System/README.md).

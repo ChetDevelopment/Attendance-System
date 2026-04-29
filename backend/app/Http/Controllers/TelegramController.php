@@ -44,24 +44,26 @@ class TelegramController extends Controller
             ], 400);
         }
 
-        // Send test message
-        $result = $this->telegramService->sendTestMessage();
+        $chatValidationError = $this->telegramService->validateChatIdAgainstBot($botInfo['bot_info'] ?? []);
 
-        // Provide specific error message for bot-to-bot chat
-        if (!$result['success'] && ($result['error'] ?? '') === 'Forbidden: bots can\'t send messages to bots') {
+        if ($chatValidationError !== null) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid Chat ID - Cannot send to another bot',
-                'error' => 'The TELEGRAM_CHAT_ID is set to a bot ID. You must use a personal user chat ID instead. To get your user ID: 1) Start a chat with @userinfobot on Telegram, or 2) Add your bot to a group and use @userinfobot to get the group chat ID.',
+                'message' => $chatValidationError['message'],
+                'error' => $chatValidationError['error'],
                 'configured' => true,
+                'bot_info' => $botInfo['bot_info'] ?? null,
             ], 400);
         }
+
+        // Send test message
+        $result = $this->telegramService->sendTestMessage();
 
         return response()->json([
             'success' => $result['success'],
             'message' => $result['success'] 
                 ? 'Test message sent successfully!' 
-                : 'Failed to send test message',
+                : ($result['error'] ?? 'Failed to send test message'),
             'error' => $result['error'] ?? null,
             'bot_info' => $botInfo['bot_info'] ?? null,
             'configured' => true,

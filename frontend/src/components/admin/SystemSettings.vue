@@ -253,21 +253,33 @@ const restoreBackup = async (name: string) => {
   }
 };
 
-  const testTelegramConnection = async () => {
-    if (testingTelegram.value) return;
-    testingTelegram.value = true;
-    errorMessage.value = '';
-    successMessage.value = '';
-    try {
-      const response = await api.post('/telegram/test');
+const buildTelegramFeedback = (payload: any) => {
+  const parts = [payload?.message, payload?.error, payload?.hint]
+    .filter((value, index, array) => value && array.indexOf(value) === index)
+    .map((value) => String(value).trim())
+    .filter(Boolean);
 
-      if (response?.data?.success || response?.status === 200) {
-        successMessage.value = 'Telegram test request sent successfully.';
-      } else {
-      throw new Error(response?.data?.message || 'Telegram test failed.');
+  return parts.join(' ');
+};
+
+const testTelegramConnection = async () => {
+  if (testingTelegram.value) return;
+  testingTelegram.value = true;
+  errorMessage.value = '';
+  successMessage.value = '';
+  try {
+    const response = await api.post('/telegram/test');
+
+    if (response?.data?.success || response?.status === 200) {
+      successMessage.value = buildTelegramFeedback(response?.data) || 'Telegram test request sent successfully.';
+    } else {
+      throw new Error(buildTelegramFeedback(response?.data) || 'Telegram test failed.');
     }
   } catch (error: any) {
-    errorMessage.value = error?.response?.data?.message || error?.message || 'Failed to test Telegram connection.';
+    errorMessage.value =
+      buildTelegramFeedback(error?.response?.data) ||
+      error?.message ||
+      'Failed to test Telegram connection.';
   } finally {
     testingTelegram.value = false;
   }

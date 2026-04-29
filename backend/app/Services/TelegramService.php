@@ -9,13 +9,13 @@ class TelegramService
 {
     private ?string $botToken;
     private ?string $chatId;
-    private bool $isConfigured;
+    private bool $hasCredentials;
 
     public function __construct()
     {
-        $this->botToken = config('services.telegram.bot_token', env('TELEGRAM_BOT_TOKEN'));
-        $this->chatId = config('services.telegram.chat_id', env('TELEGRAM_CHAT_ID'));
-        $this->isConfigured = !empty($this->botToken) && !empty($this->chatId);
+        $this->botToken = $this->normalizeConfigValue(config('services.telegram.bot_token'));
+        $this->chatId = $this->normalizeConfigValue(config('services.telegram.chat_id'));
+        $this->hasCredentials = $this->botToken !== null && $this->chatId !== null;
     }
 
     /**
@@ -23,9 +23,7 @@ class TelegramService
      */
     public function isConfigured(): bool
     {
-        // Also check if Telegram is enabled in settings
-        $enabled = config('services.telegram.enabled', true);
-        return $this->isConfigured && $enabled;
+        return $this->hasCredentials && $this->isEnabled();
     }
 
     /**
@@ -36,7 +34,7 @@ class TelegramService
         Log::debug('TelegramService: Attempting to send message', [
             'botToken' => substr($this->botToken ?? '', 0, 5) . '...',
             'chatId' => $this->chatId,
-            'isConfigured' => $this->isConfigured
+            'isConfigured' => $this->isConfigured(),
         ]);
 
         if (!$this->isConfigured()) {
@@ -377,5 +375,62 @@ MESSAGE;
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    public function validateChatIdAgainstBot(array $botInfo): ?array
+    {
+        if (!$this->chatId) {
+            return [
+                'success' => false,
+                'message' => 'Telegram chat ID is missing',
+                'error' => 'Please set TELEGRAM_CHAT_ID in the backend .env file.',
+            ];
+        }
+
+        $chatId = trim($this->chatId);
+
+        if (str_starts_with($chatId, '@')) {
+            return [
+                'success' => false,
+                'message' => 'Telegram chat ID must be numeric',
+                'error' => 'Use a numeric personal, group, or channel chat ID instead of a username.',
+            ];
+        }
+
+        if (!preg_match('/^-?\d+$/', $chatId)) {
+            return [
+                'success' => false,
+                'message' => 'Telegram chat ID format is invalid',
+                'error' => 'TELEGRAM_CHAT_ID must contain only digits, for example 123456789 or -1001234567890.',
+            ];
+        }
+
+        $botId = isset($botInfo['id']) ? (string) $botInfo['id'] : null;
+
+        if ($botId !== null && ltrim($chatId, '-') === $botId) {
+            return [
+                'success' => false,
+                'message' => 'Invalid Telegram chat ID',
+                'error' => 'TELEGRAM_CHAT_ID is using the bot ID. Replace it with your own user ID or a valid group/channel chat ID.',
+            ];
+        }
+
+        return null;
+    }
+
+    private function isEnabled(): bool
+    {
+        return filter_var(config('services.telegram.enabled', true), FILTER_VALIDATE_BOOL);
+    }
+
+    private function normalizeConfigValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        return $normalized === '' ? null : $normalized;
     }
 }

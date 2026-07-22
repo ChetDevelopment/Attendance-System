@@ -315,13 +315,13 @@ class EducationDashboardController extends Controller
 
         $rows = $query
             ->selectRaw("
-                COALESCE({$classColumn}, s.class, 'Unknown Class') as class,
+                COALESCE({$classColumn}, 'Unknown Class') as class,
                 SUM(CASE WHEN LOWER(ar.status) = 'present' THEN 1 ELSE 0 END) as present_count,
                 SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count,
                 SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count
             ")
-            ->groupByRaw("COALESCE({$classColumn}, s.class, 'Unknown Class')")
-            ->orderByRaw("COALESCE({$classColumn}, s.class, 'Unknown Class')")
+            ->groupByRaw("COALESCE({$classColumn}, 'Unknown Class')")
+            ->orderByRaw("COALESCE({$classColumn}, 'Unknown Class')")
             ->get()
             ->map(function ($row) {
                 $total = (int) $row->present_count + (int) $row->absent_count + (int) $row->late_count;
@@ -395,7 +395,8 @@ class EducationDashboardController extends Controller
     public function exportClassReports()
     {
         $studentClassColumn = Schema::hasColumn('students', 'class') ? 's.class' : 'NULL';
-        $classLabel = "COALESCE(c.class_name, {$studentClassColumn}, 'Unknown Class')";
+        $classNameColumn = Schema::hasColumn('classes', 'class_name') ? 'c.class_name' : 'c.name';
+        $classLabel = "COALESCE({$classNameColumn}, {$studentClassColumn}, 'Unknown Class')";
 
         // Get all attendance data grouped by class
         $classSummary = DB::table('attendance_records as ar')

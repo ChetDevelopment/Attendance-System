@@ -311,15 +311,17 @@ class EducationDashboardController extends Controller
             $query->where('s.academic_year_id', $academicYearId);
         }
         
+        $classColumn = Schema::hasColumn('classes', 'class_name') ? 'c.class_name' : 'c.name';
+
         $rows = $query
             ->selectRaw("
-                COALESCE(c.class_name, s.class, 'Unknown Class') as class,
+                COALESCE({$classColumn}, s.class, 'Unknown Class') as class,
                 SUM(CASE WHEN LOWER(ar.status) = 'present' THEN 1 ELSE 0 END) as present_count,
                 SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count,
                 SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count
             ")
-            ->groupByRaw("COALESCE(c.class_name, s.class, 'Unknown Class')")
-            ->orderByRaw("COALESCE(c.class_name, s.class, 'Unknown Class')")
+            ->groupByRaw("COALESCE({$classColumn}, s.class, 'Unknown Class')")
+            ->orderByRaw("COALESCE({$classColumn}, s.class, 'Unknown Class')")
             ->get()
             ->map(function ($row) {
                 $total = (int) $row->present_count + (int) $row->absent_count + (int) $row->late_count;
@@ -349,10 +351,10 @@ class EducationDashboardController extends Controller
     public function reportClasses()
     {
         $classes = DB::table('classes')
-            ->select('id', 'name', 'class_name')
+            ->select('id', 'name')
             ->orderBy('name')
             ->get()
-            ->map(fn($c) => ['id' => (string) ($c->id ?? $c->name), 'name' => $c->class_name ?? $c->name]);
+            ->map(fn($c) => ['id' => (string) $c->id, 'name' => $c->name]);
         
         return response()->json($classes);
     }

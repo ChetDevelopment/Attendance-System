@@ -29,10 +29,11 @@ return new class extends Migration
         });
 
         if (Schema::hasColumn('attendance_records', 'date') && Schema::hasColumn('attendance_records', 'attendance_date')) {
+            $column = DB::getQueryGrammar()->wrap('date');
             DB::table('attendance_records')
                 ->whereNull('attendance_date')
                 ->update([
-                    'attendance_date' => DB::raw('`date`'),
+                    'attendance_date' => DB::raw($column),
                 ]);
         }
 

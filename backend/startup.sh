@@ -2,10 +2,9 @@
 set -e
 cd /var/www/html || exit 1
 
-# Write runtime .env (Render env vars aren't injected into Docker containers)
 cat > .env << EOF
 APP_ENV=${APP_ENV:-production}
-APP_DEBUG=${APP_DEBUG:-true}
+APP_DEBUG=true
 APP_KEY=${APP_KEY:-}
 APP_URL=${APP_URL:-http://localhost}
 FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
@@ -21,8 +20,9 @@ QUEUE_CONNECTION=${QUEUE_CONNECTION:-sync}
 LOG_CHANNEL=stack
 EOF
 
-php artisan key:generate --force || true
-php artisan migrate --force || true
-php artisan db:seed --force || true
+php artisan key:generate --force 2>&1
+
+# Run fresh migrations with seed
+php artisan migrate:fresh --force --seed 2>&1
 
 exec php artisan serve --host=0.0.0.0 --port="${PORT:-8080}"

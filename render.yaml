@@ -1,0 +1,82 @@
+services:
+  - type: web
+    name: attendance-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile.render
+    branch: main
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        generateValue: true
+      - key: DB_CONNECTION
+        value: mysql
+      - key: DB_HOST
+        fromDatabase:
+          name: attendance-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: attendance-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: attendance-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: attendance-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: attendance-db
+          property: password
+      - key: REDIS_HOST
+        value: localhost
+      - key: REDIS_PASSWORD
+        value: "null"
+      - key: REDIS_PORT
+        value: 6379
+      - key: CACHE_DRIVER
+        value: file
+      - key: SESSION_DRIVER
+        value: file
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: APP_URL
+        fromService:
+          name: attendance-backend
+          type: web
+          property: host
+      - key: FRONTEND_URL
+        fromService:
+          name: attendance-frontend
+          type: web
+          property: host
+    disk:
+      name: backend-storage
+      mountPath: /var/www/html/storage
+      sizeGB: 1
+
+  - type: web
+    name: attendance-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          name: attendance-backend
+          type: web
+          property: host
+
+datastores:
+  - name: attendance-db
+    type: mysql
+    plan: free
+    version: "8"
+    ipAllowList: []

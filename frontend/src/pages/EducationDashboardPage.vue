@@ -199,68 +199,62 @@ const fetchUserProfile = async () => {
   }
 }
 
-const fetchData = async () => {
-  isLoading.value = true
-  errorMessage.value = ''
-  const results = await Promise.allSettled([
-    fetchJson('/api/education/dashboard/stats'),
-    fetchJson('/api/education/students/absent-today'),
-    fetchJson('/api/education/students/all-absent'),
-    fetchJson('/api/education/students/risk'),
-    fetchJson('/api/education/reports/class-summary'),
-    fetchJson('/api/admin/reports/trends'),
-  ])
-
-  // Fetch class attendance report data
-  try {
-    const reportData = await fetchJson('/api/education/attendance/report?period=today')
-    classAttendanceStudents.value = reportData
-  } catch (e) {
-    console.error('Failed to fetch class attendance report:', e)
-    classAttendanceStudents.value = []
-  }
-
-  // Fetch academic years and classes for Class Attendance Report
-  try {
-    const [yearsData, classesData] = await Promise.all([
+  const fetchData = async () => {
+    isLoading.value = true
+    errorMessage.value = ''
+    const results = await Promise.allSettled([
+      fetchJson('/api/education/dashboard/stats'),
+      fetchJson('/api/education/students/absent-today'),
+      fetchJson('/api/education/students/all-absent'),
+      fetchJson('/api/education/students/risk'),
+      fetchJson('/api/education/reports/class-summary'),
+      fetchJson('/api/admin/reports/trends'),
+      fetchJson('/api/education/attendance/report?period=today'),
       fetchJson('/api/education/reports/academic-years'),
       fetchJson('/api/education/reports/classes'),
     ])
-    reportAcademicYears.value = yearsData || []
-    reportClasses.value = classesData || []
-  } catch (e) {
-    console.error('Failed to fetch filter options:', e)
-    reportAcademicYears.value = []
-    reportClasses.value = []
+
+    const [
+      stats,
+      today,
+      all,
+      risk,
+      reports,
+      trends,
+      attendanceReport,
+      academicYears,
+      classes,
+    ] = results
+
+    dashboardStats.value =
+      stats.status === 'fulfilled'
+        ? stats.value
+        : {
+            absentToday: 0,
+            lateToday: 0,
+            highRisk: 0,
+            pendingFollowUp: 0,
+          }
+    absentToday.value = today.status === 'fulfilled' ? today.value : []
+    allAbsent.value = all.status === 'fulfilled' ? all.value : []
+    riskStudents.value = risk.status === 'fulfilled' ? risk.value : []
+    classReports.value = reports.status === 'fulfilled' ? reports.value : []
+    trendData.value = trends.status === 'fulfilled' ? trends.value : []
+    classAttendanceStudents.value = attendanceReport.status === 'fulfilled' ? (attendanceReport.value || []) : []
+    reportAcademicYears.value = academicYears.status === 'fulfilled' ? (academicYears.value || []) : []
+    reportClasses.value = classes.status === 'fulfilled' ? (classes.value || []) : []
+
+    const allResults = [stats, today, all, risk, reports, trends, attendanceReport]
+    const failed = allResults.some((r) => r.status === 'rejected')
+    if (failed) {
+      const accessDenied = allResults.find((r) => r.status === 'rejected' && isAccessError((r as PromiseRejectedResult).reason))
+      errorMessage.value = accessDenied
+        ? 'You do not have permission to view one or more sections of this dashboard.'
+        : 'Some data could not be loaded from server. Showing available data only.'
+    }
+
+    isLoading.value = false
   }
-
-  const [stats, today, all, risk, reports, trends] = results
-
-  dashboardStats.value =
-    stats.status === 'fulfilled'
-      ? stats.value
-      : {
-          absentToday: 0,
-          lateToday: 0,
-          highRisk: 0,
-          pendingFollowUp: 0,
-        }
-  absentToday.value = today.status === 'fulfilled' ? today.value : []
-  allAbsent.value = all.status === 'fulfilled' ? all.value : []
-  riskStudents.value = risk.status === 'fulfilled' ? risk.value : []
-  classReports.value = reports.status === 'fulfilled' ? reports.value : []
-  trendData.value = trends.status === 'fulfilled' ? trends.value : []
-
-  const failed = results.some((r) => r.status === 'rejected')
-  if (failed) {
-    const accessDenied = results.find((r) => r.status === 'rejected' && isAccessError((r as PromiseRejectedResult).reason))
-    errorMessage.value = accessDenied
-      ? 'You do not have permission to view one or more sections of this dashboard.'
-      : 'Some data could not be loaded from server. Showing available data only.'
-  }
-
-  isLoading.value = false
-}
 
 const handleOpenDetail = async (attendanceId: number) => {
   try {
@@ -348,6 +342,7 @@ const handleExportReports = async () => {
 
 // Fetch class attendance report with filters
 const fetchClassAttendanceReport = async (period: string = 'today', academicYearId?: string, classId?: string) => {
+  errorMessage.value = ''
   try {
     const params = new URLSearchParams({ period })
     if (academicYearId && academicYearId !== 'all') params.append('academic_year_id', academicYearId)
@@ -356,7 +351,7 @@ const fetchClassAttendanceReport = async (period: string = 'today', academicYear
     classAttendanceStudents.value = reportData || []
   } catch (e: any) {
     console.error('Failed to fetch class attendance report:', e)
-    errorMessage.value = 'Failed to load class attendance report data.'
+    errorMessage.value = e?.response?.data?.message || 'Failed to load class attendance report data.'
     classAttendanceStudents.value = []
   }
 }

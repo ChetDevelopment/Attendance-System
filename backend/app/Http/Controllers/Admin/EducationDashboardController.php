@@ -43,13 +43,17 @@ class EducationDashboardController extends Controller
         $period = $request->input('period', 'today');
         $academicYearId = $request->input('academic_year_id');
         $classId = $request->input('class_id');
-        
-        $startDate = match($period) {
+
+        $startDate = match ($period) {
             'weekly' => now()->subDays(7)->toDateString(),
             'monthly' => now()->subDays(30)->toDateString(),
             default => now()->toDateString(),
         };
-        
+
+        $codeColumn = Schema::hasColumn('students', 'username') ? 's.username' : 's.student_code';
+        $profileColumn = Schema::hasColumn('students', 'profile') ? 's.profile' : 'NULL';
+        $classNameColumn = Schema::hasColumn('classes', 'class_name') ? 'c.class_name' : 'c.name';
+
         $query = DB::table('attendance_records as ar')
             ->join('students as s', 's.id', '=', 'ar.student_id')
             ->leftJoin('classes as c', 'c.id', '=', 's.class_id')
@@ -68,39 +72,54 @@ class EducationDashboardController extends Controller
                         });
                 }
             });
-        
+
         if ($classId) {
             $query->where('s.class_id', $classId);
         }
-        
+
         if ($academicYearId) {
             $query->where('s.academic_year_id', $academicYearId);
         }
-        
+
+        $selectRaw = "
+            s.id as student_id,
+            COALESCE(s.fullname, CONCAT(s.first_name, ' ', s.last_name)) as name,
+            {$codeColumn} as code,
+            {$profileColumn} as photo,
+            {$classNameColumn} as class_name,
+            SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count,
+            SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count
+        ";
+
+        $groupBy = ['s.id', 's.fullname', 's.first_name', 's.last_name'];
+        if (Schema::hasColumn('students', 'username')) {
+            $groupBy[] = 's.username';
+        }
+        if (Schema::hasColumn('students', 'profile')) {
+            $groupBy[] = 's.profile';
+        }
+        if (Schema::hasColumn('classes', 'class_name')) {
+            $groupBy[] = 'c.class_name';
+        } else {
+            $groupBy[] = 'c.name';
+        }
+
         $students = $query
-            ->selectRaw("
-                s.id as student_id,
-                COALESCE(s.fullname, CONCAT(s.first_name, ' ', s.last_name)) as name,
-                s.username as code,
-                s.profile as photo,
-                c.class_name as class_name,
-                SUM(CASE WHEN LOWER(ar.status) = 'late' THEN 1 ELSE 0 END) as late_count,
-                SUM(CASE WHEN LOWER(ar.status) = 'absent' THEN 1 ELSE 0 END) as absent_count
-            ")
-            ->groupBy('s.id', 's.fullname', 's.first_name', 's.last_name', 's.username', 's.profile', 'c.class_name')
+            ->selectRaw($selectRaw)
+            ->groupBy(...$groupBy)
             ->orderBy('name')
             ->get()
             ->map(function ($student, $index) {
                 return [
                     'no' => $index + 1,
                     'name' => $student->name,
-                    'code' => $student->code,
-                    'photo' => $this->buildStudentPhotoUrl((object) ['profile' => $student->photo]),
-                    'late_count' => (int) $student->late_count,
-                    'absent_count' => (int) $student->absent_count,
+                    'code' => $student->code ?? '',
+                    'photo' => $this->buildStudentPhotoUrl((object) ['profile' => $student->photo ?? null]),
+                    'late_count' => (int) ($student->late_count ?? 0),
+                    'absent_count' => (int) ($student->absent_count ?? 0),
                 ];
             });
-        
+
         return response()->json($students);
     }
 

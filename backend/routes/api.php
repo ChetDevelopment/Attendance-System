@@ -27,6 +27,10 @@ use App\Http\Controllers\Teacher\TeacherAttendanceController;
 use App\Http\Controllers\TelegramController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/health', function () {
+    return response()->json(['status' => 'ok', 'timestamp' => now()->toIso8601String()]);
+});
+
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);

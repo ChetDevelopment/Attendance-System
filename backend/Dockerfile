@@ -27,8 +27,13 @@ RUN cp .env.example .env
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 RUN chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
+    && chmod -R 775 storage bootstrap/cache \
+    && touch database/database.sqlite \
+    && chmod -R 775 database
+
+COPY startup.sh /usr/local/bin/startup.sh
+RUN chmod +x /usr/local/bin/startup.sh
 
 EXPOSE 8080
 
-CMD php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
+CMD ["/usr/local/bin/startup.sh"]

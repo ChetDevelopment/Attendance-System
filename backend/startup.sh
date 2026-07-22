@@ -2,12 +2,20 @@
 set -e
 cd /var/www/html || exit 1
 
-# Override .env with Render runtime env vars (injected via dashboard)
-sed -i "s/^DB_CONNECTION=.*/DB_CONNECTION=${DB_CONNECTION:-sqlite}/" .env
-sed -i "s|^DB_DATABASE=.*|DB_DATABASE=${DB_DATABASE:-/var/www/html/database/database.sqlite}|" .env
-sed -i "s/^APP_KEY=.*/APP_KEY=${APP_KEY:-}/" .env
-sed -i "s/^APP_ENV=.*/APP_ENV=${APP_ENV:-production}/" .env
-sed -i "s/^APP_DEBUG=.*/APP_DEBUG=${APP_DEBUG:-false}/" .env
+# Append runtime env overrides to .env
+{
+  echo ""
+  echo "# --- Runtime overrides ---"
+  echo "APP_ENV=${APP_ENV:-production}"
+  echo "APP_DEBUG=${APP_DEBUG:-false}"
+  echo "APP_URL=${APP_URL:-http://localhost}"
+  echo "FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}"
+  echo "DB_CONNECTION=${DB_CONNECTION:-sqlite}"
+  echo "DB_DATABASE=${DB_DATABASE:-/var/www/html/database/database.sqlite}"
+  echo "CACHE_DRIVER=${CACHE_DRIVER:-file}"
+  echo "SESSION_DRIVER=${SESSION_DRIVER:-file}"
+  echo "QUEUE_CONNECTION=${QUEUE_CONNECTION:-sync}"
+} >> .env
 
 php artisan key:generate --force || true
 

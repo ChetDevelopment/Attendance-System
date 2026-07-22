@@ -5,7 +5,7 @@ cd /var/www/html || exit 1
 # Write runtime .env (Render env vars aren't injected into Docker containers)
 cat > .env << EOF
 APP_ENV=${APP_ENV:-production}
-APP_DEBUG=${APP_DEBUG:-false}
+APP_DEBUG=${APP_DEBUG:-true}
 APP_KEY=${APP_KEY:-}
 APP_URL=${APP_URL:-http://localhost}
 FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
